@@ -82,6 +82,14 @@ public record Forcing(Module upstream, Module downstream, String reason) {
             // through the contract or a service lookup: PluginLoader builds one URLClassLoader over the
             // whole resolved project classpath, so plugin A sees plugin B's classes and Maven has already
             // mediated B to one version. The price is that plugin-basics stops being freely breakable.
+            //
+            // THIS EDGE IS DELIBERATELY ONE PHASE AHEAD OF THE DEPENDENCY IT DESCRIBES (2026-09-09, the
+            // maintainer's call). botmaker-sdk does not declare botmaker-plugin-basics yet — phase 2 of
+            // ~/.claude/plans/settings-becomes-a-plugin.md is what adds it — so until then this refuses a
+            // release that is not strictly owed. That is the safe direction and it costs nothing: the
+            // refusal names the flag to add, --force overrides it, and neither module is released before
+            // phase 2 lands. The other direction is the one that has actually hurt here — the missing
+            // sdk->studio edge left studio v1.0.37 pinning an SDK its own changelog disowned.
             new Forcing(Module.PLUGIN_BASICS, Module.SDK,
                     "the SDK compiles against plugin #2 as an ordinary Maven dependency, and flatten bakes "
                             + "that pin into the SDK's published pom"),

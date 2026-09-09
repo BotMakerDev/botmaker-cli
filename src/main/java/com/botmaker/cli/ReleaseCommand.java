@@ -132,9 +132,24 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "Re-poll a releases/*.md instead of planning (default: the newest).")
     private String status;
 
+    /**
+     * The umbrella checkout, always absolute.
+     *
+     * <p>The setter is what makes the second half of that sentence true, and it is load-bearing rather than
+     * tidy: half of a release runs a process in a MODULE's directory ({@code Proc.run(dir, …)}), so a
+     * relative umbrella turns every path built from it into a path resolved against the wrong directory.
+     * {@code --umbrella .} refused a changelog that was there, because the extractor was looked for at
+     * {@code ./botmaker-plugin-basics/tools/…} from inside {@code botmaker-plugin-basics}.
+     * {@code release.sh} cannot have that bug — its {@code ROOT} is computed absolute — so it was also a
+     * silent divergence between two implementations that are verified by diffing their output.
+     */
+    private Path umbrella = Path.of("").toAbsolutePath();
+
     @Option(names = "--umbrella", paramLabel = "<dir>",
             description = "The umbrella checkout (default: the current directory).")
-    private Path umbrella = Path.of("").toAbsolutePath();
+    private void setUmbrella(Path dir) {
+        umbrella = dir.toAbsolutePath().normalize();
+    }
 
     /** True unless {@code --no-wait-jitpack}: waiting costs minutes, losing the race burns a tag. */
     private boolean wait;

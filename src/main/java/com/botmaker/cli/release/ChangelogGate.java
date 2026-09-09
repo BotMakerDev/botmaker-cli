@@ -36,7 +36,12 @@ public final class ChangelogGate {
     }
 
     public static GateVerdict check(Path umbrella, Module module, Version version, boolean force) {
-        Path dir = umbrella.resolve(module.directory());
+        // Absolute, and not merely for tidiness: the extractor is launched WITH THE MODULE AS ITS WORKING
+        // DIRECTORY, so a relative path here is resolved against that directory rather than against the
+        // caller's. A relative umbrella therefore refused a changelog that was in fact present. The caller
+        // normalises too; this is the half that must not depend on the caller having done so, because it is
+        // the only gate whose argv carries a path at all.
+        Path dir = umbrella.toAbsolutePath().resolve(module.directory());
         Path script = dir.resolve("tools/changelog-section.sh");
         if (!Files.isExecutable(script)) {
             throw new ReleaseRefusal(module.directory() + ": " + module.directory()
