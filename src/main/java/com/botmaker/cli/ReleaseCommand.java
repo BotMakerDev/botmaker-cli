@@ -70,6 +70,10 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "mvn archetype:generate. " + SPEC_HELP)
     private String pluginArchetype;
 
+    @Option(names = "--plugin-basics", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
+            description = "Plugin #2: the value types, Settings and the project store. " + SPEC_HELP)
+    private String pluginBasics;
+
     @Option(names = "--cli", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
             description = "The botmaker command and the validator. " + SPEC_HELP)
     private String cli;
@@ -182,6 +186,7 @@ public final class ReleaseCommand implements Callable<Integer> {
         put(out, Module.PLUGIN_TOOLKIT, pluginToolkit);
         put(out, Module.PLUGIN_HOST, pluginHost);
         put(out, Module.PLUGIN_ARCHETYPE, pluginArchetype);
+        put(out, Module.PLUGIN_BASICS, pluginBasics);
         put(out, Module.CLI, cli);
         put(out, Module.SHARED, shared);
         put(out, Module.SESSION, session);

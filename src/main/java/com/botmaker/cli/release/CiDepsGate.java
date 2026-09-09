@@ -116,6 +116,7 @@ public final class CiDepsGate {
             case "sdk" -> Optional.of(Module.SDK);
             case "studioapi" -> Optional.of(Module.STUDIO_API);
             case "plugintoolkit" -> Optional.of(Module.PLUGIN_TOOLKIT);
+            case "pluginbasics" -> Optional.of(Module.PLUGIN_BASICS);
             case "pluginhost" -> Optional.of(Module.PLUGIN_HOST);
             default -> Optional.empty();
         };

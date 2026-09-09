@@ -45,6 +45,13 @@ public record Forcing(Module upstream, Module downstream, String reason) {
             new Forcing(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, "the toolkit " + BAKED),
             new Forcing(Module.STUDIO_API, Module.PLUGIN_HOST, "the loader " + BAKED),
 
+            // Plugin #2 pins the contract at `provided` and the toolkit at `compile`, and flatten bakes
+            // both into the pom another plugin — the SDK — resolves.
+            new Forcing(Module.STUDIO_API, Module.PLUGIN_BASICS, "plugin #2 " + BAKED),
+            new Forcing(Module.PLUGIN_TOOLKIT, Module.PLUGIN_BASICS,
+                    "plugin #2 compiles against the toolkit at compile scope, and flatten bakes that pin "
+                            + "into its published pom"),
+
             // The CLI pins BOTH, and flatten bakes both into the pom the plugin registry's CI resolves to
             // run `validate` as a library. A gate loading plugins with a different loader than Studio's is a
             // gate that admits plugins Studio then refuses.
@@ -71,6 +78,13 @@ public record Forcing(Module upstream, Module downstream, String reason) {
             new Forcing(Module.PLUGIN_TOOLKIT, Module.SDK,
                     "the SDK's slot editors are built on the toolkit, and flatten bakes that pin into the "
                             + "SDK's published pom"),
+            // A plugin compiling against another plugin, as an ordinary Maven dependency rather than
+            // through the contract or a service lookup: PluginLoader builds one URLClassLoader over the
+            // whole resolved project classpath, so plugin A sees plugin B's classes and Maven has already
+            // mediated B to one version. The price is that plugin-basics stops being freely breakable.
+            new Forcing(Module.PLUGIN_BASICS, Module.SDK,
+                    "the SDK compiles against plugin #2 as an ordinary Maven dependency, and flatten bakes "
+                            + "that pin into the SDK's published pom"),
 
             new Forcing(Module.SHARED, Module.STUDIO, "Studio builds shared from source at the ref in its "
                     + ".deps.env, which this release moves"),

@@ -75,8 +75,12 @@ class OrderTest {
         assertEquals(Set.of(Module.STUDIO_API), upstreamsOf(Module.PLUGIN_HOST));
         assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_HOST), upstreamsOf(Module.CLI));
         assertEquals(Set.of(Module.SHARED), upstreamsOf(Module.SESSION));
-        assertEquals(Set.of(Module.SHARED, Module.SESSION, Module.STUDIO_API, Module.PLUGIN_TOOLKIT),
-                upstreamsOf(Module.SDK));
+        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT), upstreamsOf(Module.PLUGIN_BASICS));
+        // Plugin #2 is in the SDK's set because the SDK compiles against it as an ordinary Maven
+        // dependency — a plugin depending on another plugin, which PluginLoader's single classloader makes
+        // possible and which costs plugin-basics its freedom to break.
+        assertEquals(Set.of(Module.SHARED, Module.SESSION, Module.STUDIO_API, Module.PLUGIN_TOOLKIT,
+                Module.PLUGIN_BASICS), upstreamsOf(Module.SDK));
         // The toolkit is deliberately NOT here since 2026-09-06: a generated bot's pom stopped declaring it,
         // MavenService.TOOLKIT_FALLBACK_VERSION went with the entry, and with no toolkit version written
         // anywhere in Studio's source a toolkit release changes nothing here.

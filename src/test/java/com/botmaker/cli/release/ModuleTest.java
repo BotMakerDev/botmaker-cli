@@ -12,10 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModuleTest {
 
-    /** The ten flags `release.sh --help` lists, in the order it lists them. */
+    /** The eleven flags `release.sh --help` lists, in the order it lists them. */
     private static final List<String> SCRIPT_FLAGS = List.of(
-            "--studio-api", "--plugin-toolkit", "--plugin-host", "--plugin-archetype", "--cli",
-            "--shared", "--session", "--sdk", "--studio", "--pilot");
+            "--studio-api", "--plugin-toolkit", "--plugin-host", "--plugin-archetype", "--plugin-basics",
+            "--cli", "--shared", "--session", "--sdk", "--studio", "--pilot");
 
     @Test
     void theFlagsAreTheScriptsFlags() {

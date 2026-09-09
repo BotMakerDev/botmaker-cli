@@ -33,11 +33,12 @@ public final class DepsEnv {
             Module.SDK, "SDK_TAG",
             Module.STUDIO_API, "STUDIO_API_TAG",
             Module.PLUGIN_TOOLKIT, "PLUGIN_TOOLKIT_TAG",
-            Module.PLUGIN_HOST, "PLUGIN_HOST_TAG"));
+            Module.PLUGIN_HOST, "PLUGIN_HOST_TAG",
+            Module.PLUGIN_BASICS, "PLUGIN_BASICS_TAG"));
 
     private static final List<Module> ORDER = List.of(
             Module.SHARED, Module.SESSION, Module.SDK,
-            Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_HOST);
+            Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_HOST, Module.PLUGIN_BASICS);
 
     /**
      * Which modules write one, what they pin, and the sentence naming who reads it.
@@ -59,6 +60,13 @@ public final class DepsEnv {
                     "Consumer: jitpack.yml, which sources this file and injects it as\n"
                             + "# -Dbotmaker.studioapi.version at build time.",
                     List.of(Module.STUDIO_API)),
+            // Plugin #2 pins two: the contract at `provided` and the toolkit at `compile`. Both are baked
+            // into the published pom by flatten, and that pom is what another plugin — the SDK — resolves.
+            Module.PLUGIN_BASICS, new Writer(
+                    "Consumer: jitpack.yml, which sources this file and injects these as\n"
+                            + "# -Dbotmaker.studioapi.version / -Dbotmaker.plugintoolkit.version at build"
+                            + " time.",
+                    List.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT)),
             Module.CLI, new Writer(
                     "Consumer: jitpack.yml, which sources this file and injects these as\n"
                             + "# -Dbotmaker.studioapi.version / -Dbotmaker.pluginhost.version at build"

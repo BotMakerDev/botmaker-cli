@@ -22,7 +22,8 @@ import java.util.List;
  *
  * <pre>
  *   pilot (APK, ~3m) → studio (per-OS package matrix, ~6m)
- *     → studio-api → plugin-toolkit → plugin-host → plugin-archetype → cli → shared → session → sdk
+ *     → studio-api → plugin-toolkit → plugin-host → plugin-archetype → cli → shared → session
+ *     → plugin-basics → sdk
  * </pre>
  *
  * <p>And {@link Module}'s own declaration order is a third thing again — the order {@code release.sh --help}
@@ -38,6 +39,7 @@ public final class Order {
             Module.PLUGIN_TOOLKIT,
             Module.PLUGIN_HOST,
             Module.PLUGIN_ARCHETYPE,
+            Module.PLUGIN_BASICS,
             Module.CLI,
             Module.SHARED,
             Module.SESSION,
@@ -55,6 +57,10 @@ public final class Order {
             Module.CLI,
             Module.SHARED,
             Module.SESSION,
+            // Plugin #2 is tagged immediately before the SDK, which resolves it. Nothing here waits on
+            // shared or session — it pins the contract and the toolkit, both tagged far above — but
+            // JitPack builds on demand and does not queue, so the SDK must not start building first.
+            Module.PLUGIN_BASICS,
             Module.SDK);
 
     private Order() {

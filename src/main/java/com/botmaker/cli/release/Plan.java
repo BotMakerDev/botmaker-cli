@@ -32,23 +32,26 @@ import java.util.stream.Collectors;
 public final class Plan {
 
     /** The label and parenthetical each module gets in the plan block, spaced as the script spaces them. */
-    private static final Map<Module, String> LABEL = new EnumMap<>(Map.of(
-            Module.STUDIO_API, "studio-api",
-            Module.PLUGIN_TOOLKIT, "toolkit   ",
-            Module.PLUGIN_HOST, "host      ",
-            Module.PLUGIN_ARCHETYPE, "archetype ",
-            Module.CLI, "cli       ",
-            Module.SHARED, "shared ",
-            Module.SESSION, "session",
-            Module.SDK, "sdk    ",
-            Module.STUDIO, "studio ",
-            Module.PILOT, "pilot  "));
+    // Map.ofEntries rather than Map.of: there are eleven modules and Map.of stops at ten pairs.
+    private static final Map<Module, String> LABEL = new EnumMap<>(Map.ofEntries(
+            Map.entry(Module.STUDIO_API, "studio-api"),
+            Map.entry(Module.PLUGIN_TOOLKIT, "toolkit   "),
+            Map.entry(Module.PLUGIN_HOST, "host      "),
+            Map.entry(Module.PLUGIN_ARCHETYPE, "archetype "),
+            Map.entry(Module.PLUGIN_BASICS, "basics    "),
+            Map.entry(Module.CLI, "cli       "),
+            Map.entry(Module.SHARED, "shared "),
+            Map.entry(Module.SESSION, "session"),
+            Map.entry(Module.SDK, "sdk    "),
+            Map.entry(Module.STUDIO, "studio "),
+            Map.entry(Module.PILOT, "pilot  ")));
 
     private static final Map<Module, String> NOTE = new EnumMap<>(Map.of(
             Module.STUDIO_API, "  (the plugin contract)",
             Module.PLUGIN_TOOLKIT, "  (the plugin widget toolkit)",
             Module.PLUGIN_HOST, "  (the plugin loader)",
             Module.PLUGIN_ARCHETYPE, "  (mvn archetype:generate)",
+            Module.PLUGIN_BASICS, "  (plugin #2: values, Settings, the store)",
             Module.CLI, "  (the botmaker command + the validator)",
             Module.PILOT, "  (tags -> APK GitHub Release)"));
 

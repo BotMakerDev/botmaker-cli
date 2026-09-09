@@ -34,9 +34,9 @@ class GatePlanTest {
 
     @Test
     void theCountsAreTheScriptsOwnLoops() {
-        assertEquals(9, GatePlan.changelog(ALL).size());
-        assertEquals(9, GatePlan.ciDeps(ALL).size());
-        assertEquals(8, GatePlan.jitpackPlugins(ALL).size());
+        assertEquals(10, GatePlan.changelog(ALL).size());
+        assertEquals(10, GatePlan.ciDeps(ALL).size());
+        assertEquals(9, GatePlan.jitpackPlugins(ALL).size());
     }
 
     @Test

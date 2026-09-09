@@ -3,7 +3,7 @@ package com.botmaker.cli.release;
 import java.util.Optional;
 
 /**
- * The modules {@code release.sh} can cut a tag for — ten, and this is now the list that owns that fact.
+ * The modules {@code release.sh} can cut a tag for — eleven, and this is now the list that owns that fact.
  *
  * <p><b>Keeping the list here is the opposite of the rule {@code botmaker-dashboard} follows, and both are
  * right.</b> The dashboard refuses to keep it because it is a <i>reader</i>: a second copy there would go
@@ -27,6 +27,7 @@ public enum Module {
     PLUGIN_TOOLKIT("botmaker-plugin-toolkit"),
     PLUGIN_HOST("botmaker-plugin-host"),
     PLUGIN_ARCHETYPE("botmaker-plugin-archetype"),
+    PLUGIN_BASICS("botmaker-plugin-basics"),
     CLI("botmaker-cli"),
     SHARED("botmaker-shared"),
     SESSION("botmaker-session"),
@@ -49,7 +50,7 @@ public enum Module {
 
     /**
      * The command-line flag, derived rather than tabulated: {@code --plugin-toolkit} is the directory
-     * without the {@code botmaker-} prefix, for all ten.
+     * without the {@code botmaker-} prefix, for all eleven.
      */
     public String flag() {
         return "--" + directory.substring(PREFIX.length());
