@@ -28,13 +28,16 @@ class WritesTest {
         Files.createDirectories(sdk);
         List<String> log = new ArrayList<>();
 
-        // All four of the SDK's upstreams are being cut in this run. An upstream that is NOT would be
-        // looked up in the checkout, which a temp directory cannot answer — see the refusal in DepTag.
+        // All five of the SDK's upstreams are being cut in this run — plugin-basics joined them on
+        // 2026-09-09, when the SDK started declaring plugin #2 as an ordinary dependency. An upstream that
+        // is NOT being cut would be looked up in the checkout, which a temp directory cannot answer — see
+        // the refusal in DepTag.
         DepsEnv.write(recording(log), umbrella, Module.SDK, Map.of(
                 Module.SHARED, new Version(0, 0, 21),
                 Module.SESSION, new Version(0, 0, 13),
                 Module.STUDIO_API, new Version(0, 0, 5),
-                Module.PLUGIN_TOOLKIT, new Version(0, 0, 6)));
+                Module.PLUGIN_TOOLKIT, new Version(0, 0, 6),
+                Module.PLUGIN_BASICS, new Version(0, 1, 0)));
 
         assertFalse(Files.exists(sdk.resolve(".deps.env")), "a dry run wrote a file");
         assertTrue(log.stream().anyMatch(line -> line.startsWith("  pinning botmaker-sdk to ")));

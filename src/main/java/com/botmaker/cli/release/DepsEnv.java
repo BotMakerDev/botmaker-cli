@@ -80,8 +80,10 @@ public final class DepsEnv {
                     "Consumer: jitpack.yml, which sources this file and injects these as\n"
                             + "# -Dbotmaker.shared.version / -Dbotmaker.session.version /"
                             + " -Dbotmaker.studioapi.version /\n"
-                            + "# -Dbotmaker.plugintoolkit.version at build time.",
-                    List.of(Module.SHARED, Module.SESSION, Module.STUDIO_API, Module.PLUGIN_TOOLKIT)),
+                            + "# -Dbotmaker.plugintoolkit.version /"
+                            + " -Dbotmaker.pluginbasics.version at build time.",
+                    List.of(Module.SHARED, Module.SESSION, Module.STUDIO_API, Module.PLUGIN_TOOLKIT,
+                            Module.PLUGIN_BASICS)),
             Module.STUDIO, new Writer(
                     "Consumer: the `package` job of .github/workflows/ci.yml. It checks these four repos"
                             + " out at\n"
