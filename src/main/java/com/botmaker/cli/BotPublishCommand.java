@@ -1,9 +1,15 @@
 package com.botmaker.cli;
 
 import com.botmaker.cli.gallery.GalleryEntry;
+import com.botmaker.cli.gallery.GalleryFacts;
+import com.botmaker.cli.gallery.GalleryGate;
+import com.botmaker.cli.gallery.ListingPolicy;
+import com.botmaker.cli.gallery.Requirements;
 import com.botmaker.cli.gallery.Templates;
+import com.botmaker.cli.gallery.Tier;
 import com.botmaker.cli.project.Poms;
 import com.botmaker.cli.registry.Registry;
+import com.botmaker.cli.registry.RegistryEntry;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -30,9 +36,10 @@ import java.util.concurrent.Callable;
  *       behind it is a 404 on somebody else's machine.</li>
  *   <li><b>The archive is fetched before anything points at it.</b> Same principle {@code botmaker plugin publish}
  *       follows for a coordinate: do not publish a pointer nobody has followed.</li>
- *   <li><b>The gallery pull request</b> — fork, one file at {@code bots/<owner>-<repo>.json}, open it. One
- *       file per entry, never the generated index, so two authors publishing on the same day open two pull
- *       requests with no line in common.</li>
+ *   <li><b>The gallery pull request</b> — the gallery's own {@code GalleryGate} entry checks run first, on
+ *       this machine; then fork, one file at {@code bots/<owner>-<repo>.json}, open it. One file per entry,
+ *       never the generated index, so two authors publishing on the same day open two pull requests with no
+ *       line in common. A passing pull request is merged by the gallery's CI and listed as Community.</li>
  * </ol>
  *
  * <p><b>{@code --template} is the whole reason this exists.</b> It puts {@code "template"} in the entry's
@@ -52,6 +59,8 @@ import java.util.concurrent.Callable;
 final class BotPublishCommand implements Callable<Integer> {
 
     private static final String GALLERY_REPO = "LiQiyeDev/botmaker-gallery";
+
+    private final GalleryFacts facts = GalleryFacts.github();
 
     @ParentCommand
     private BotCommand parent;
@@ -117,7 +126,38 @@ final class BotPublishCommand implements Callable<Integer> {
                     + " yet, and that archive is what an install actually fetches. Nothing was submitted.");
             return 1;
         }
-        return openPullRequest(console, entry, json);
+
+        // The gallery's own gate, on this machine, before a pull request exists — so a refusal is met here
+        // rather than as a red check on somebody else's repository.
+        Path work = Files.createTempDirectory("botmaker-bot-publish");
+        String login = Shell.capture(work, "gh", "api", "user", "--jq", ".login").orElse("").trim();
+        boolean push = Shell.capture(work, "gh", "api", "repos/" + GALLERY_REPO, "--jq",
+                ".permissions.push").orElse("").trim().equals("true");
+        List<GalleryGate.Finding> findings = GalleryGate.checkEntry(entry, entry.path(), login, push,
+                facts.listedEntry(entry.path()), facts);
+        boolean refused = false;
+        for (GalleryGate.Finding finding : findings) {
+            if (finding.severity() == GalleryGate.Severity.ERROR) {
+                console.error(finding.message());
+                refused = true;
+            } else {
+                console.warn(finding.message());
+            }
+        }
+        if (refused) {
+            console.error("the gallery would refuse this entry, so nothing was submitted.");
+            return 1;
+        }
+        int opened = openPullRequest(console, work, push, entry, json);
+        if (opened == 0) {
+            console.step(push
+                    ? "Opened by a maintainer: it is merged as soon as the gallery's checks pass."
+                    : "Once the gallery's checks pass it is merged automatically and listed as "
+                            + Tier.COMMUNITY.displayName() + " (at most " + ListingPolicy.NEW_LISTINGS_PER_DAY
+                            + " new bots a day per author). " + Tier.VETTED.displayName()
+                            + " is granted by a maintainer, per release.");
+        }
+        return opened;
     }
 
     private GalleryEntry compose(Path dir, Path pom) throws IOException {
@@ -134,7 +174,16 @@ final class BotPublishCommand implements Callable<Integer> {
                     + ", and " + dir + " has none. `botmaker bot new` writes one; a project created in"
                     + " Studio needs a line saying `package=<your package>`.");
         }
-        return new GalleryEntry(name, target[0], target[1], description, entryTags);
+        GalleryEntry entry = new GalleryEntry(name, target[0], target[1], description, entryTags);
+        // What the bot needs, by registry id. An unreachable registry composes none rather than failing the
+        // publish: the entry is still correct, only less informative.
+        Optional<List<RegistryEntry>> registry = facts.registry();
+        if (registry.isEmpty()) {
+            parent.main().console().warn("the plugin registry could not be read, so the entry names no required"
+                    + " plugins.");
+            return entry;
+        }
+        return entry.withRequires(Requirements.of(Poms.dependencies(pom), Poms.properties(pom), registry.get()));
     }
 
     /**
@@ -215,10 +264,8 @@ final class BotPublishCommand implements Callable<Integer> {
      * push there, and through a fork otherwise. That is the same pull request either way; what changes is
      * only where its head branch lives.
      */
-    private int openPullRequest(Console console, GalleryEntry entry, String json) throws IOException {
-        Path work = Files.createTempDirectory("botmaker-bot-publish");
-        boolean push = Shell.capture(work, "gh", "api", "repos/" + GALLERY_REPO, "--jq",
-                ".permissions.push").orElse("").trim().equals("true");
+    private int openPullRequest(Console console, Path work, boolean push, GalleryEntry entry, String json)
+            throws IOException {
         if (push) {
             console.step("You can push to " + GALLERY_REPO + " — branching on it directly rather than"
                     + " forking.");
@@ -259,8 +306,8 @@ final class BotPublishCommand implements Callable<Integer> {
                 "--title", "Add " + entry.name() + " (" + kind + ")",
                 "--body", "Adds `" + entry.path() + "` — [" + entry.slug()
                         + "](https://github.com/" + entry.slug() + "), released as `" + tag + "`.\n\n"
-                        + "Composed by `botmaker bot publish`, which downloaded the release archive before"
-                        + " writing this entry.\n\n```json\n" + json + "\n```");
+                        + "Composed by `botmaker bot publish`, which downloaded the release archive and ran"
+                        + " the gallery's checks before writing this entry.\n\n```json\n" + json + "\n```");
         return opened == 0 ? 0 : 1;
     }
 

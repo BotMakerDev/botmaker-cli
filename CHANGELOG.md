@@ -5,6 +5,37 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **The gallery's gate, catalog and auto-merge policy** (`com.botmaker.cli.gallery`). The gallery lists bots
+  automatically now: a pull request that passes `GalleryGate` is merged by the gallery's own CI, subject to
+  `ListingPolicy` (at most 3 new listings per author per 24 hours; updating your own listing never counts).
+  Such a bot is listed as **Community**. A bot is **Vetted** when a maintainer writes
+  `vetted/<owner>-<repo>.json`, which pins one release.
+- `GalleryGate` refuses:
+  - edits to the generated files;
+  - `vetted/` changes by anyone but a maintainer;
+  - a filename that is not the entry's `owner-repo`;
+  - a schema newer than this gate;
+  - a change or delisting of someone else's listing, checked against the **base** copy;
+  - a repository with no release, or whose release archive does not download.
+
+  A new entry for a repository the author is not, and a `requires` naming an unregistered plugin, are
+  warnings.
+- `CatalogBuilder` writes `catalog.json` (every listing with its tier, `schemaVersion: 2`) and
+  `index.json`. The legacy file holds **vetted listings only**, in the old shape, so a Studio that cannot show
+  a tier never shows an unvetted bot.
+- Gallery entries carry `schemaVersion` (2). A file without one is version 1 and is read unchanged; nothing
+  is rewritten to migrate. `launchTargets` is now carried rather than dropped, and `requires` names the
+  plugins a bot's pom declares, by registry id.
+
+### Changed
+
+- **`bot publish`** writes a version 2 entry with `requires`, runs the gallery's own entry checks before
+  opening the pull request, and says which tier the bot lands in.
+
 ## [0.0.13] — 2026-09-16
 
 ### Added

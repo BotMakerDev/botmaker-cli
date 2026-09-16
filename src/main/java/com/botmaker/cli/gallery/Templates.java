@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -65,11 +66,17 @@ public final class Templates {
 
     /** The newest release's tag, which is the one a gallery install would take. */
     public static String latestReleaseTag(String owner, String repo) throws IOException {
+        return findLatestReleaseTag(owner, repo).orElseThrow(() -> new IOException(owner + "/" + repo
+                + " has no release yet, and a template is installed from its release archive. Ask its author"
+                + " to cut one."));
+    }
+
+    /** The newest release's tag, or empty when the repository has none (or does not exist). */
+    public static Optional<String> findLatestReleaseTag(String owner, String repo) throws IOException {
         String url = API + "/repos/" + owner + "/" + repo + "/releases/latest";
         HttpResponse<byte[]> response = get(url);
         if (response.statusCode() == 404) {
-            throw new IOException(owner + "/" + repo + " has no release yet, and a template is installed"
-                    + " from its release archive. Ask its author to cut one.");
+            return Optional.empty();
         }
         if (response.statusCode() / 100 != 2) {
             throw new IOException("GitHub answered " + response.statusCode() + " for " + url);
@@ -79,7 +86,7 @@ public final class Templates {
         if (tag.isBlank()) {
             throw new IOException("the newest release of " + owner + "/" + repo + " has no tag");
         }
-        return tag;
+        return Optional.of(tag);
     }
 
     /** Downloads the release archive for {@code tag} and unpacks it into {@code dest}. */

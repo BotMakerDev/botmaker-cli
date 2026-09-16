@@ -59,5 +59,30 @@ class GalleryEntryTest {
                 new GalleryEntry("Bot", "o", "r", "", List.of()));
         assertFalse(bare.contains("tags"), "an entry with no tags carries no line saying so: " + bare);
         assertFalse(bare.contains("description"), bare);
+        assertFalse(bare.contains("requires"), bare);
+        assertTrue(bare.contains("\"schemaVersion\" : " + GalleryEntry.CURRENT_SCHEMA), bare);
+    }
+
+    /** Every entry written before 2026-09-16 has no schemaVersion, and must read as version 1, unchanged. */
+    @Test
+    void a_file_without_a_schema_version_is_version_one_and_keeps_studios_fields() throws Exception {
+        GalleryEntry legacy = Registry.mapper().readValue("""
+                {"name": "Update", "owner": "LiQiyeDev", "repo": "Update", "description": "",
+                 "tags": [], "launchTargets": ["heroic"]}""", GalleryEntry.class);
+
+        assertEquals(GalleryEntry.LEGACY_SCHEMA, legacy.schemaVersion());
+        assertEquals(List.of("heroic"), legacy.launchTargets());
+        GalleryEntry migrated = legacy.migrated();
+        assertEquals(GalleryEntry.CURRENT_SCHEMA, migrated.schemaVersion());
+        assertEquals(List.of("heroic"), migrated.launchTargets(), "migration must not drop Studio's field");
+    }
+
+    @Test
+    void requires_round_trips() throws Exception {
+        GalleryEntry entry = new GalleryEntry("Bot", "o", "r", "", List.of())
+                .withRequires(List.of(new GalleryEntry.Requirement("com.botmaker.sdk", "v1.1.7")));
+
+        String json = Registry.mapper().writeValueAsString(entry);
+        assertEquals(entry, Registry.mapper().readValue(json, GalleryEntry.class));
     }
 }
