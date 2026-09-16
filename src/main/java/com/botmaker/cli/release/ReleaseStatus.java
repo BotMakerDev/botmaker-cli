@@ -41,6 +41,14 @@ public final class ReleaseStatus {
         List<ReleaseLog.Row> rows = new ArrayList<>();
         for (ReleaseLog.Row row : ReleaseLog.read(log)) {
             ReleaseLog.Row polled = row;
+            if (!row.stage().tagged()) {
+                // A row the release never tagged keeps its stage and its failure: there is no tag to ask
+                // JitPack or Actions about, and the reason it stopped is not something a poll can re-derive.
+                runner.say("    " + row.module().directory() + " " + row.version().tag()
+                        + " — " + row.stage().cell() + ", not polled");
+                rows.add(row);
+                continue;
+            }
 
             if (ReleaseLog.onJitpack(row.module())) {
                 Optional<String> broken = CleanRoom.resolve(runner, row.module(), row.version());

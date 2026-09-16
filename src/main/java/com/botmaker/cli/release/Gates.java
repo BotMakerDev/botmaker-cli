@@ -33,6 +33,11 @@ public final class Gates {
         // First, because it is about the plan itself rather than about any module's contents, and because
         // an operator who has to add a flag would rather learn that before Maven runs a test.
         record(runner, refusals, ForcingGate.check(plan, force));
+        // Before anything reads a file: a module red on main is the refusal the operator can least fix
+        // from here, so it is the one worth hearing first.
+        for (Module module : GatePlan.ci(modules)) {
+            record(runner, refusals, CiGate.check(module, force));
+        }
         if (GatePlan.fallbackVersions(modules)) {
             record(runner, refusals, FallbackVersionsGate.check(umbrella, releasing, force));
         }

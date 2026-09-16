@@ -20,17 +20,20 @@ class ReleaseLogTest {
     private static final LocalDateTime WHEN = LocalDateTime.of(2026, 9, 5, 12, 12);
 
     @Test
-    void aStudioOnlyReleaseRendersExactlyWhatTheLastRealReleaseWrote() {
-        // Byte-for-byte against releases/2026-09-05-1212.md, which release.sh itself wrote.
+    void aStudioOnlyReleaseRendersTheTableWithItsStage() {
+        // The shape of releases/2026-09-05-1212.md, which release.sh itself wrote, plus the stage column
+        // every log carries since 2026-09-16.
         String rendered = ReleaseLog.render(WHEN, List.of(
-                new ReleaseLog.Row(Module.STUDIO, new Version(1, 0, 37), "", "success (1)", "", "")));
+                new ReleaseLog.Row(Module.STUDIO, new Version(1, 0, 37))
+                        .withStage(ReleaseLog.Stage.TAGGED)
+                        .withActions("success (1)", "")));
 
         assertEquals("""
                 # Release 2026-09-05 12:12
 
-                | module | version | tag | changelog | jitpack | actions |
-                |---|---|---|---|---|---|
-                | botmaker-studio | 1.0.37 | v1.0.37 | stamped | n/a (not a Maven artifact) | success (1) |
+                | module | version | tag | stage | changelog | jitpack | actions |
+                |---|---|---|---|---|---|---|
+                | botmaker-studio | 1.0.37 | v1.0.37 | tagged | stamped | n/a (not a Maven artifact) | success (1) |
                 """, rendered);
     }
 
@@ -42,19 +45,30 @@ class ReleaseLogTest {
     }
 
     @Test
-    void everyVerdictStartsPendingBecauseTheLogIsWrittenBeforeThePoll() {
-        // A log that only appears after the five-minute poll is missing in exactly the case worth
-        // recording: the tags are already pushed by then.
+    void theLogWrittenBeforeTheFirstTagIsPendingThroughout() {
         String rendered = ReleaseLog.render(WHEN, List.of(
                 new ReleaseLog.Row(Module.SDK, new Version(1, 1, 7))));
 
-        assertTrue(rendered.contains("| botmaker-sdk | 1.1.7 | v1.1.7 | stamped | pending | pending |"));
+        assertTrue(rendered.contains("| botmaker-sdk | 1.1.7 | v1.1.7 | pending | — | pending | pending |"),
+                rendered);
+    }
+
+    @Test
+    void aRowThatWasNeverTaggedSaysSoInsteadOfPending() {
+        // "pending" would promise a verdict that no poll can ever produce.
+        String rendered = ReleaseLog.render(WHEN, List.of(
+                new ReleaseLog.Row(Module.SHARED, new Version(0, 1, 0)).failed("commit, tag and push", "boom"),
+                new ReleaseLog.Row(Module.SDK, new Version(1, 2, 0)).withStage(ReleaseLog.Stage.NOT_REACHED)));
+
+        assertTrue(rendered.contains("| botmaker-shared | 0.1.0 | v0.1.0 | FAILED | — | not tagged | not tagged |"));
+        assertTrue(rendered.contains("| botmaker-sdk | 1.2.0 | v1.2.0 | not reached | — | not tagged | not tagged |"));
+        assertTrue(rendered.contains("**botmaker-shared — release**\n```\ncommit, tag and push: boom\n```"));
     }
 
     @Test
     void thePilotHasNoChangelogAndTheCellSaysSo() {
         String rendered = ReleaseLog.render(WHEN, List.of(
-                new ReleaseLog.Row(Module.PILOT, new Version(0, 0, 12))));
+                new ReleaseLog.Row(Module.PILOT, new Version(0, 0, 12)).withStage(ReleaseLog.Stage.TAGGED)));
 
         assertTrue(rendered.contains("| n/a (no CHANGELOG.md) | n/a (not a Maven artifact) | pending |"));
     }
@@ -62,6 +76,7 @@ class ReleaseLogTest {
     @Test
     void errorsGoUnderTheTableInFullRatherThanIntoACell() {
         ReleaseLog.Row row = new ReleaseLog.Row(Module.SESSION, new Version(0, 0, 13))
+                .withStage(ReleaseLog.Stage.BUILT)
                 .withJitpack("BROKEN", "Could not find artifact com.github.LiQiyeDev:botmaker-shared")
                 .withActions("FAILED — ci", "ci: failure — https://example.invalid/run/1");
 
@@ -81,26 +96,46 @@ class ReleaseLogTest {
         released.put(Module.STUDIO, new Version(1, 0, 38));
         released.put(Module.SHARED, new Version(0, 0, 21));
 
-        assertEquals(List.of(Module.STUDIO, Module.SHARED, Module.SDK),
+        assertEquals(List.of(Module.SHARED, Module.SDK, Module.STUDIO),
                 ReleaseLog.rows(released).stream().map(ReleaseLog.Row::module).toList());
     }
 
     @Test
-    void theTableIsTheContractAndReadsBackForAReePoll(@TempDir Path umbrella) throws IOException {
+    void theTableIsTheContractAndReadsBackForARePoll(@TempDir Path umbrella) throws IOException {
         Path log = ReleaseLog.path(umbrella, WHEN);
         Files.createDirectories(log.getParent());
-        Files.writeString(log, ReleaseLog.render(WHEN, List.of(
-                new ReleaseLog.Row(Module.SHARED, new Version(0, 0, 20)),
-                new ReleaseLog.Row(Module.SDK, new Version(1, 1, 6)))));
+        List<ReleaseLog.Row> written = List.of(
+                new ReleaseLog.Row(Module.SHARED, new Version(0, 0, 20)).withStage(ReleaseLog.Stage.BUILT)
+                        .withJitpack("BROKEN", "line one\nline two"),
+                new ReleaseLog.Row(Module.SDK, new Version(1, 1, 6)).failed("jitpack wait", "gave up"),
+                new ReleaseLog.Row(Module.STUDIO, new Version(1, 1, 0)).withStage(ReleaseLog.Stage.NOT_REACHED));
+        Files.writeString(log, ReleaseLog.render(WHEN, written));
 
         // Reading the table back, rather than keeping state beside it, is what lets --status run a week
-        // later from another machine on somebody else's release.
+        // later from another machine on somebody else's release — and the stage and failure survive it.
         List<ReleaseLog.Row> read = ReleaseLog.read(log);
 
-        assertEquals(2, read.size());
-        assertEquals(Module.SHARED, read.get(0).module());
-        assertEquals("1.1.6", read.get(1).version().toString());
+        assertEquals(written, read);
         assertEquals(log, ReleaseLog.newest(umbrella));
         assertEquals(WHEN, ReleaseStatus.stampOf(log));
+    }
+
+    @Test
+    void aLogOlderThanTheStageColumnReadsAsAWholeRelease() {
+        // Every log before 2026-09-16 was written after the last tag, so every row in it was tagged.
+        List<ReleaseLog.Row> read = ReleaseLog.parse("""
+                # Release 2026-09-05 12:12
+
+                | module | version | tag | changelog | jitpack | actions |
+                |---|---|---|---|---|---|
+                | botmaker-studio | 1.0.37 | v1.0.37 | stamped | n/a (not a Maven artifact) | success (1) |
+                | botmaker-sdk | 1.1.6 | v1.1.6 | stamped | pending | pending |
+                """.lines().toList());
+
+        assertEquals(2, read.size());
+        assertEquals(ReleaseLog.Stage.TAGGED, read.get(0).stage());
+        assertEquals("success (1)", read.get(0).actions());
+        assertEquals("", read.get(0).jitpack());
+        assertEquals("", read.get(1).actions());
     }
 }

@@ -40,6 +40,11 @@ public final class GatePlan {
                 .toList();
     }
 
+    /** Modules whose newest CI run on {@code main} must not be red — every one being cut. */
+    public static List<Module> ci(Set<Module> releasing) {
+        return Order.TAG.stream().filter(releasing::contains).toList();
+    }
+
     /** Modules whose own CI must be able to build them standalone. */
     public static List<Module> ciDeps(Set<Module> releasing) {
         return Order.DECIDE.stream()

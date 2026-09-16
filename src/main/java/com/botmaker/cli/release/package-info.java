@@ -91,9 +91,13 @@
  *       {@code dependency:resolve} from a throwaway repository, which is the only thing that catches a
  *       published pom naming a dependency nobody can resolve.</li>
  *   <li>{@link com.botmaker.cli.release.Actions} — {@code poll_actions}, the worst verdict of every
- *       workflow a tag fired.</li>
+ *       workflow a tag fired, and since 2026-09-16 the error lines of each failed run's log.</li>
+ *   <li>{@link com.botmaker.cli.release.CiGate} — no script counterpart (2026-09-16): refuses a module whose
+ *       newest finished CI run on {@code main} is red.</li>
  *   <li>{@link com.botmaker.cli.release.ReleaseLog} — {@code releases/<YYYY-MM-DD-HHMM>.md}, rendered
- *       whole every time so the two writers cannot leave a half-updated table.</li>
+ *       whole every time so the two writers cannot leave a half-updated table. Since 2026-09-16 it is
+ *       written before the first tag with a per-row stage, and a release that throws is recorded rather
+ *       than lost ({@code Release.tagChain}).</li>
  *   <li>{@link com.botmaker.cli.release.ReleaseStatus} — {@code --status}, re-polling both columns through
  *       those same two readers.</li>
  * </ul>

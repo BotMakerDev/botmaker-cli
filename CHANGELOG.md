@@ -7,7 +7,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- **A release refuses a module whose CI is red on `main`** (`CiGate`). The newest finished `ci.yml` run on
+  `main` must not be a failure or cancelled. A run still going, no `gh`, or no run is reported and does not
+  refuse. `--force` overrides. `botmaker-plugin-host v0.1.0` was tagged on 2026-09-16 while its `main` had
+  been red for ten days, and its tag failed the same test.
+- **The Actions error in a release log says what failed**, not only where: the first `[ERROR]` and
+  `##[error]` lines of each failed run's log, with the command before a runner error.
+
 ### Changed
+
+- **Studio is tagged last.** Its package jobs check out every upstream at the tag its `.deps.env` names,
+  and those tags used to be pushed after Studio's. Studio v1.1.0 failed exactly that way.
+- **The release log is written before the first tag and kept current**, with a new `stage` column. A module
+  that throws is recorded as `FAILED` with the step and message, later modules as `not reached`, and the log
+  is committed locally with the pointers of the modules that were tagged, as `release (stopped): …`. Logs
+  written before this column still read, as whole releases.
+- **A failed tag push stops the release.** It was returned and ignored, while every later module pinned the
+  tag that was not on origin.
+- `--status` leaves a row that was never tagged as it is, rather than polling for a tag that does not exist.
 
 - **`release.sh` is a wrapper over `botmaker release`, so this package is the release rather than a port of
   it.** 2,214 lines of bash to ~230: the decide pass, the gates, the tag order, every `.deps.env`, both

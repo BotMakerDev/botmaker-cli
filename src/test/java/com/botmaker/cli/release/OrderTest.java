@@ -31,12 +31,25 @@ class OrderTest {
     }
 
     @Test
-    void studioIsTaggedSecondAndDecidedLast() {
-        // The whole reason the decisions are taken up front: studio's package matrix is the longest job in
-        // the release, and it depends on nothing that has to be published first.
+    void thePilotIsTaggedFirstAndStudioIsDecidedLast() {
+        // The pilot's APK build depends on nothing of ours, so it runs while the chain is being cut.
         assertEquals(Module.PILOT, Order.TAG.get(0));
-        assertEquals(Module.STUDIO, Order.TAG.get(1));
         assertEquals(Module.STUDIO, Order.DECIDE.get(Order.DECIDE.size() - 1));
+    }
+
+    @Test
+    void studioIsTaggedAfterEveryTagItsPackageJobChecksOut() {
+        // Derived from what Studio's .deps.env pins, not restated: Studio v1.1.0's package jobs failed on
+        // 2026-09-16 fetching botmaker-shared v0.1.0, which was tagged after it. A pin added to that file
+        // later is covered without touching this test.
+        List<Module> pins = DepsEnv.upstreams(Module.STUDIO);
+        assertFalse(pins.isEmpty());
+        for (Module pinned : pins) {
+            assertTrue(Order.TAG.indexOf(pinned) < Order.TAG.indexOf(Module.STUDIO),
+                    "studio must be tagged after " + pinned);
+        }
+        // And after the SDK, whose release rewrites SDK_FALLBACK_VERSION in Studio's source.
+        assertTrue(Order.TAG.indexOf(Module.SDK) < Order.TAG.indexOf(Module.STUDIO));
     }
 
     @Test
@@ -52,7 +65,7 @@ class OrderTest {
     @Test
     void filteringKeepsTheOrderRatherThanTheCallersOwn() {
         Set<Module> picked = Set.of(Module.SDK, Module.STUDIO, Module.SHARED);
-        assertEquals(List.of(Module.STUDIO, Module.SHARED, Module.SDK), Order.toTag(picked));
+        assertEquals(List.of(Module.SHARED, Module.SDK, Module.STUDIO), Order.toTag(picked));
         assertEquals(List.of(Module.SHARED, Module.SDK, Module.STUDIO), Order.toDecide(picked));
         assertTrue(Order.toTag(Set.of()).isEmpty());
     }

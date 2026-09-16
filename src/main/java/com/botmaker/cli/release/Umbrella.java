@@ -39,6 +39,11 @@ public final class Umbrella {
      */
     public static String recordPointers(Runner runner, Path umbrella, Map<Module, Version> released,
                                         boolean withLog) {
+        return record(runner, umbrella, released, withLog, "release: ");
+    }
+
+    private static String record(Runner runner, Path umbrella, Map<Module, Version> released, boolean withLog,
+                                 String prefix) {
         runner.say("Recording submodule pointers in the umbrella");
         StringBuilder pointers = new StringBuilder();
         for (Module module : Order.DECIDE) {
@@ -52,10 +57,24 @@ public final class Umbrella {
             runner.git(umbrella, "add", "releases");
         }
         String subject = pointers.toString().stripTrailing();
-        if (!subject.isEmpty() && staged(runner, umbrella)) {
-            runner.git(umbrella, "commit", "-m", "release: " + subject);
+        // A stopped release with nothing tagged still has a log worth committing.
+        boolean anything = !subject.isEmpty() || withLog;
+        if (anything && staged(runner, umbrella)) {
+            runner.git(umbrella, "commit", "-m", prefix + (subject.isEmpty() ? "nothing tagged" : subject));
         }
         return subject;
+    }
+
+    /**
+     * The pointer commit of a release that stopped partway: the modules that were tagged, plus the log.
+     *
+     * <p>Said as {@code release (stopped): …} so the umbrella's history cannot read a half release as a
+     * whole one. Not pushed — the operator is about to decide what to do about the module that failed, and
+     * that decision may be a re-run, which records its own commit.
+     */
+    public static String recordStopped(Runner runner, Path umbrella, Map<Module, Version> tagged,
+                                       boolean withLog) {
+        return record(runner, umbrella, tagged, withLog, "release (stopped): ");
     }
 
     /**

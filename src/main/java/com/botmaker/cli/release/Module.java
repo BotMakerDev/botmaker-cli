@@ -18,8 +18,7 @@ import java.util.Optional;
  * them has a flag, and the script answers {@code unknown arg} to one invented for them.
  *
  * <p><b>Declaration order is the script's flag order, and it is deliberately NOT the tag order.</b> The two
- * differ on purpose — the two longest CI jobs are tagged first so they run while the JitPack chain is still
- * going — and porting that order is slice 3's job. Nothing here may be read as an ordering.
+ * differ on purpose — see {@link Order#TAG} — and nothing here may be read as an ordering.
  */
 public enum Module {
 

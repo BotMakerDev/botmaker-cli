@@ -32,12 +32,88 @@ public final class Actions {
         if (!Proc.onPath("gh")) {
             return new Poll("unknown (no gh on PATH)", "");
         }
+        String repo = CleanRoom.OWNER + "/" + module.directory();
         Proc.Result run = Proc.run(Path.of("."), "gh", "run", "list",
-                "--repo", CleanRoom.OWNER + "/" + module.directory(),
+                "--repo", repo,
                 "--branch", version.tag(), "--limit", "20",
-                "--json", "name,status,conclusion,url",
-                "--jq", ".[] | [.name, .status, .conclusion, .url] | @tsv");
-        return verdict(run.ok() ? run.out() : "", version);
+                "--json", "name,status,conclusion,url,databaseId",
+                "--jq", ".[] | [.name, .status, .conclusion, .url, .databaseId] | @tsv");
+        String tsv = run.ok() ? run.out() : "";
+        Poll poll = verdict(tsv, version);
+        if (poll.error().isBlank()) {
+            return poll;
+        }
+        // A URL says where the failure is; what a reader wants from the log six weeks later is what it was.
+        StringBuilder error = new StringBuilder(poll.error());
+        for (String id : failedRunIds(tsv)) {
+            Proc.Result log = Proc.run(Path.of("."), "gh", "run", "view", id, "--repo", repo, "--log-failed");
+            String excerpt = log.ok() ? excerpt(log.out()) : "";
+            if (!excerpt.isBlank()) {
+                error.append("\n\n").append(excerpt);
+            }
+        }
+        return new Poll(poll.verdict(), error.toString());
+    }
+
+    /** At most this many lines of a failed run's log go into the release log. */
+    static final int EXCERPT_LINES = 15;
+
+    /** Maven's advice after every failure, identical each time and never the reason. */
+    private static final List<String> BOILERPLATE = List.of(
+            "Please refer to", "-> [Help", "To see the full stack trace", "Re-run Maven using",
+            "For more information about the errors", "[Help 1] http");
+
+    /** The ids of the completed runs that did not succeed, from the fifth column {@link #poll} asks for. */
+    static List<String> failedRunIds(String tsv) {
+        List<String> ids = new ArrayList<>();
+        for (String line : tsv.lines().filter(l -> !l.isBlank()).toList()) {
+            String[] cells = line.split("\t", -1);
+            if (cells.length > 4 && "completed".equals(cells[1].strip())
+                    && !"success".equals(cells[2].strip()) && !"skipped".equals(cells[2].strip())) {
+                ids.add(cells[4].strip());
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * The lines of {@code gh run view --log-failed} worth keeping: Maven's {@code [ERROR]} lines and the
+     * runner's {@code ##[error]} lines, each with the command that ran just before it.
+     *
+     * <p>The command matters for the second kind. {@code ##[error]The process '/usr/bin/git' failed with exit
+     * code 1} is all Studio v1.1.0's package job said, and the {@code [command]} line above it is the one
+     * that names the ref it could not fetch. Each line is {@code <job>\t<step>\t<timestamp> <text>}; the job
+     * is kept, the step and timestamp are dropped, and a message repeated across a matrix is kept once.
+     */
+    static String excerpt(String log) {
+        java.util.LinkedHashSet<String> kept = new java.util.LinkedHashSet<>();
+        String lastCommand = "";
+        for (String line : log.lines().toList()) {
+            String[] cells = line.split("\t", 3);
+            String job = cells.length == 3 ? cells[0].strip() : "";
+            String text = cells.length == 3 ? cells[2] : line;
+            // "﻿2026-09-16T10:25:31.6610499Z message" — a BOM on the first line, then an ISO instant.
+            text = text.replaceFirst("^﻿?\\d{4}-\\d{2}-\\d{2}T[0-9:.]+Z ?", "");
+            if (text.startsWith("[command]")) {
+                lastCommand = text.substring("[command]".length());
+                continue;
+            }
+            boolean maven = text.startsWith("[ERROR]");
+            boolean runner = text.startsWith("##[error]");
+            if (!maven && !runner) {
+                continue;
+            }
+            String message = text.substring(maven ? "[ERROR]".length() : "##[error]".length()).strip();
+            if (message.isEmpty() || BOILERPLATE.stream().anyMatch(message::startsWith)) {
+                continue;
+            }
+            String prefix = job.isEmpty() ? "" : job + ": ";
+            if (runner && !lastCommand.isBlank()) {
+                kept.add(prefix + "$ " + lastCommand);
+            }
+            kept.add(prefix + message);
+        }
+        return kept.stream().limit(EXCERPT_LINES).collect(java.util.stream.Collectors.joining("\n"));
     }
 
     /** The rule over {@code gh}'s tab-separated output — pure, so every verdict is testable offline. */

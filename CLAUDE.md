@@ -59,8 +59,8 @@ same reason.
 **This package keeps the module list that `botmaker-dashboard` refuses to keep, and both are right**: the
 dashboard is a reader, so a copy there goes stale against the script; this is the owner being ported, so the
 list has to land somewhere. `Module`'s declaration order is the script's **flag** order and is deliberately
-not the **tag** order — the two differ so the two longest CI jobs are tagged first, and porting that is
-slice 3.
+not the **tag** order — see `Order.TAG`, where the pilot goes first and Studio last (since 2026-09-16:
+Studio's package jobs check out the tags its `.deps.env` pins, so those must already be pushed).
 
 **A tag exists to publish an artifact, so "changed" is not "some byte moved" — and that is `ChangeKind`.**
 It answers three things, not two: `REAL`, `DOCS` (commits exist, all of them markdown, so the tag would

@@ -14,17 +14,23 @@ import java.util.List;
  *
  * <p><b>{@link #TAG} is neither, and that freedom is the whole reason the decisions are taken up front.</b>
  * {@code should_release} used to be evaluated inline, immediately before each module was tagged, which
- * forced the tag order to equal the decision order and so put {@code botmaker-studio} last — behind three
- * JitPack waits, even though its per-OS {@code package} matrix is the longest pole in the release and no
- * longer needs those builds to exist (it builds its upstreams from source, at the refs in its own
- * {@code .deps.env}). So the two longest CI jobs are tagged <b>first</b> and run while the JitPack chain is
- * still going:
+ * forced the tag order to equal the decision order. The pilot's APK build depends on nothing of ours, so it
+ * is tagged first and runs while the JitPack chain is still going:
  *
  * <pre>
- *   pilot (APK, ~3m) → studio (per-OS package matrix, ~6m)
+ *   pilot (APK, ~3m)
  *     → studio-api → plugin-toolkit → plugin-host → plugin-archetype → cli → shared → session
  *     → plugin-basics → sdk
+ *     → studio (per-OS package matrix, ~6m)
  * </pre>
+ *
+ * <p><b>Studio was tagged second until 2026-09-16, and that was a race every release lost.</b> The argument
+ * was that its {@code package} matrix builds its upstreams from source, so it needs no JitPack build to
+ * exist. True, and beside the point: it checks those upstreams out <i>at the tags in its own
+ * {@code .deps.env}</i>, and those tags are pushed minutes later, further down this list. On 2026-09-16
+ * Studio v1.1.0's two package jobs failed fetching {@code botmaker-shared v0.1.0}, which did not exist yet.
+ * So Studio goes last: every tag it pins is on origin before its CI starts. The cost is that its matrix no
+ * longer overlaps the JitPack waits, which is minutes; the other way cost a Studio tag.
  *
  * <p>And {@link Module}'s own declaration order is a third thing again — the order {@code release.sh --help}
  * lists the flags. Three orders, three jobs; none of them is a preference, and collapsing any two would be
@@ -46,10 +52,9 @@ public final class Order {
             Module.SDK,
             Module.STUDIO);
 
-    /** Tag order: longest CI first, then the JitPack chain in dependency order. */
+    /** Tag order: the pilot, the JitPack chain in dependency order, then Studio once all its pins exist. */
     public static final List<Module> TAG = List.of(
             Module.PILOT,
-            Module.STUDIO,
             Module.STUDIO_API,
             Module.PLUGIN_TOOLKIT,
             Module.PLUGIN_HOST,
@@ -61,7 +66,9 @@ public final class Order {
             // shared or session — it pins the contract and the toolkit, both tagged far above — but
             // JitPack builds on demand and does not queue, so the SDK must not start building first.
             Module.PLUGIN_BASICS,
-            Module.SDK);
+            Module.SDK,
+            // Last: its package job checks out every upstream at the tag its .deps.env names.
+            Module.STUDIO);
 
     private Order() {
     }
