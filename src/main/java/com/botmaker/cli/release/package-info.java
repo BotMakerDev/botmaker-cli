@@ -143,14 +143,28 @@
  * The one-directional gaps are closed: echoes are shell-quoted, the push pass inspects for real in a dry
  * run, and the two dry-run lines the script prints and this did not now print.
  *
- * <p>So what remains is one thing: <b>cut a real release through here and watch it end to end</b>, before
- * {@code release.sh} is deleted. Until then a release from this package requires {@code --execute}, which
- * is the inverse of the script's default on purpose — the port is what is on trial, and a tag is permanent.
+ * <p>So what remains is one thing: <b>cut a real release through here and watch it end to end</b>. A release
+ * from this package requires {@code --execute}, which is the inverse of the script's default on purpose —
+ * the port is what is on trial, and a tag is permanent.
  *
  * <p><b>Nothing in this package has pushed anything yet, and that is now a fact about its callers rather
  * than about its code.</b> {@link com.botmaker.cli.release.CommitTagPush} can push; it is reached only
- * through a {@link com.botmaker.cli.release.Runner}, and no caller has yet handed it a real one. The plan's
- * discipline holds until then: the first tag cut by this library is a single-module release, watched end to
- * end.
+ * through a {@link com.botmaker.cli.release.Runner}, and no caller has yet handed it a real one.
+ *
+ * <p><b>All three callers reach it now (2026-09-16), and the script is one of them.</b> {@code release.sh}
+ * is a ~230-line wrapper: it owns the spelling, {@code --ci}'s runner preparation, the
+ * {@code BOTMAKER_RELEASE_TOKEN} precondition and one line of translation — no {@code --dry-run} means
+ * {@code --execute}, because a script whose purpose is cutting a release should not need a flag to do it
+ * while a command anyone can type should not push a tag by accident. {@code .github/workflows/release.yml}
+ * calls that script for {@code --ci} alone; {@code botmaker-dashboard} calls {@link
+ * com.botmaker.cli.release.Release#run} in-process.
+ *
+ * <p><b>Which retires the diff, and the reason is worth keeping.</b> The port was verified against the
+ * script's {@code --dry-run}; with the script a wrapper there is no second implementation to disagree with,
+ * so that check is gone and cannot be brought back. What replaces it is the property this package was built
+ * on: a preview and a release are this same call with a different {@link com.botmaker.cli.release.Runner},
+ * and {@code Runner} is the only class here that writes, commits, tags or pushes. A preview is the release,
+ * less its writes. Keep it that way — a write that reaches the file system by some other route makes a
+ * preview a description of the code rather than a rehearsal of it.
  */
 package com.botmaker.cli.release;

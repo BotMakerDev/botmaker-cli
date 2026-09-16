@@ -69,6 +69,25 @@ subject and the final `Released:` line agree, line for line. What remains in a r
 prefix, the gate ordering above, heredoc bodies the port elides on purpose, and the minute in the release
 log's filename.
 
+## The cutover, 2026-09-16 — and why this document stops being re-runnable
+
+`release.sh` is a wrapper now: 2,214 lines to ~230, with the decide pass, the gates, the tag order, the
+`.deps.env` writes, both source edits, the release log and the JitPack verification all reached through
+`botmaker release`. **The comparison at the top of this file cannot be run again**, because both sides of it
+are the same code. What was run immediately before the cutover, on the real eleven-repository tree, is the
+record above: same flags, same tree, agreement everywhere a decision or a write is stated.
+
+**Three differences survive the cutover as behaviour, and are not regressions.** D3 — every gate runs, where
+the script stopped at the first `die`. D2/D5 — the two Maven-backed SDK gates run last, so a cheap refusal is
+reported before Maven starts, under a `Gates:` heading the script did not print. D7's sibling — a heredoc's
+body is not echoed. Anyone reading an old transcript beside a new one should expect exactly those.
+
+**What replaces the diff as the check.** There is no second implementation to agree with, so the safety now
+comes from the property the port was built on: a preview and a release are `Release.run` with a different
+`Runner`, and `Runner` is the only class in the package that writes, commits, tags or pushes. A preview is
+therefore the release, less its writes — which is stronger than two implementations agreeing, and is why
+this file ends here rather than asking for a matrix nobody can run.
+
 ---
 
 ## How it was run

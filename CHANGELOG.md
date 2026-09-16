@@ -7,6 +7,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- **`release.sh` is a wrapper over `botmaker release`, so this package is the release rather than a port of
+  it.** 2,214 lines of bash to ~230: the decide pass, the gates, the tag order, every `.deps.env`, both
+  source edits, the release log and the JitPack verification are reached through the command. What stays in
+  the script is the part that is not a decision — the spelling everyone's fingers know, `--ci`'s runner
+  preparation (a git identity, the push credential for the other ten repositories, reattaching submodules
+  `actions/checkout` left detached), the `BOTMAKER_RELEASE_TOKEN` precondition, and one line of translation:
+  no `--dry-run` means `--execute`. The defaults are inverted between the two on purpose — a script whose
+  whole purpose is cutting a release should not need a flag to do it, and a command anyone can type should
+  not push a tag by accident.
+
+  **The dry-run diff that verified this package is retired with the script, and nothing replaces it.** Both
+  sides of that comparison are now the same code. It was run once more immediately before the cutover, as
+  `--all --sdk 1.2.0` over the real eleven-repository tree, and agreed on every decided version, skip, gate
+  verdict, pin, stamp, source edit and the tag order; `docs/release-port-divergences.md` records that and the
+  three differences that survive as deliberate behaviour. What guards the code from here is the property it
+  was built on: a preview and a release are one `Release.run` with a different `Runner`, and `Runner` is the
+  only class in the package that writes.
+
 ### Fixed
 
 - **The release port made two source edits it never made: the japicmp baseline and
