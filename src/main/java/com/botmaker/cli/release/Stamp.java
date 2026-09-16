@@ -4,8 +4,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Renames {@code ## [Unreleased]} to {@code ## [<version>] — <date>} in the module's release commit —
@@ -24,6 +25,22 @@ import java.util.Optional;
  */
 public final class Stamp {
 
+    /**
+     * The heading, and only the heading.
+     *
+     * <p><b>An anchored replacement rather than a whole-file rewrite</b>, which is what this did until
+     * 2026-09-16. A rewrite through {@code readAllLines}/{@code join("\n")} normalises everything the reader
+     * did not model — line endings, a missing or doubled final newline — in a file the maintainer has been
+     * editing all week, and the release commit then carries that reformatting as if it were the release's.
+     * The script's {@code sed '0,/^## \[Unreleased\]/s//…/'} touches one line, and so does this.
+     *
+     * <p>The {@code ^} is multiline and {@link Runner#replace} takes the <b>first</b> match, which together
+     * are the script's {@code 0,/…/} address: a changelog carrying both a stamped section and a fresh
+     * {@code [Unreleased]} is the ordinary state one release after another, and only the newer one is the
+     * release being cut.
+     */
+    private static final Pattern UNRELEASED = Pattern.compile("(?m)^## \\[Unreleased]");
+
     private Stamp() {
     }
 
@@ -33,34 +50,21 @@ public final class Stamp {
         if (!Files.isRegularFile(file)) {
             return Optional.empty();                       // the pilot has none, and is exempt
         }
-        List<String> lines;
+        String text;
         try {
-            lines = Files.readAllLines(file);
+            text = Files.readString(file);
         } catch (IOException e) {
             throw new ReleaseRefusal(file + ": could not be read (" + e.getMessage() + ")");
         }
         String stamped = "## [" + version + "] — " + LocalDate.now();
-        if (lines.stream().anyMatch(line -> line.startsWith("## [" + version + "]"))) {
+        if (Pattern.compile("(?m)^## \\[" + Pattern.quote(version.toString()) + "]").matcher(text).find()) {
             return Optional.empty();                       // already stamped — a resumed release
         }
-        int heading = indexOfUnreleased(lines);
-        if (heading < 0) {
+        if (!UNRELEASED.matcher(text).find()) {
             return Optional.empty();                       // nothing to stamp
         }
         runner.say("  stamping " + module.directory() + " CHANGELOG.md: [Unreleased] -> [" + version + "]");
-        // The FIRST such heading only, as the script's `sed '0,/…/s//…/'` does: a changelog carrying both a
-        // stamped section and a fresh [Unreleased] is the ordinary state one release after another.
-        lines.set(heading, stamped);
-        runner.write(file, String.join("\n", lines) + "\n");
+        runner.replace(file, UNRELEASED, Matcher.quoteReplacement(stamped));
         return Optional.of(stamped);
-    }
-
-    private static int indexOfUnreleased(List<String> lines) {
-        for (int i = 0; i < lines.size(); i++) {
-            if (lines.get(i).startsWith("## [Unreleased]")) {
-                return i;
-            }
-        }
-        return -1;
     }
 }

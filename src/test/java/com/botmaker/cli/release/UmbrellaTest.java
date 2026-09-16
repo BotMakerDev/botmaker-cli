@@ -35,7 +35,7 @@ class UmbrellaTest {
         // fact, and a log committed separately is a log somebody forgets to commit.
         assertTrue(log.stream().anyMatch(line -> line.endsWith("add releases")));
         assertTrue(log.stream().anyMatch(line ->
-                line.contains("commit -m release: shared v0.0.21 sdk v1.1.7")), log.toString());
+                line.contains("commit -m 'release: shared v0.0.21 sdk v1.1.7'")), log.toString());
     }
 
     @Test
@@ -50,11 +50,13 @@ class UmbrellaTest {
     void theUmbrellaIsPushedLastBecauseItsCommitNamesSubmoduleCommits(@TempDir Path umbrella) {
         List<String> log = new ArrayList<>();
 
+        // A dry run inspects for real and pushes nothing, so every module here reports what a directory
+        // that is not a git repository truthfully is — which is also the shape of a detached HEAD.
         Umbrella.pushBranches(recording(log), umbrella);
 
-        List<String> pushes = log.stream().filter(line -> line.contains("would push")).toList();
-        assertEquals(Order.DECIDE.size() + 1, pushes.size());
-        assertTrue(pushes.get(pushes.size() - 1).contains("would push umbrella"), pushes.toString());
+        List<String> visited = log.stream().filter(line -> line.contains("nothing pushed")).toList();
+        assertEquals(Order.DECIDE.size() + 1, visited.size(), visited.toString());
+        assertTrue(visited.get(visited.size() - 1).startsWith("  umbrella:"), visited.toString());
     }
 
     @Test

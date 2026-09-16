@@ -13,6 +13,64 @@ divergences are all in *narration, ordering and echo form*. That is a materially
 diffs are empty" would have been if it had been true by accident, and it is also not the cutover condition
 the plan wrote down.
 
+---
+
+## Update, 2026-09-16 — the release-run matrix, and two writes that did not exist
+
+**The 2026-09-06 matrix asked the wrong question of nine of its fourteen combinations.** Twelve of them cut
+a single module, and a single-module run reaches almost none of the per-module write path: no
+`.deps.env` with more than one pin, no Studio release beside an SDK release, no baseline bump on a module
+whose newest tag has moved. Run once as `--all --sdk 1.2.0` — the release actually about to be cut — the
+same comparison found **two things `release.sh` does that the port did not do at all**, both of which land
+inside a module's own release commit:
+
+### D11 — `bump_japicmp_baseline` was not ported. **Wrote nothing. Disarmed a gate. Fixed.**
+
+`release.sh:627` moves `<botmaker.japicmp.baseline>` up to the module's newest existing tag, in the release
+commit, for `botmaker-studio-api` and `botmaker-sdk`. The port had no equivalent, so a release cut through
+it would leave both baselines where they were — and a baseline that does not name the previous release is
+exactly the state `ignoreMissingOldVersion` turns into a gate that reports success and checks nothing. The
+rules it carries are never-delete on `com.botmaker.sdk.api.**` and binary compatibility for the contract.
+
+Now `Japicmp`, with the never-move-backwards rule intact (the SDK's `v1.2.0` outranks its older newest tag,
+because never-delete *begins* there and is not retroactive). Which modules it runs for is read off their
+poms rather than listed, so the two call sites the script names become one question asked of eleven.
+
+### D12 — `SDK_FALLBACK_VERSION` was not bumped. **Wrote nothing. Fixed.**
+
+`release.sh:1980` seds the constant in `MavenService.java` during the Studio release whenever the same run
+cuts the SDK. Without it, every project created by the Studio this release publishes pins the *previous*
+SDK — the failure that produced Studio v1.0.34, 1.0.35 and 1.0.36, and the entire reason `--sdk` forces
+`--studio`.
+
+Now `Fallback`, which also **takes ownership of the constant list** that `FallbackVersionsGate` used to
+declare separately. Two lists is how `TOOLKIT_FALLBACK_VERSION` spent months being moved by a release and
+checked by nothing.
+
+### What else moved in the same pass
+
+| Was | Now |
+|---|---|
+| **D1** pointer commit wording | `Module.pointerName()` transcribes the script's eleven labels, inconsistency included, so `git log --grep` over the release history does not gain a seam |
+| **D4** three missing narration lines | two of the three print (`would verify on JitPack`, the Studio package-matrix line); `DRY RUN — no changes will be made.` stays the caller's, because a library has no opinion about a banner |
+| **D6** unquoted echoes | `Runner.run` quotes each argument, so a commit subject echoes as one argument and the line is paste-able |
+| **D7** `DEPS_EOF` on a changelog | the marker follows the file |
+| **D8** whole-file changelog rewrite | `Stamp` is an anchored first-match replacement, tested to leave every other byte — CRLF, tabs, a missing final newline — exactly as it found them |
+| **D9** push pass reported nothing useful in a dry run | it inspects for real and pushes nothing; reading `rev-list --count` is not a side effect |
+
+**Still standing, both deliberately:** D3 (the port runs every gate; the script stops at the first `die`)
+and D2/D5 (gate order, and the `Gates:` heading). The port runs the two Maven-backed SDK gates **last**
+rather than third, so a cheap refusal is reported before Maven starts — which is a reason the script's order
+does not have. Neither changes a verdict.
+
+**Where that leaves the comparison**, run as `--all --sdk 1.2.0` on 2026-09-16: every decided version, every
+skip, every gate verdict, the tag order, every pin, every stamp, both source edits, the pointer-commit
+subject and the final `Released:` line agree, line for line. What remains in a raw `diff` is the `==> `
+prefix, the gate ordering above, heredoc bodies the port elides on purpose, and the minute in the release
+log's filename.
+
+---
+
 ## How it was run
 
 ```bash

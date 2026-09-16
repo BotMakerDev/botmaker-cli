@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,18 +44,15 @@ import java.util.regex.Pattern;
 public final class FallbackVersionsGate {
 
     /**
-     * The constant, and the module whose tags it must name.
+     * Studio's file holding them, relative to that module's directory — {@link Fallback}'s, read rather
+     * than copied.
      *
-     * <p>It is a map of one since 2026-09-06, and it stays a map: {@code TOOLKIT_FALLBACK_VERSION} was
-     * deleted with the toolkit entry a generated bot's pom used to declare, and the shape that outlived it is
-     * the general one — any constant Studio's source holds naming another module's tag belongs here.
+     * <p>The constant list was declared here too until 2026-09-16, beside a {@code release.sh} that
+     * {@code sed}ded the same constants from its own spelling of them. Two lists let a release move a
+     * constant this gate does not check, which is the state {@code TOOLKIT_FALLBACK_VERSION} was in for
+     * months before it was deleted. The writer owns the list; the gate reads {@link Fallback#CONSTANTS}.
      */
-    private static final Map<Module, String> CONSTANTS =
-            new EnumMap<>(Map.of(Module.SDK, "SDK_FALLBACK_VERSION"));
-
-    /** Studio's file holding them, relative to that module's directory. */
-    static final String SOURCE =
-            "src/main/java/com/botmaker/studio/services/MavenService.java";
+    static final String SOURCE = Fallback.SOURCE;
 
     private FallbackVersionsGate() {
     }
@@ -73,7 +69,7 @@ public final class FallbackVersionsGate {
 
         List<String> problems = new ArrayList<>();
         List<String> checked = new ArrayList<>();
-        for (Map.Entry<Module, String> entry : CONSTANTS.entrySet()) {
+        for (Map.Entry<Module, String> entry : Fallback.CONSTANTS.entrySet()) {
             Module module = entry.getKey();
             String constant = entry.getValue();
             if (releasing.containsKey(module)) {

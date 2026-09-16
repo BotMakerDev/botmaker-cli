@@ -7,6 +7,49 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- **The release port made two source edits it never made: the japicmp baseline and
+  `SDK_FALLBACK_VERSION`.** Both are `sed`s that land inside a module's own release commit, and neither
+  existed in `com.botmaker.cli.release` — so a release cut through the library would have produced tags that
+  differ from the script's in two ways that matter. `Japicmp` moves `<botmaker.japicmp.baseline>` up to the
+  module's newest existing tag, and only ever upwards: left where it was, the baseline stops naming the
+  previous release and `ignoreMissingOldVersion` turns never-delete into a gate that reports success and
+  checks nothing. `Fallback` moves `MavenService.SDK_FALLBACK_VERSION` during the Studio release whenever
+  the same run cuts the SDK — without it every project a freshly released Studio creates pins the
+  *previous* SDK, which is what Studio v1.0.34, v1.0.35 and v1.0.36 each shipped.
+
+  It also takes ownership of the constant list `FallbackVersionsGate` used to declare beside it. Two lists
+  is how `TOOLKIT_FALLBACK_VERSION` spent months being moved by a release and checked by nothing.
+
+  **Found by re-running the dry-run comparison as `--all --sdk 1.2.0`.** The 2026-09-06 matrix was twelve
+  single-module runs, which reach almost none of the per-module write path — and a stdout diff finds a line
+  worded differently, never a write nobody makes. `docs/release-port-divergences.md` records it as D11 and
+  D12, with the restated test.
+
+- **The changelog stamp no longer rewrites the whole file.** It was `readAllLines` then `join("\n")`, which
+  normalises line endings and the final newline of a file the maintainer has been editing all week, and the
+  release commit then carries that reformatting as if it were the release's. It is an anchored first-match
+  replacement now, like the script's `sed '0,/^## \[Unreleased\]/s//…/'`.
+
+- **A dry run's echoed commands are shell-quoted, and its push pass inspects for real.**
+  `commit -am release: studio v1.0.38` echoed as four bare words where it is one argument, and the push pass
+  answered `would push <module> if it is ahead of origin` for all eleven rather than reading the ahead-count
+  — which is not a side effect, and is the difference between *eleven repositories might be pushed* and
+  *these four will*. A dry run's output is read as a script by whoever is checking it.
+
+- **`Runner.replace` refuses a pattern that matches nothing**, where the script's `sed` is silent. That
+  silence is how `MIN_SDK_VERSION` went on being `sed`ded for weeks after the constant was deleted: a
+  release that believes it moved a pin it did not move is worse than one that stops.
+
+### Changed
+
+- **The umbrella's pointer commit is worded as `release.sh` words it.** `Module.pointerName()` transcribes
+  the script's eleven hand-written labels — `toolkit` and `archetype` abbreviated, `plugin-host` and
+  `plugin-basics` not — rather than deriving a tidier set, because that inconsistency is in every umbrella
+  release commit this project has made and a `git log --grep` over the release history would otherwise split
+  in two at the day the port took over.
+
 ### Documentation
 
 - **`docs/release-port-divergences.md` — what the release port's dry run still says differently.** The

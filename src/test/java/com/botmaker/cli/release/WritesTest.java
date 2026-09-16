@@ -114,7 +114,10 @@ class WritesTest {
 
         // Asking git in a dry run would answer "clean" and the commit would vanish from the plan — the one
         // thing a preview must not do.
-        assertTrue(log.stream().anyMatch(l -> l.contains("commit -am release: cli v0.0.13")), log.toString());
+        // Quoted, because the echo is read as a shell line: a subject joined bare would read as three
+        // arguments where it is one.
+        assertTrue(log.stream().anyMatch(l -> l.contains("commit -am 'release: cli v0.0.13'")),
+                log.toString());
         assertTrue(log.stream().anyMatch(l -> l.endsWith("tag v0.0.13")));
         assertTrue(log.stream().anyMatch(l -> l.endsWith("push origin HEAD")));
         assertTrue(log.stream().anyMatch(l -> l.endsWith("push origin v0.0.13")));

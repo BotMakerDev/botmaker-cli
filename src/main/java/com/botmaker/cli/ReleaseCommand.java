@@ -28,19 +28,19 @@ import java.util.concurrent.Callable;
  * {@code botmaker-dashboard} — and CI cannot run a JavaFX app, so the owner of those decisions cannot be
  * either of the other two. Same shape, same reason, as {@code com.botmaker.cli.validate}.
  *
- * <p><b>It cannot cut a release, and that is enforced here rather than remembered.</b> It builds a
- * {@link Runner#preview()} and has no flag that changes it. The port is verified by diffing this command's
- * output against {@code ./release.sh}'s for the same flags, and until those diffs are empty the script stays
- * the only thing that pushes a tag. A wrong tag is permanent and no exit code recalls one.
+ * <p><b>It previews unless {@code --execute} is passed, which is the inverse of the script's default.</b>
+ * {@code release.sh} releases unless {@code --dry-run} opts out; here the safe direction is the default,
+ * because a wrong tag is permanent and no exit code recalls one. The port is verified by diffing this
+ * command's preview against {@code ./release.sh --dry-run}'s for the same flags — see {@link #execute}.
  *
  * <p>The ten module options are spelled out one per field rather than collected into a map: they are the
  * script's own flags, one for one, and {@code --help} listing them is half of what makes this command
  * usable.
  */
 @Command(name = "release",
-        header = "Preview what a cross-module release would do.",
+        header = "Cut, or preview, a cross-module release.",
         description = "The decide pass, the gates and the tag order, from com.botmaker.cli.release — the "
-                + "port of release.sh. Previews only: it pushes nothing.",
+                + "port of release.sh. Previews unless --execute is passed: it pushes nothing by default.",
         mixinStandardHelpOptions = true)
 public final class ReleaseCommand implements Callable<Integer> {
 

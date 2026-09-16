@@ -45,7 +45,7 @@ public final class Umbrella {
             Version version = released.get(module);
             if (version != null) {
                 runner.git(umbrella, "add", module.directory());
-                pointers.append(module.shortName()).append(' ').append(version.tag()).append(' ');
+                pointers.append(module.pointerName()).append(' ').append(version.tag()).append(' ');
             }
         }
         if (withLog) {
@@ -73,11 +73,14 @@ public final class Umbrella {
         return ok & pushBranch(runner, umbrella, "umbrella");
     }
 
+    /**
+     * <b>A dry run inspects for real and pushes nothing.</b> Every step down to the push is a read — the
+     * branch, its upstream, the commit count — so answering {@code would push X if it is ahead} instead, as
+     * this did until 2026-09-16, threw away the one number the operator wants from a preview and made the
+     * port's output differ from the script's over a question neither had to guess at. The push itself goes
+     * through {@link Runner#git}, which echoes it and runs nothing.
+     */
     static boolean pushBranch(Runner runner, Path dir, String label) {
-        if (runner.dryRun()) {
-            runner.say("    (dry-run) would push " + label + " if it is ahead of origin");
-            return true;
-        }
         String branch = Git.capture(dir, "symbolic-ref", "--quiet", "--short", "HEAD").orElse("");
         if (branch.isBlank()) {
             runner.say("  " + label + ": detached HEAD — nothing pushed");

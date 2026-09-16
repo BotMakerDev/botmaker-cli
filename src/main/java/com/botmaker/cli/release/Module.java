@@ -67,6 +67,24 @@ public enum Module {
         return directory.substring(PREFIX.length());
     }
 
+    /**
+     * The name the umbrella's pointer commit calls this module — {@code release: toolkit v0.0.6}.
+     *
+     * <p><b>It is {@link #shortName()} for eight of the eleven and a recorded exception for three</b>, and
+     * the exception is a transcription rather than a design: {@code release.sh} writes {@code toolkit} and
+     * {@code archetype} while writing {@code plugin-host} and {@code plugin-basics} in full, in a hand-kept
+     * list of eleven lines. That inconsistency is in every pointer commit this project has ever made, so it
+     * is what a {@code git log --grep} of the release history matches. Deriving a tidier name here would
+     * silently split that history in two at the day the port took over.
+     */
+    public String pointerName() {
+        return switch (this) {
+            case PLUGIN_TOOLKIT -> "toolkit";
+            case PLUGIN_ARCHETYPE -> "archetype";
+            default -> shortName();
+        };
+    }
+
     /** The module a flag names, or empty — which the caller reports as the script's {@code unknown arg}. */
     public static Optional<Module> byFlag(String flag) {
         for (Module module : values()) {

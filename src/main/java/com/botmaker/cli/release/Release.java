@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * A whole release, from the decide pass to the pushed branches — the top half of {@code release.sh}'s main
@@ -88,6 +89,16 @@ public final class Release {
         LocalDateTime when = LocalDateTime.now();
         Path log = ReleaseLog.write(runner, umbrella, when, ReleaseLog.rows(releasing));
 
+        if (log == null && runner.dryRun()) {
+            // A dry run writes no log, so the verify loop below has nothing to fill in. Naming the artifacts
+            // it would have resolved still matters: this is the pass that catches a published pom declaring
+            // a dependency nobody can resolve, and a preview that simply stops here reads as if it does not
+            // run at all.
+            runner.say("    (dry-run) would verify on JitPack: " + ReleaseLog.rows(releasing).stream()
+                    .filter(row -> ReleaseLog.onJitpack(row.module()))
+                    .map(row -> row.module().directory() + ":" + row.version().tag())
+                    .collect(Collectors.joining(" ")));
+        }
         if (log != null) {
             // Every tag is pushed by now, so this blocks nothing: it fills the log's columns in.
             List<ReleaseLog.Row> polled = new ArrayList<>();
@@ -112,19 +123,38 @@ public final class Release {
         return new Outcome(plan, List.of(), Optional.ofNullable(log), pushed);
     }
 
-    /** One module: its pins, its changelog heading, its tag, and the wait for its JitPack build. */
+    /**
+     * One module: its pins, the constants it holds about other modules, its changelog heading, its tag, and
+     * the wait for its JitPack build.
+     *
+     * <p>The two source edits between the pins and the stamp are the script's order and it is the only one
+     * that works: both land in <i>this module's</i> release commit, so they have to happen before
+     * {@link CommitTagPush} and after the {@code .deps.env} they sit beside.
+     */
     private static void release(Runner runner, Path umbrella, Module module, Version version,
                                 Map<Module, Version> releasing, boolean wait) {
         runner.say("Releasing " + module.directory() + " " + version.tag());
         if (DepsEnv.writes(module)) {
             DepsEnv.write(runner, umbrella, module, releasing);
         }
+        if (module == Module.STUDIO) {
+            // What a freshly generated bot's pom pins, which is Studio's source and not Studio's dependency.
+            Fallback.bump(runner, umbrella, releasing);
+        }
+        // Silent for every module without the property, which is nine of the eleven.
+        Japicmp.bump(runner, umbrella, module);
         Stamp.changelog(runner, umbrella, module, version);
         // The pilot has no CHANGELOG.md and nothing else to commit, so it takes no message — as it has
         // since the stamp arrived and the other three stopped passing an empty one.
         String message = module == Module.PILOT ? ""
                 : "release: " + module.shortName() + " " + version.tag();
         CommitTagPush.run(runner, umbrella, module, version, message);
+        if (module == Module.STUDIO) {
+            // Said because it is the one tag that buys time rather than costing it: Studio heads the order
+            // precisely so its per-OS package matrix runs while the chain below is still being cut.
+            runner.say("botmaker-studio " + version.tag()
+                    + " tagged — its package matrix runs in parallel with the chain below.");
+        }
         if (wait && ReleaseLog.onJitpack(module)) {
             Jitpack.waitFor(runner, module, version, Jitpack.Sleeper.real());
         }
