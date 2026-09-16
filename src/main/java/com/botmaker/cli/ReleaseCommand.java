@@ -4,6 +4,7 @@ import com.botmaker.cli.release.Module;
 import com.botmaker.cli.release.Release;
 import com.botmaker.cli.release.ReleaseRefusal;
 import com.botmaker.cli.release.ReleaseStatus;
+import com.botmaker.cli.release.Requested;
 import com.botmaker.cli.release.Runner;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -194,26 +195,27 @@ public final class ReleaseCommand implements Callable<Integer> {
         return 0;
     }
 
-    /** The flags, as module to spec. An explicit module beats {@code --all} — {@code release.sh}'s rule. */
+    /**
+     * The flags, as module to spec.
+     *
+     * <p>This half — eleven fields to a map — is the command line's own shape. The rule that an explicit
+     * module beats {@code --all} is {@link Requested}'s, because the Dashboard and the workflow ask the
+     * same question from eleven table rows and eleven workflow inputs.
+     */
     private Map<Module, String> requested() {
-        Map<Module, String> out = new EnumMap<>(Module.class);
-        put(out, Module.STUDIO_API, studioApi);
-        put(out, Module.PLUGIN_TOOLKIT, pluginToolkit);
-        put(out, Module.PLUGIN_HOST, pluginHost);
-        put(out, Module.PLUGIN_ARCHETYPE, pluginArchetype);
-        put(out, Module.PLUGIN_BASICS, pluginBasics);
-        put(out, Module.CLI, cli);
-        put(out, Module.SHARED, shared);
-        put(out, Module.SESSION, session);
-        put(out, Module.SDK, sdk);
-        put(out, Module.STUDIO, studio);
-        put(out, Module.PILOT, pilot);
-        if (all != null) {
-            for (Module module : Module.values()) {
-                out.putIfAbsent(module, all);
-            }
-        }
-        return out;
+        Map<Module, String> explicit = new EnumMap<>(Module.class);
+        put(explicit, Module.STUDIO_API, studioApi);
+        put(explicit, Module.PLUGIN_TOOLKIT, pluginToolkit);
+        put(explicit, Module.PLUGIN_HOST, pluginHost);
+        put(explicit, Module.PLUGIN_ARCHETYPE, pluginArchetype);
+        put(explicit, Module.PLUGIN_BASICS, pluginBasics);
+        put(explicit, Module.CLI, cli);
+        put(explicit, Module.SHARED, shared);
+        put(explicit, Module.SESSION, session);
+        put(explicit, Module.SDK, sdk);
+        put(explicit, Module.STUDIO, studio);
+        put(explicit, Module.PILOT, pilot);
+        return Requested.of(Optional.ofNullable(all), explicit);
     }
 
     private static void put(Map<Module, String> out, Module module, String spec) {
