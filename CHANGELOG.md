@@ -5,6 +5,17 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- **A failed run whose log has no `[ERROR]` line still gets an excerpt in the release log.** Two shapes
+  from the 2026-09-17 release said nothing but a URL: a Node action dying inside itself (`Error: The
+  process '…/sdkmanager' failed with exit code 1`, botmaker-remote) and a job refused before any step ran
+  (`Tag "v0.0.1" is not allowed to deploy to github-pages due to environment protection rules`,
+  botmaker-remote-server) — the second has no log at all, only a failure annotation. `Actions` keeps
+  `Error:` lines and, when the log yields nothing, reads the failed jobs' annotations.
+
 ## [0.0.14] — 2026-09-17
 
 ### Fixed

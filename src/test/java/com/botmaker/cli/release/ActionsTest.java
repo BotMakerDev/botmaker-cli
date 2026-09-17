@@ -94,6 +94,22 @@ class ActionsTest {
     }
 
     @Test
+    void aNodeActionsErrorLineIsKeptAndItsStackIsNot() {
+        // botmaker-remote v0.0.1: android-actions/setup-android died inside its own dist/index.js. Neither
+        // [ERROR] nor ##[error] appears; the one line that says what failed starts with "Error: ".
+        String job = "apk";
+        String log = job + "\tRun android-actions/setup-android@v3\t2026-09-17T15:12:45.8Z Warning: Failed to"
+                + " find package 'tools'\n"
+                + job + "\tRun android-actions/setup-android@v3\t2026-09-17T15:12:45.8Z Error: The process"
+                + " '/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager' failed with exit code 1\n"
+                + job + "\tRun android-actions/setup-android@v3\t2026-09-17T15:12:45.8Z     at"
+                + " ExecState._setResult (/home/runner/work/_actions/android-actions/setup-android/v3/dist/index.js:1823:25)\n";
+
+        assertEquals(job + ": The process '/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager'"
+                + " failed with exit code 1", Actions.excerpt(log));
+    }
+
+    @Test
     void theExcerptIsCapped() {
         StringBuilder log = new StringBuilder();
         for (int i = 0; i < 40; i++) {

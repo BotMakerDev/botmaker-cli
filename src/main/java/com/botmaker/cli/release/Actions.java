@@ -48,11 +48,42 @@ public final class Actions {
         for (String id : failedRunIds(tsv)) {
             Proc.Result log = Proc.run(Path.of("."), "gh", "run", "view", id, "--repo", repo, "--log-failed");
             String excerpt = log.ok() ? excerpt(log.out()) : "";
+            if (excerpt.isBlank()) {
+                // No log line said anything: a job that failed before a step ran has no log at all, and
+                // what it has instead is a failure annotation. botmaker-remote-server v0.0.1's pages job:
+                // "Tag "v0.0.1" is not allowed to deploy to github-pages due to environment protection
+                // rules." — nowhere but there.
+                excerpt = annotations(repo, id);
+            }
             if (!excerpt.isBlank()) {
                 error.append("\n\n").append(excerpt);
             }
         }
         return new Poll(poll.verdict(), error.toString());
+    }
+
+    /** The failure annotations of a run's failed jobs, {@code <job>: <message>} per line; "" when none. */
+    static String annotations(String repo, String runId) {
+        Proc.Result jobs = Proc.run(Path.of("."), "gh", "api",
+                "repos/" + repo + "/actions/runs/" + runId + "/jobs",
+                "--jq", ".jobs[] | select(.conclusion == \"failure\") | [.id, .name] | @tsv");
+        if (!jobs.ok()) {
+            return "";
+        }
+        java.util.LinkedHashSet<String> kept = new java.util.LinkedHashSet<>();
+        for (String line : jobs.out().lines().filter(l -> !l.isBlank()).toList()) {
+            String[] cells = line.split("\t", 2);
+            String job = cells.length == 2 ? cells[1].strip() : "";
+            Proc.Result notes = Proc.run(Path.of("."), "gh", "api",
+                    "repos/" + repo + "/check-runs/" + cells[0].strip() + "/annotations",
+                    "--jq", ".[] | select(.annotation_level == \"failure\") | .message");
+            if (!notes.ok()) {
+                continue;
+            }
+            notes.out().lines().map(String::strip).filter(m -> !m.isEmpty())
+                    .forEach(m -> kept.add((job.isEmpty() ? "" : job + ": ") + m));
+        }
+        return kept.stream().limit(EXCERPT_LINES).collect(java.util.stream.Collectors.joining("\n"));
     }
 
     /** At most this many lines of a failed run's log go into the release log. */
@@ -77,8 +108,10 @@ public final class Actions {
     }
 
     /**
-     * The lines of {@code gh run view --log-failed} worth keeping: Maven's {@code [ERROR]} lines and the
-     * runner's {@code ##[error]} lines, each with the command that ran just before it.
+     * The lines of {@code gh run view --log-failed} worth keeping: Maven's {@code [ERROR]} lines, the
+     * runner's {@code ##[error]} lines and a Node action's {@code Error:} line (the first line of the stack
+     * {@code android-actions/setup-android} died with on botmaker-remote v0.0.1, and the only one that says
+     * which process failed), each with the command that ran just before it.
      *
      * <p>The command matters for the second kind. {@code ##[error]The process '/usr/bin/git' failed with exit
      * code 1} is all Studio v1.1.0's package job said, and the {@code [command]} line above it is the one
@@ -100,10 +133,12 @@ public final class Actions {
             }
             boolean maven = text.startsWith("[ERROR]");
             boolean runner = text.startsWith("##[error]");
-            if (!maven && !runner) {
+            boolean node = text.startsWith("Error: ");
+            if (!maven && !runner && !node) {
                 continue;
             }
-            String message = text.substring(maven ? "[ERROR]".length() : "##[error]".length()).strip();
+            String message = text.substring(maven ? "[ERROR]".length()
+                    : runner ? "##[error]".length() : "Error: ".length()).strip();
             if (message.isEmpty() || BOILERPLATE.stream().anyMatch(message::startsWith)) {
                 continue;
             }
