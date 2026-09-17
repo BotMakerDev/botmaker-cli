@@ -12,10 +12,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModuleTest {
 
-    /** The thirteen flags `release.sh --help` lists, in the order it lists them. */
+    /** The fourteen flags `release.sh --help` lists, in the order it lists them. */
     private static final List<String> SCRIPT_FLAGS = List.of(
             "--studio-api", "--plugin-toolkit", "--plugin-host", "--plugin-archetype", "--plugin-basics",
-            "--cli", "--shared", "--session", "--sdk", "--studio", "--pilot", "--remote-server", "--remote");
+            "--cli", "--shared", "--session", "--sdk", "--studio", "--pilot", "--remote-server", "--remote",
+            "--dashboard");
 
     @Test
     void theFlagsAreTheScriptsFlags() {
@@ -32,10 +33,10 @@ class ModuleTest {
     @Test
     void aFlagNobodyDefinedIsNotAModule() {
         assertEquals(Optional.of(Module.SDK), Module.byFlag("--sdk"));
-        // The data repositories and the dashboard have no artifact and no flag; the script answers
-        // `unknown arg` to one invented for them, and so must this.
+        // The data repositories have no artifact and no flag; the script answers `unknown arg` to one
+        // invented for them, and so must this. The dashboard was on that list until 2026-09-17.
         assertTrue(Module.byFlag("--gallery").isEmpty());
-        assertTrue(Module.byFlag("--dashboard").isEmpty());
+        assertEquals(Optional.of(Module.DASHBOARD), Module.byFlag("--dashboard"));
         assertTrue(Module.byDirectory("botmaker-plugin-registry").isEmpty());
     }
 

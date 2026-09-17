@@ -34,9 +34,10 @@ class GatePlanTest {
 
     @Test
     void theCountsAreTheScriptsOwnLoops() {
-        // Thirteen modules: two APKs take no gate; Studio and remote-server take every gate but JitPack's.
-        assertEquals(11, GatePlan.changelog(ALL).size());
-        assertEquals(11, GatePlan.ciDeps(ALL).size());
+        // Fourteen modules: two APKs take no gate; Studio, remote-server and the dashboard take every gate
+        // but JitPack's.
+        assertEquals(12, GatePlan.changelog(ALL).size());
+        assertEquals(12, GatePlan.ciDeps(ALL).size());
         assertEquals(9, GatePlan.jitpackPlugins(ALL).size());
     }
 

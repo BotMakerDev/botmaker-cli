@@ -22,11 +22,15 @@ import java.util.List;
  *     → studio-api → plugin-toolkit → plugin-host → plugin-archetype → cli → remote-server → shared
  *     → session → plugin-basics → sdk
  *     → studio (per-OS package matrix, ~6m)
+ *     → dashboard (Linux package job)
  * </pre>
  *
  * <p>{@code botmaker-remote} is the pilot's case again: an APK depending on nothing of ours, tagged with the
  * pilot so its build overlaps the chain. {@code botmaker-remote-server} is a jar JitPack never builds and
  * nothing pins, so its place in the chain is its reactor position, after the cli, and nothing waits on it.
+ * {@code botmaker-dashboard} (2026-09-17) is Studio's case once more: its {@code package} job checks out
+ * shared and the cli — and the cli's own two pins — at the refs in its {@code .deps.env}, so every one of
+ * them must be on origin first. Nothing depends on it, so it goes after Studio rather than before.
  *
  * <p><b>Studio was tagged second until 2026-09-16, and that was a race every release lost.</b> The argument
  * was that its {@code package} matrix builds its upstreams from source, so it needs no JitPack build to
@@ -56,9 +60,13 @@ public final class Order {
             Module.SHARED,
             Module.SESSION,
             Module.SDK,
-            Module.STUDIO);
+            Module.STUDIO,
+            Module.DASHBOARD);
 
-    /** Tag order: the pilot, the JitPack chain in dependency order, then Studio once all its pins exist. */
+    /**
+     * Tag order: the pilot, the JitPack chain in dependency order, then Studio once all its pins exist, then
+     * the dashboard once the cli's do.
+     */
     public static final List<Module> TAG = List.of(
             Module.PILOT,
             Module.REMOTE,
@@ -75,8 +83,10 @@ public final class Order {
             // JitPack builds on demand and does not queue, so the SDK must not start building first.
             Module.PLUGIN_BASICS,
             Module.SDK,
-            // Last: its package job checks out every upstream at the tag its .deps.env names.
-            Module.STUDIO);
+            // Its package job checks out every upstream at the tag its .deps.env names.
+            Module.STUDIO,
+            // Last: the same shape over the cli, whose tag is far above; nothing pins the dashboard.
+            Module.DASHBOARD);
 
     private Order() {
     }

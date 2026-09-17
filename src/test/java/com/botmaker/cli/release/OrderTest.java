@@ -31,10 +31,32 @@ class OrderTest {
     }
 
     @Test
-    void thePilotIsTaggedFirstAndStudioIsDecidedLast() {
-        // The pilot's APK build depends on nothing of ours, so it runs while the chain is being cut.
+    void thePilotIsTaggedFirstAndTheDashboardIsDecidedLast() {
+        // The pilot's APK build depends on nothing of ours, so it runs while the chain is being cut. The
+        // dashboard depends on the cli and nothing depends on it, so it closes both lists.
         assertEquals(Module.PILOT, Order.TAG.get(0));
-        assertEquals(Module.STUDIO, Order.DECIDE.get(Order.DECIDE.size() - 1));
+        assertEquals(Module.DASHBOARD, Order.DECIDE.get(Order.DECIDE.size() - 1));
+        assertEquals(Module.DASHBOARD, Order.TAG.get(Order.TAG.size() - 1));
+    }
+
+    @Test
+    void theDashboardIsStudiosCaseOverTheCli() {
+        // An installable app whose package job builds its upstreams from source at the refs in .deps.env:
+        // every pin must be tagged before it, and the cli's own two pins are among them because the job
+        // installs the cli from source too.
+        List<Module> pins = DepsEnv.upstreams(Module.DASHBOARD);
+        assertEquals(List.of(Module.SHARED, Module.STUDIO_API, Module.PLUGIN_HOST, Module.CLI), pins);
+        for (Module pinned : pins) {
+            assertTrue(Order.TAG.indexOf(pinned) < Order.TAG.indexOf(Module.DASHBOARD),
+                    "dashboard must be tagged after " + pinned);
+        }
+        assertTrue(Module.DASHBOARD.hasChangelog());
+        assertTrue(Module.DASHBOARD.mavenBuild());
+        assertFalse(Module.DASHBOARD.onJitpack());
+        // Forced by the cli alone, because the Release tab calls the cli's release library in-process: an
+        // installed dashboard decides by the rules it was built with.
+        assertEquals(Set.of(Module.CLI), upstreamsOf(Module.DASHBOARD));
+        assertTrue(Forcing.EDGES.stream().noneMatch(edge -> edge.upstream() == Module.DASHBOARD));
     }
 
     @Test

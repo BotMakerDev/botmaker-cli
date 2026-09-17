@@ -3,7 +3,7 @@ package com.botmaker.cli.release;
 import java.util.Optional;
 
 /**
- * The modules {@code release.sh} can cut a tag for — thirteen, and this is now the list that owns that fact.
+ * The modules {@code release.sh} can cut a tag for — fourteen, and this is now the list that owns that fact.
  *
  * <p><b>Keeping the list here is the opposite of the rule {@code botmaker-dashboard} follows, and both are
  * right.</b> The dashboard refuses to keep it because it is a <i>reader</i>: a second copy there would go
@@ -14,8 +14,10 @@ import java.util.Optional;
  *
  * <p><b>Not every submodule is here, and that is the distinction the dashboard reports as <i>not released
  * by release.sh</i>.</b> {@code botmaker-gallery} and {@code botmaker-plugin-registry} are data
- * repositories with no artifact, and {@code botmaker-dashboard} is an application nothing resolves. None of
- * them has a flag, and the script answers {@code unknown arg} to one invented for them.
+ * repositories with no artifact. Neither has a flag, and the script answers {@code unknown arg} to one
+ * invented for them. {@code botmaker-dashboard} was that case too until 2026-09-17: it is an application
+ * nothing resolves, but it is an installable one now (rpm + deb from its own {@code package} job), so it
+ * is tagged like Studio — last, and forced by the cli whose release rules it carries.
  *
  * <p><b>Declaration order is the script's flag order, and it is deliberately NOT the tag order.</b> The two
  * differ on purpose — see {@link Order#TAG} — and nothing here may be read as an ordering.
@@ -34,7 +36,8 @@ public enum Module {
     STUDIO("botmaker-studio"),
     PILOT("botmaker-pilot"),
     REMOTE_SERVER("botmaker-remote-server"),
-    REMOTE("botmaker-remote");
+    REMOTE("botmaker-remote"),
+    DASHBOARD("botmaker-dashboard");
 
     private static final String PREFIX = "botmaker-";
 
@@ -51,7 +54,7 @@ public enum Module {
 
     /**
      * The command-line flag, derived rather than tabulated: {@code --plugin-toolkit} is the directory
-     * without the {@code botmaker-} prefix, for all thirteen.
+     * without the {@code botmaker-} prefix, for all fourteen.
      */
     public String flag() {
         return "--" + directory.substring(PREFIX.length());
@@ -95,12 +98,12 @@ public enum Module {
     }
 
     /**
-     * Whether anybody resolves this module as a Maven artifact. Studio and remote-server are programs
-     * packaged by their own CI; the two apps are APKs. JitPack builds none of the four, so neither the
-     * JitPack wait nor the clean-room verification applies to them.
+     * Whether anybody resolves this module as a Maven artifact. Studio, the dashboard and remote-server
+     * are programs packaged by their own CI; the two apps are APKs. JitPack builds none of the five, so
+     * neither the JitPack wait nor the clean-room verification applies to them.
      */
     public boolean onJitpack() {
-        return mavenBuild() && this != STUDIO && this != REMOTE_SERVER;
+        return mavenBuild() && this != STUDIO && this != REMOTE_SERVER && this != DASHBOARD;
     }
 
     /**

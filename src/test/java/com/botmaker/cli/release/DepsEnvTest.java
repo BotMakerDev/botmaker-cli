@@ -23,6 +23,28 @@ class DepsEnvTest {
     }
 
     @Test
+    void theDashboardPinsTheCliAndWhatTheCliPins() {
+        // Its package job installs the cli from source, and the cli's pom resolves the contract and the
+        // loader at 0.0.0-SNAPSHOT — so those two are checked out too, or the cli's install fails. CLI_TAG
+        // is last in the file because it is the newest key.
+        String text = DepsEnv.text(Module.DASHBOARD, Map.of(
+                Module.SHARED, "v0.0.21",
+                Module.STUDIO_API, "v0.1.0",
+                Module.PLUGIN_HOST, "v0.1.0",
+                Module.CLI, "v0.0.14",
+                Module.SESSION, "v0.0.13"));
+
+        assertTrue(text.endsWith("""
+                SHARED_TAG=v0.0.21
+                STUDIO_API_TAG=v0.1.0
+                PLUGIN_HOST_TAG=v0.1.0
+                CLI_TAG=v0.0.14
+                """), text);
+        assertFalse(text.contains("SESSION_TAG"));
+        assertTrue(text.contains("compares CLI_TAG against the checkout's botmaker-cli"));
+    }
+
+    @Test
     void theTwoModulesThatRecordNothingRecordNothing() {
         // studio-api pins nothing of ours; the archetype ships text whose versions are generation-time
         // properties, so there is no pin for a contract release to invalidate.

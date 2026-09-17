@@ -59,11 +59,15 @@ same reason.
 **This package keeps the module list that `botmaker-dashboard` refuses to keep, and both are right**: the
 dashboard is a reader, so a copy there goes stale against the script; this is the owner being ported, so the
 list has to land somewhere. `Module`'s declaration order is the script's **flag** order and is deliberately
-not the **tag** order — see `Order.TAG`, where the two APKs (pilot, remote) go first and Studio last (since
-2026-09-16: Studio's package jobs check out the tags its `.deps.env` pins, so those must already be pushed).
-What a module is exempt from is asked of `Module` itself (`mavenBuild`, `onJitpack`, `hasChangelog`), never
-by naming it: the pilot and `botmaker-remote` are APKs, Studio and `botmaker-remote-server` are programs
-JitPack never builds.
+not the **tag** order — see `Order.TAG`, where the two APKs (pilot, remote) go first, Studio after the whole
+chain (since 2026-09-16: Studio's package jobs check out the tags its `.deps.env` pins, so those must
+already be pushed) and the dashboard last of all (since 2026-09-17, the same shape over the cli). What a
+module is exempt from is asked of `Module` itself (`mavenBuild`, `onJitpack`, `hasChangelog`), never by
+naming it: the pilot and `botmaker-remote` are APKs; Studio, the dashboard and `botmaker-remote-server` are
+programs JitPack never builds. **`--cli` forces `--dashboard`**: the dashboard's Release tab calls this
+package in-process, so an installed dashboard decides by the cli it was built with, and a cli release
+without a dashboard release leaves its previews on the previous rules. Its `.deps.env` pins shared, the
+cli and the cli's own two pins (`CiDepsGate.repositoryModule` maps the `cli` key).
 
 **A tag exists to publish an artifact, so "changed" is not "some byte moved" — and that is `ChangeKind`.**
 It answers three things, not two: `REAL`, `DOCS` (commits exist, all of them markdown, so the tag would

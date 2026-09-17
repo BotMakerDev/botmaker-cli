@@ -19,6 +19,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`--dashboard`** (`Module.DASHBOARD`): the operator's window joins the release as a Linux package
+  (rpm + deb from its own `package` job). Last in both orders, like Studio: its package job checks out
+  `botmaker-shared`, `botmaker-cli` and the cli's two pins at the refs in its `.deps.env` (`CLI_TAG` is a
+  new key, and `CiDepsGate` now maps the `cli` property). **`--cli` forces `--dashboard`** — the Release
+  tab calls this library in-process, so an installed dashboard decides by the cli it was built with.
+
 - **`--remote-server` and `--remote`** (`Module.REMOTE_SERVER`, `Module.REMOTE`): the phone terminal
   server and its app join the release. The app is the pilot's case — an APK with no changelog, tagged
   before the JitPack chain; the server is a jar with a changelog that JitPack never builds, tagged after

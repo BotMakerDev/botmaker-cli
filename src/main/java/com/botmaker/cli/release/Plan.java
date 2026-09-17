@@ -46,7 +46,8 @@ public final class Plan {
             Map.entry(Module.STUDIO, "studio "),
             Map.entry(Module.PILOT, "pilot  "),
             Map.entry(Module.REMOTE_SERVER, "remote-server"),
-            Map.entry(Module.REMOTE, "remote       ")));
+            Map.entry(Module.REMOTE, "remote       "),
+            Map.entry(Module.DASHBOARD, "dashboard    ")));
 
     private static final Map<Module, String> NOTE = new EnumMap<>(Map.of(
             Module.STUDIO_API, "  (the plugin contract)",
@@ -57,7 +58,8 @@ public final class Plan {
             Module.CLI, "  (the botmaker command + the validator)",
             Module.PILOT, "  (tags -> APK GitHub Release)",
             Module.REMOTE_SERVER, "  (tags -> jar GitHub Release)",
-            Module.REMOTE, "  (tags -> APK GitHub Release)"));
+            Module.REMOTE, "  (tags -> APK GitHub Release)",
+            Module.DASHBOARD, "  (tags -> rpm + deb GitHub Release)"));
 
     /** What one module was asked for, what that resolves to, and what was decided about it. */
     public record Decision(Module module, VersionSpec spec, Version version,

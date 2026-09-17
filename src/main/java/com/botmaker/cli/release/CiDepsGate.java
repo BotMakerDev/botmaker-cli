@@ -118,6 +118,9 @@ public final class CiDepsGate {
             case "plugintoolkit" -> Optional.of(Module.PLUGIN_TOOLKIT);
             case "pluginbasics" -> Optional.of(Module.PLUGIN_BASICS);
             case "pluginhost" -> Optional.of(Module.PLUGIN_HOST);
+            // The dashboard's pin on the release library (2026-09-16); the first key naming a non-plugin
+            // module, since the cli's main jar is a library the registry's CI and the dashboard both call.
+            case "cli" -> Optional.of(Module.CLI);
             default -> Optional.empty();
         };
     }

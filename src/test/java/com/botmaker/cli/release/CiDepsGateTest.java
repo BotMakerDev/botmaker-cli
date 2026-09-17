@@ -51,6 +51,17 @@ class CiDepsGateTest {
     }
 
     @Test
+    void theDashboardsPinOnTheCliIsAKeyTheGateKnows() {
+        // The first 0.0.0-SNAPSHOT pin on a non-plugin module (2026-09-16). Unmapped, the gate would throw
+        // even under --force, which is the right answer for a key nobody classified and the wrong one here.
+        String pom = "<botmaker.cli.version>0.0.0-SNAPSHOT</botmaker.cli.version>";
+        assertEquals(Optional.of(Module.CLI), CiDepsGate.repositoryModule("cli"));
+        GateVerdict verdict = CiDepsGate.check(Module.DASHBOARD, pom, Optional.of("steps: []"), false);
+        assertTrue(verdict.refusal().startsWith("botmaker-dashboard: pom.xml resolves botmaker-cli"),
+                verdict.refusal());
+    }
+
+    @Test
     void forceDowngradesARefusalToALineThatStillSaysItFailed() {
         GateVerdict verdict = CiDepsGate.check(Module.SDK, POM, Optional.of("steps: []"), true);
         assertEquals(GateVerdict.Status.FORCED, verdict.status());

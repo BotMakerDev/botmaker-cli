@@ -115,7 +115,17 @@ public record Forcing(Module upstream, Module downstream, String reason) {
             // Studio's source naming a toolkit version, a toolkit release owes Studio nothing.
             new Forcing(Module.SDK, Module.STUDIO,
                     "the release bumps MavenService.SDK_FALLBACK_VERSION, so Studio's own source changes — "
-                            + "without a Studio release, freshly created bots keep pinning the previous SDK"));
+                            + "without a Studio release, freshly created bots keep pinning the previous SDK"),
+
+            // The packaged dashboard cuts releases with the rules of the cli it was BUILT with — this very
+            // package, called in-process — so a cli release with no dashboard release leaves an installed
+            // operator's window deciding by older rules than `botmaker release` does. The edge closes that
+            // by never releasing the cli without it (2026-09-17). The run-time half is UmbrellaBar's
+            // notice, for a checkout that has moved past the installed build.
+            new Forcing(Module.CLI, Module.DASHBOARD,
+                    "the dashboard's Release tab calls this release library in-process, so an installed "
+                            + "dashboard decides by the cli it was built with — without a dashboard release, "
+                            + "its previews follow the previous rules"));
 
     /** Every reason this module is dragged in by what is already being cut. Empty means it is not forced. */
     public static List<Forcing> forcedBy(Module downstream, Set<Module> cutting) {

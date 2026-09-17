@@ -34,11 +34,12 @@ public final class DepsEnv {
             Module.STUDIO_API, "STUDIO_API_TAG",
             Module.PLUGIN_TOOLKIT, "PLUGIN_TOOLKIT_TAG",
             Module.PLUGIN_HOST, "PLUGIN_HOST_TAG",
-            Module.PLUGIN_BASICS, "PLUGIN_BASICS_TAG"));
+            Module.PLUGIN_BASICS, "PLUGIN_BASICS_TAG",
+            Module.CLI, "CLI_TAG"));
 
     private static final List<Module> ORDER = List.of(
             Module.SHARED, Module.SESSION, Module.SDK,
-            Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_HOST, Module.PLUGIN_BASICS);
+            Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_HOST, Module.PLUGIN_BASICS, Module.CLI);
 
     /**
      * Which modules write one, what they pin, and the sentence naming who reads it.
@@ -90,7 +91,20 @@ public final class DepsEnv {
                             + "# these refs and `mvn install`s them at 0.0.0-SNAPSHOT, so the release build"
                             + " resolves them from\n"
                             + "# source and never touches JitPack at all.",
-                    List.of(Module.SHARED, Module.SESSION, Module.STUDIO_API, Module.PLUGIN_HOST))));
+                    List.of(Module.SHARED, Module.SESSION, Module.STUDIO_API, Module.PLUGIN_HOST)),
+            // The dashboard depends on shared and the cli's main jar, and its package job installs the cli
+            // from source — which needs the cli's own two pins installed first. So it records four: the two
+            // it resolves and the two the cli does. The cli's tag is also what the installed app compares
+            // the checkout against (UmbrellaBar's notice), so the pin is read at run time too.
+            Module.DASHBOARD, new Writer(
+                    "Consumer: the `package` job of .github/workflows/ci.yml. It checks these four repos"
+                            + " out at\n"
+                            + "# these refs and `mvn install`s them at 0.0.0-SNAPSHOT, so the release build"
+                            + " resolves them from\n"
+                            + "# source and never touches JitPack at all. The file is also baked into the"
+                            + " packaged app, which\n"
+                            + "# compares CLI_TAG against the checkout's botmaker-cli at start-up.",
+                    List.of(Module.SHARED, Module.STUDIO_API, Module.PLUGIN_HOST, Module.CLI))));
 
     private DepsEnv() {
     }
