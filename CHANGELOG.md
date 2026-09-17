@@ -7,6 +7,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- **The packaging and Pages jobs run on the Node 24 action majors** (`checkout@v7`, `setup-java@v6`,
+  `upload-artifact@v7`, `download-artifact@v8`, `configure-pages@v6`, `upload-pages-artifact@v5`,
+  `deploy-pages@v5`). GitHub was forcing the Node 20 versions onto Node 24 and `setup-java@v4` no longer
+  receives updates. No input changed; `download-artifact@v8` now fails a download whose digest does not
+  match, which is the verdict the rpm and the deb want.
+
 ### Fixed
 
 - **A failed run whose log has no `[ERROR]` line still gets an excerpt in the release log.** Two shapes
