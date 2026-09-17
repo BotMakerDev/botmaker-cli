@@ -15,6 +15,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   (`Tag "v0.0.1" is not allowed to deploy to github-pages due to environment protection rules`,
   botmaker-remote-server) — the second has no log at all, only a failure annotation. `Actions` keeps
   `Error:` lines and, when the log yields nothing, reads the failed jobs' annotations.
+- **A tag whose workflow has not started yet no longer reads as a failed release.** The chain polls
+  seconds after the push, GitHub takes a moment to register a tag-triggered run, and the empty answer was
+  written to the log as `no run on <tag>` — which is *broken*, with no error text behind it, so the
+  dashboard drew a red lane for a module whose CI then passed (both botmaker-remote-server tags,
+  2026-09-17). `Actions.poll` now asks again every 5 s for up to 60 s before believing an empty answer.
+  Nothing else waits: a registered run already answers `running (n of m)`, which is pending.
 
 ## [0.0.14] — 2026-09-17
 

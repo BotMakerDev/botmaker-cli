@@ -28,17 +28,61 @@ public final class Actions {
     private Actions() {
     }
 
+    /** How long a tag is given to grow a run before {@code no run on <tag>} is believed, and how often it is asked. */
+    static final java.time.Duration APPEAR_WINDOW = java.time.Duration.ofSeconds(60);
+    static final java.time.Duration APPEAR_INTERVAL = java.time.Duration.ofSeconds(5);
+
+    /** What the loop waits with, so a test drives the window without spending it. */
+    @FunctionalInterface
+    interface Waiter {
+        void await(java.time.Duration duration);
+    }
+
+    private static void sleep(java.time.Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     public static Poll poll(Module module, Version version) {
         if (!Proc.onPath("gh")) {
             return new Poll("unknown (no gh on PATH)", "");
         }
         String repo = CleanRoom.OWNER + "/" + module.directory();
+        return poll(module, version, () -> runs(repo, version), Actions::sleep);
+    }
+
+    private static String runs(String repo, Version version) {
         Proc.Result run = Proc.run(Path.of("."), "gh", "run", "list",
                 "--repo", repo,
                 "--branch", version.tag(), "--limit", "20",
                 "--json", "name,status,conclusion,url,databaseId",
                 "--jq", ".[] | [.name, .status, .conclusion, .url, .databaseId] | @tsv");
-        String tsv = run.ok() ? run.out() : "";
+        return run.ok() ? run.out() : "";
+    }
+
+    /**
+     * One module's verdict, with the seam the grace window is tested through.
+     *
+     * <p><b>A run that has not appeared yet is not a run that failed.</b> The chain polls seconds after the
+     * last tag is pushed, and GitHub takes a moment to register a tag-triggered run — so an empty answer
+     * meant {@code no run on <tag>}, which {@code ReleaseLog.Health} reads as broken, with no error text to
+     * show for it. Both botmaker-remote-server tags of 2026-09-17 read {@code FAILED} in the dashboard while
+     * their workflows were starting, and both then passed. The classification is right and stays; what is
+     * added is the wait that makes the sentence true. Only the <i>empty</i> answer is retried: a run that is
+     * {@code in_progress} already answers {@code running (n of m)}, which is pending and needs no wait.
+     */
+    static Poll poll(Module module, Version version, java.util.function.Supplier<String> runs, Waiter waiter) {
+        String repo = CleanRoom.OWNER + "/" + module.directory();
+        String tsv = runs.get();
+        for (java.time.Duration waited = java.time.Duration.ZERO;
+             tsv.isBlank() && waited.compareTo(APPEAR_WINDOW) < 0;
+             waited = waited.plus(APPEAR_INTERVAL)) {
+            waiter.await(APPEAR_INTERVAL);
+            tsv = runs.get();
+        }
         Poll poll = verdict(tsv, version);
         if (poll.error().isBlank()) {
             return poll;

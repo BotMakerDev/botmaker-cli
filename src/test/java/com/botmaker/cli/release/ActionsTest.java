@@ -110,6 +110,43 @@ class ActionsTest {
     }
 
     @Test
+    void aTagWhoseRunHasNotAppearedYetIsWaitedForRatherThanCalledFailed() {
+        // The chain polls seconds after the push. botmaker-remote-server v0.0.2 and v0.0.3 both read
+        // "no run on <tag>" — broken, with no error text — while their workflow was still being registered.
+        java.util.List<java.time.Duration> waits = new java.util.ArrayList<>();
+        java.util.Iterator<String> answers = java.util.List.of("", "",
+                "release\tin_progress\t\thttps://example.invalid/1\t9").iterator();
+
+        Actions.Poll poll = Actions.poll(Module.REMOTE_SERVER, V, answers::next, waits::add);
+
+        assertEquals("running (1 of 1)", poll.verdict());
+        assertEquals(java.util.List.of(Actions.APPEAR_INTERVAL, Actions.APPEAR_INTERVAL), waits);
+    }
+
+    @Test
+    void aRunThatIsAlreadyThereIsNotWaitedOn() {
+        java.util.List<java.time.Duration> waits = new java.util.ArrayList<>();
+
+        Actions.Poll poll = Actions.poll(Module.REMOTE_SERVER, V,
+                () -> "release\tcompleted\tsuccess\thttps://example.invalid/1\t9", waits::add);
+
+        assertEquals("success (1)", poll.verdict());
+        assertTrue(waits.isEmpty());
+    }
+
+    @Test
+    void theWindowEndsAndNoRunAtAllIsStillAVerdict() {
+        // A tag that fires nothing is the failure this column was added to catch; the wait only makes the
+        // sentence true. The window is asked for exactly as many intervals as it holds.
+        java.util.List<java.time.Duration> waits = new java.util.ArrayList<>();
+
+        Actions.Poll poll = Actions.poll(Module.REMOTE_SERVER, V, () -> "", waits::add);
+
+        assertEquals("no run on v1.1.7", poll.verdict());
+        assertEquals(Actions.APPEAR_WINDOW.dividedBy(Actions.APPEAR_INTERVAL), waits.size());
+    }
+
+    @Test
     void theExcerptIsCapped() {
         StringBuilder log = new StringBuilder();
         for (int i = 0; i < 40; i++) {

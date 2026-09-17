@@ -122,6 +122,13 @@ computes exactly as a real run does, and echoes `    $ <command>` instead of exe
 `Files.writeString` or `Git.run` on a write path is a line that ignores `--dry-run`**, and it would be
 discovered as a tag that exists.
 
+**A verdict is only as true as the moment it was asked, and `Actions` owns that moment.** The chain polls
+each tag seconds after pushing it, so an empty `gh run list` means *not registered yet* far more often than
+*nothing will ever run*. `no run on <tag>` stays a **failure** — a tag is finished, and a tag that fires
+nothing is what this column was added to catch — and `Actions.poll` waits the sentence out: the empty answer
+alone is retried, every 5 s for 60 s. A run that exists already answers `running (n of m)` and is returned
+at once. The wait lives behind a `Supplier`/`Waiter` seam so the window is tested without being spent.
+
 Landed: slice 1 (`Module`, `Version`, `Level`, `Tags` = `latest_version`, `VersionSpec` = `resolve_version`,
 `Git`), slice 2 (`Relevance` = `is_release_irrelevant`, `ChangeKind`, `ReleaseDecision` = `should_release`),
 slice 3 (`Forcing`, `Order`, `DepTag`), slice 4 (`GateVerdict`, `GatePlan`, `CiDepsGate`, `ChangelogGate`,
