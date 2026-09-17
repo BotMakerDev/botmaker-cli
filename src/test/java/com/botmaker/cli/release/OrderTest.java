@@ -38,6 +38,22 @@ class OrderTest {
     }
 
     @Test
+    void theRemoteAppIsTaggedWithThePilotAndItsServerSitsInTheChain() {
+        // Both APKs depend on nothing of ours and build for minutes: both go before the JitPack chain.
+        assertTrue(Order.TAG.indexOf(Module.REMOTE) < Order.TAG.indexOf(Module.STUDIO_API));
+        assertFalse(Module.REMOTE.hasChangelog());
+        assertFalse(Module.REMOTE.mavenBuild());
+        // The server is a Maven build with a changelog that JitPack never serves and nothing pins.
+        assertTrue(Module.REMOTE_SERVER.hasChangelog());
+        assertTrue(Module.REMOTE_SERVER.mavenBuild());
+        assertFalse(Module.REMOTE_SERVER.onJitpack());
+        assertTrue(DepsEnv.upstreams(Module.REMOTE_SERVER).isEmpty());
+        assertTrue(Forcing.EDGES.stream().noneMatch(edge ->
+                edge.upstream() == Module.REMOTE_SERVER || edge.downstream() == Module.REMOTE_SERVER
+                        || edge.upstream() == Module.REMOTE || edge.downstream() == Module.REMOTE));
+    }
+
+    @Test
     void studioIsTaggedAfterEveryTagItsPackageJobChecksOut() {
         // Derived from what Studio's .deps.env pins, not restated: Studio v1.1.0's package jobs failed on
         // 2026-09-16 fetching botmaker-shared v0.1.0, which was tagged after it. A pin added to that file

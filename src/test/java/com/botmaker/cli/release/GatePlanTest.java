@@ -34,8 +34,9 @@ class GatePlanTest {
 
     @Test
     void theCountsAreTheScriptsOwnLoops() {
-        assertEquals(10, GatePlan.changelog(ALL).size());
-        assertEquals(10, GatePlan.ciDeps(ALL).size());
+        // Thirteen modules: two APKs take no gate; Studio and remote-server take every gate but JitPack's.
+        assertEquals(11, GatePlan.changelog(ALL).size());
+        assertEquals(11, GatePlan.ciDeps(ALL).size());
         assertEquals(9, GatePlan.jitpackPlugins(ALL).size());
     }
 
@@ -55,6 +56,6 @@ class GatePlanTest {
     @Test
     void gatesAreListedInDecideOrderSoTheOutputReadsAsThePlanDid() {
         assertEquals(GatePlan.ciDeps(ALL),
-                Order.DECIDE.stream().filter(m -> m != Module.PILOT).toList());
+                Order.DECIDE.stream().filter(Module::mavenBuild).toList());
     }
 }

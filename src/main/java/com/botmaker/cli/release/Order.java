@@ -18,11 +18,15 @@ import java.util.List;
  * is tagged first and runs while the JitPack chain is still going:
  *
  * <pre>
- *   pilot (APK, ~3m)
- *     → studio-api → plugin-toolkit → plugin-host → plugin-archetype → cli → shared → session
- *     → plugin-basics → sdk
+ *   pilot, remote (APKs, ~3m each)
+ *     → studio-api → plugin-toolkit → plugin-host → plugin-archetype → cli → remote-server → shared
+ *     → session → plugin-basics → sdk
  *     → studio (per-OS package matrix, ~6m)
  * </pre>
+ *
+ * <p>{@code botmaker-remote} is the pilot's case again: an APK depending on nothing of ours, tagged with the
+ * pilot so its build overlaps the chain. {@code botmaker-remote-server} is a jar JitPack never builds and
+ * nothing pins, so its place in the chain is its reactor position, after the cli, and nothing waits on it.
  *
  * <p><b>Studio was tagged second until 2026-09-16, and that was a race every release lost.</b> The argument
  * was that its {@code package} matrix builds its upstreams from source, so it needs no JitPack build to
@@ -41,12 +45,14 @@ public final class Order {
     /** Dependency order: an upstream is decided before anything its release would force. */
     public static final List<Module> DECIDE = List.of(
             Module.PILOT,
+            Module.REMOTE,
             Module.STUDIO_API,
             Module.PLUGIN_TOOLKIT,
             Module.PLUGIN_HOST,
             Module.PLUGIN_ARCHETYPE,
             Module.PLUGIN_BASICS,
             Module.CLI,
+            Module.REMOTE_SERVER,
             Module.SHARED,
             Module.SESSION,
             Module.SDK,
@@ -55,11 +61,13 @@ public final class Order {
     /** Tag order: the pilot, the JitPack chain in dependency order, then Studio once all its pins exist. */
     public static final List<Module> TAG = List.of(
             Module.PILOT,
+            Module.REMOTE,
             Module.STUDIO_API,
             Module.PLUGIN_TOOLKIT,
             Module.PLUGIN_HOST,
             Module.PLUGIN_ARCHETYPE,
             Module.CLI,
+            Module.REMOTE_SERVER,
             Module.SHARED,
             Module.SESSION,
             // Plugin #2 is tagged immediately before the SDK, which resolves it. Nothing here waits on

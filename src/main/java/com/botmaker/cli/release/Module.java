@@ -3,7 +3,7 @@ package com.botmaker.cli.release;
 import java.util.Optional;
 
 /**
- * The modules {@code release.sh} can cut a tag for — eleven, and this is now the list that owns that fact.
+ * The modules {@code release.sh} can cut a tag for — thirteen, and this is now the list that owns that fact.
  *
  * <p><b>Keeping the list here is the opposite of the rule {@code botmaker-dashboard} follows, and both are
  * right.</b> The dashboard refuses to keep it because it is a <i>reader</i>: a second copy there would go
@@ -32,7 +32,9 @@ public enum Module {
     SESSION("botmaker-session"),
     SDK("botmaker-sdk"),
     STUDIO("botmaker-studio"),
-    PILOT("botmaker-pilot");
+    PILOT("botmaker-pilot"),
+    REMOTE_SERVER("botmaker-remote-server"),
+    REMOTE("botmaker-remote");
 
     private static final String PREFIX = "botmaker-";
 
@@ -49,7 +51,7 @@ public enum Module {
 
     /**
      * The command-line flag, derived rather than tabulated: {@code --plugin-toolkit} is the directory
-     * without the {@code botmaker-} prefix, for all eleven.
+     * without the {@code botmaker-} prefix, for all thirteen.
      */
     public String flag() {
         return "--" + directory.substring(PREFIX.length());
@@ -69,7 +71,7 @@ public enum Module {
     /**
      * The name the umbrella's pointer commit calls this module — {@code release: toolkit v0.0.6}.
      *
-     * <p><b>It is {@link #shortName()} for eight of the eleven and a recorded exception for three</b>, and
+     * <p><b>It is {@link #shortName()} for all but two, and a recorded exception for those</b>, and
      * the exception is a transcription rather than a design: {@code release.sh} writes {@code toolkit} and
      * {@code archetype} while writing {@code plugin-host} and {@code plugin-basics} in full, in a hand-kept
      * list of eleven lines. That inconsistency is in every pointer commit this project has ever made, so it
@@ -82,6 +84,31 @@ public enum Module {
             case PLUGIN_ARCHETYPE -> "archetype";
             default -> shortName();
         };
+    }
+
+    /**
+     * Whether this is a Maven build at all — a pom CI builds standalone, plugin pins, a japicmp baseline.
+     * The two phone apps are Capacitor projects: no pom, nothing of that applies.
+     */
+    public boolean mavenBuild() {
+        return this != PILOT && this != REMOTE;
+    }
+
+    /**
+     * Whether anybody resolves this module as a Maven artifact. Studio and remote-server are programs
+     * packaged by their own CI; the two apps are APKs. JitPack builds none of the four, so neither the
+     * JitPack wait nor the clean-room verification applies to them.
+     */
+    public boolean onJitpack() {
+        return mavenBuild() && this != STUDIO && this != REMOTE_SERVER;
+    }
+
+    /**
+     * Whether this module keeps a {@code CHANGELOG.md} the gate reads and the release stamps. The two
+     * apps do not: an APK's release notes are JReleaser's commit log, and nothing reads notes out of one.
+     */
+    public boolean hasChangelog() {
+        return this != PILOT && this != REMOTE;
     }
 
     /** The module a flag names, or empty — which the caller reports as the script's {@code unknown arg}. */

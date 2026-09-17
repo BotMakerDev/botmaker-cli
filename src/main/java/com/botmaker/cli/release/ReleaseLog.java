@@ -118,8 +118,8 @@ public final class ReleaseLog {
         }
 
         /**
-         * The JitPack cell: {@code pending} until polled, {@code n/a} for the two modules nobody
-         * resolves — the pilot is an APK and Studio is an app packaged per-OS by its own CI — and
+         * The JitPack cell: {@code pending} until polled, {@code n/a} for the modules nobody resolves —
+         * the two APKs, Studio and remote-server, each packaged by its own CI — and
          * {@code not tagged} for a row the run never tagged, which no poll can change.
          */
         String jitpackCell() {
@@ -143,9 +143,9 @@ public final class ReleaseLog {
             return stage == Stage.FAILED || stage == Stage.NOT_REACHED;
         }
 
-        /** {@code botmaker-pilot} is the module the changelog gate exempts, and so the one with none. */
+        /** The APKs are the modules the changelog gate exempts, and so the ones with none. */
         String changelogCell() {
-            if (module == Module.PILOT) {
+            if (!module.hasChangelog()) {
                 return "n/a (no CHANGELOG.md)";
             }
             // A failed row may have failed before or after its stamp; the commit is what would say, and an
@@ -157,9 +157,9 @@ public final class ReleaseLog {
     private ReleaseLog() {
     }
 
-    /** Whether anybody resolves this module as a Maven artifact — {@code on_jitpack}. */
+    /** Whether anybody resolves this module as a Maven artifact — {@code on_jitpack}; {@link Module#onJitpack}. */
     public static boolean onJitpack(Module module) {
-        return module != Module.PILOT && module != Module.STUDIO;
+        return module.onJitpack();
     }
 
     /** The file this run writes, named for the minute it was cut. */

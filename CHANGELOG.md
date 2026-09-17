@@ -9,6 +9,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`--remote-server` and `--remote`** (`Module.REMOTE_SERVER`, `Module.REMOTE`): the phone terminal
+  server and its app join the release. The app is the pilot's case — an APK with no changelog, tagged
+  before the JitPack chain; the server is a jar with a changelog that JitPack never builds, tagged after
+  the cli. Neither pins nor forces anything. The per-module exemptions (`ChangelogGate.exempt`,
+  `ReleaseLog.onJitpack`, the gate plan) now read `Module.mavenBuild/onJitpack/hasChangelog` instead of
+  naming the pilot and Studio.
 - **The gallery's gate, catalog and auto-merge policy** (`com.botmaker.cli.gallery`). The gallery lists bots
   automatically now: a pull request that passes `GalleryGate` is merged by the gallery's own CI, subject to
   `ListingPolicy` (at most 3 new listings per author per 24 hours; updating your own listing never counts).

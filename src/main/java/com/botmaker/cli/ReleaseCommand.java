@@ -99,6 +99,14 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "The phone client. " + SPEC_HELP)
     private String pilot;
 
+    @Option(names = "--remote-server", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
+            description = "The phone terminal server. " + SPEC_HELP)
+    private String remoteServer;
+
+    @Option(names = "--remote", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
+            description = "The phone terminal app. " + SPEC_HELP)
+    private String remote;
+
     @Option(names = "--force", description = "Release every requested module, changes or not.")
     private boolean force;
 
@@ -215,6 +223,8 @@ public final class ReleaseCommand implements Callable<Integer> {
         put(explicit, Module.SDK, sdk);
         put(explicit, Module.STUDIO, studio);
         put(explicit, Module.PILOT, pilot);
+        put(explicit, Module.REMOTE_SERVER, remoteServer);
+        put(explicit, Module.REMOTE, remote);
         return Requested.of(Optional.ofNullable(all), explicit);
     }
 

@@ -93,10 +93,12 @@ public final class Release {
             // it would have resolved still matters: this is the pass that catches a published pom declaring
             // a dependency nobody can resolve, and a preview that simply stops here reads as if it does not
             // run at all.
-            runner.say("    (dry-run) would verify on JitPack: " + ReleaseLog.rows(releasing).stream()
+            String artifacts = ReleaseLog.rows(releasing).stream()
                     .filter(row -> ReleaseLog.onJitpack(row.module()))
                     .map(row -> row.module().directory() + ":" + row.version().tag())
-                    .collect(Collectors.joining(" ")));
+                    .collect(Collectors.joining(" "));
+            runner.say("    (dry-run) would verify on JitPack: "
+                    + (artifacts.isEmpty() ? "nothing (no Maven artifact in this release)" : artifacts));
         }
         if (log != null) {
             // Every tag is pushed by now, so this blocks nothing: it fills the log's columns in.
@@ -216,10 +218,10 @@ public final class Release {
         Japicmp.bump(runner, umbrella, module);
         at.accept("changelog stamp");
         Stamp.changelog(runner, umbrella, module, version);
-        // The pilot has no CHANGELOG.md and nothing else to commit, so it takes no message — as it has
+        // An APK has no CHANGELOG.md and nothing else to commit, so it takes no message — as the pilot has
         // since the stamp arrived and the other three stopped passing an empty one.
-        String message = module == Module.PILOT ? ""
-                : "release: " + module.shortName() + " " + version.tag();
+        String message = module.hasChangelog()
+                ? "release: " + module.shortName() + " " + version.tag() : "";
         at.accept("commit, tag and push");
         if (!CommitTagPush.run(runner, umbrella, module, version, message)) {
             throw new ReleaseRefusal(module.directory() + ": pushing " + version.tag() + " failed. Every"

@@ -49,14 +49,14 @@ public final class GatePlan {
     public static List<Module> ciDeps(Set<Module> releasing) {
         return Order.DECIDE.stream()
                 .filter(releasing::contains)
-                .filter(module -> module != Module.PILOT)
+                .filter(Module::mavenBuild)
                 .toList();
     }
 
     /** Modules JitPack builds, and whose pinned Maven plugins must therefore run on its Maven. */
     public static List<Module> jitpackPlugins(Set<Module> releasing) {
         return ciDeps(releasing).stream()
-                .filter(module -> module != Module.STUDIO)
+                .filter(Module::onJitpack)
                 .toList();
     }
 

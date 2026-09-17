@@ -31,9 +31,9 @@ public final class JitpackPluginsGate {
     }
 
     static GateVerdict check(Path umbrella, Module module, boolean force, Path localRepository) {
-        // Studio ships installers from its own matrix and the pilot is an APK: JitPack builds neither, so
-        // their plugin pins are bounded by nothing but their own CI.
-        if (module == Module.STUDIO || module == Module.PILOT) {
+        // Studio and remote-server ship from their own CI and the two apps are APKs: JitPack builds none
+        // of them, so their plugin pins are bounded by nothing but their own CI.
+        if (!module.onJitpack()) {
             return GateVerdict.ok("");
         }
         Path pom = umbrella.resolve(module.directory()).resolve("pom.xml");

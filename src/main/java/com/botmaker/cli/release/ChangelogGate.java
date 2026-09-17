@@ -27,9 +27,9 @@ import java.time.LocalDate;
  */
 public final class ChangelogGate {
 
-    /** {@code botmaker-pilot} has no {@code CHANGELOG.md}: it is an APK, and nothing reads notes out of it. */
+    /** The two APKs have no {@code CHANGELOG.md}, and nothing reads notes out of one ({@link Module#hasChangelog}). */
     public static boolean exempt(Module module) {
-        return module == Module.PILOT;
+        return !module.hasChangelog();
     }
 
     private ChangelogGate() {
