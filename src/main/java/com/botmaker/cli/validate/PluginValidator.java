@@ -157,7 +157,7 @@ public final class PluginValidator {
                         + " with a letter or digit, separated by . - or _");
             } else if (!seen.add(id)) {
                 problems.add("'" + id + "' is claimed twice inside this build");
-            } else if (subject.claimedPluginIds().contains(id)) {
+            } else if (subject.judges(id) && subject.claimedPluginIds().contains(id)) {
                 problems.add("'" + id + "' is already registered by another plugin; pick an id nobody else"
                         + " could reasonably want, and prefix it with something that is yours");
             }
@@ -255,7 +255,10 @@ public final class PluginValidator {
                     continue;
                 }
                 registered.add(id);
-                if (subject.claimedValueTypeIds().contains(id)) {
+                // A plugin this classpath carries only because the submitted plugin depends on it
+                // registers its own ids, under its own entry. Judging them here would refuse the SDK for
+                // plugin-basics' nine, and the advice in the message would be to rename them.
+                if (subject.judges(safeId(plugin)) && subject.claimedValueTypeIds().contains(id)) {
                     problems.add(safeId(plugin) + ": value type id '" + id
                             + "' is already registered by another plugin — a registry entry, or one the"
                             + " host itself ships; prefix yours");

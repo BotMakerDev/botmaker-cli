@@ -7,6 +7,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- **The registry gate refused a plugin that depends on a plugin.** Resolving one coordinate puts every
+  plugin it depends on on the same classpath (`botmaker-sdk` brings `botmaker-plugin-basics`), and
+  `ServiceLoader` finds them all — so the SDK's entry was refused for plugin-basics' id and its nine value
+  type ids, with a message telling the author to rename types that are not theirs. The entry's filename is
+  the id claim, so a gate run now says which plugin the entry is **about** (`PluginSubject.about`, and
+  `judges` in the `id` and `value-types` checks). A depended-on plugin is still loaded, still reported by
+  `loads`, and still merged for in-build collision detection; it is no longer judged.
+
 ### Added
 
 - **`--remote-server` and `--remote`** (`Module.REMOTE_SERVER`, `Module.REMOTE`): the phone terminal

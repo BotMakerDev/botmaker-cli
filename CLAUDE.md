@@ -269,6 +269,13 @@ on top of `botmaker plugin validate` is what only the registry knows — the ids
 the ids the **host's own bundled plugins** own (`Bundled`), and the rule that `index.json` is generated. A
 check belongs in `PluginValidator`, never here.
 
+**An entry is about one plugin, and the gate has to say which** (`PluginSubject.about`/`judges`, 2026-09-17).
+A plugin may depend on a plugin — the SDK on `botmaker-plugin-basics`, an ordinary Maven dependency — so
+resolving one coordinate loads two, and the ids the second registers belong to *its* entry. Before this the
+gate refused the SDK for plugin-basics' nine value type ids and advised renaming them. The filename is the
+id claim, so it is the answer. A local `botmaker plugin validate` names no entry and so judges every plugin
+it finds, which is what it has always done.
+
 **`Bundled` closes a hole the per-entry layout cannot close by itself.** `plugins/<id>.json` makes
 entry-vs-entry uniqueness a property of git, but a plugin the host *ships* has no entry file — so
 `com.botmaker.sdk` and the SDK's seventeen value type ids were claimed by nobody, and a submission taking one

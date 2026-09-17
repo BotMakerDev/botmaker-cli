@@ -189,9 +189,13 @@ public final class RegistryGate {
         try {
             // The bundled ids are unioned in and are never excluded by `except`: an entry claiming a host's
             // own plugin id must be refused, where an entry re-claiming its own id is an update.
+            // .about(entry.id()): the filename is the id claim, so this run knows which of the plugins on
+            // the resolved classpath the entry is about. A plugin-to-plugin dependency puts more than one
+            // there (the SDK brings plugin-basics), and those are registered under their own entries.
             subject = subjects.fromCoordinate(coordinate,
                     Bundled.union(registry.claimedPluginIds(entry.id()), bundled.pluginIds()),
-                    Bundled.union(registry.claimedValueTypeIds(entry.id()), bundled.valueTypeIds()));
+                    Bundled.union(registry.claimedValueTypeIds(entry.id()), bundled.valueTypeIds()))
+                    .about(entry.id());
         } catch (IOException e) {
             console.error("could not resolve " + coordinate + ": " + e.getMessage());
             return false;
