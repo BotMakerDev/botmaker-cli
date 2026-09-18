@@ -5,6 +5,17 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.0.16; re-released for updated upstream pins.
+
+### Fixed
+
+- **A failed run's excerpt in the release record names the actual failure.** A Java exception line
+  (`java.io.IOException: Server returned HTTP response code: 504 …`, and any `Caused by:`) is now quoted,
+  where before no line of it was. The command quoted before a runner error is now always one from the same
+  action: botmaker-session v0.0.15's record showed a `tar` an earlier action had run, as if it had failed.
+
 ## [0.0.16] — 2026-09-18
 
 ### Fixed
