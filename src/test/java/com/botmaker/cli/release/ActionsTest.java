@@ -94,6 +94,40 @@ class ActionsTest {
     }
 
     @Test
+    void aJavaExceptionIsTheReasonAndACommandFromAnEarlierActionIsNot() {
+        // Trimmed from botmaker-session v0.0.15's release job (run 35347410408, attempt 1). JReleaser's own
+        // action downloads the tool and died on a 504. The release record quoted the `tar` a PREVIOUS action
+        // ran — same job, same step column, 40 lines up — and never the exception, which matched no prefix.
+        String p = "release\tPublish the release\t2026-09-18T14:55:0";
+        String log = p + "1.1Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /tmp/a -f /tmp/b\n"
+                + p + "2.1Z ##[start-action display=Download JReleaser;id=__jreleaser_release-action.__run]\n"
+                + p + "2.2Z ##[group]📦 Download JReleaser\n"
+                + p + "3.1Z ☠️  JReleaser 1.25.0 could not be downloaded/copied\n"
+                + p + "3.2Z java.io.IOException: Server returned HTTP response code: 504 for URL:"
+                + " https://github.com/jreleaser/jreleaser/releases/download/v1.25.0/jreleaser-tool-provider-1.25.0.jar\n"
+                + p + "3.3Z \tat java.base/sun.net.www.protocol.http.HttpURLConnection.getInputStream0(HttpURLConnection.java:2024)\n"
+                + p + "3.4Z \tat get_jreleaser.main(get_jreleaser.java:87)\n"
+                + p + "4.1Z ##[error]Process completed with exit code 1.\n";
+
+        assertEquals("release: java.io.IOException: Server returned HTTP response code: 504 for URL:"
+                        + " https://github.com/jreleaser/jreleaser/releases/download/v1.25.0/jreleaser-tool-provider-1.25.0.jar\n"
+                        + "release: Process completed with exit code 1.",
+                Actions.excerpt(log));
+    }
+
+    @Test
+    void aCausedByLineIsKeptAndAMavenLineIsNotReadAsAnException() {
+        String log = "build\ttest\t2026-09-18T10:00:00.0Z Exception in thread \"main\" java.lang.IllegalStateException: no config\n"
+                + "build\ttest\t2026-09-18T10:00:00.1Z Caused by: java.nio.file.NoSuchFileException: /etc/botmaker.json\n"
+                + "build\ttest\t2026-09-18T10:00:00.2Z [ERROR] java.lang.AssertionError: expected 1\n";
+
+        assertEquals("""
+                build: java.lang.IllegalStateException: no config
+                build: Caused by: java.nio.file.NoSuchFileException: /etc/botmaker.json
+                build: java.lang.AssertionError: expected 1""", Actions.excerpt(log));
+    }
+
+    @Test
     void aNodeActionsErrorLineIsKeptAndItsStackIsNot() {
         // botmaker-remote v0.0.1: android-actions/setup-android died inside its own dist/index.js. Neither
         // [ERROR] nor ##[error] appears; the one line that says what failed starts with "Error: ".

@@ -138,6 +138,15 @@ public final class Actions {
             "Please refer to", "-> [Help", "To see the full stack trace", "Re-run Maven using",
             "For more information about the errors", "[Help 1] http");
 
+    /**
+     * A thrown Java exception as a JVM prints it: a qualified class ending {@code Exception} or {@code Error},
+     * optionally its message, optionally behind {@code Caused by: } (kept — it is usually the real reason) or
+     * {@code Exception in thread "…" } (dropped). The stack's {@code at …} lines never match: they start with
+     * {@code at}, and a class name needs a package.
+     */
+    private static final java.util.regex.Pattern EXCEPTION = java.util.regex.Pattern.compile(
+            "(?:Exception in thread \"[^\"]*\" )?((?:Caused by: )?(?:[a-z_$][\\w$]*\\.)+[A-Z][\\w$]*(?:Exception|Error)(?::.*)?)");
+
     /** The ids of the completed runs that did not succeed, from the fifth column {@link #poll} asks for. */
     static List<String> failedRunIds(String tsv) {
         List<String> ids = new ArrayList<>();
@@ -161,6 +170,12 @@ public final class Actions {
      * code 1} is all Studio v1.1.0's package job said, and the {@code [command]} line above it is the one
      * that names the ref it could not fetch. Each line is {@code <job>\t<step>\t<timestamp> <text>}; the job
      * is kept, the step and timestamp are dropped, and a message repeated across a matrix is kept once.
+     *
+     * <p>Two more since 2026-09-18, both from botmaker-session v0.0.15, whose JReleaser download died on a
+     * 504. A <b>Java exception line</b> is kept ({@link #EXCEPTION}): it was the only line naming the cause,
+     * and none of the three prefixes matched it. And the command is <b>forgotten at each {@code ##[group]} or
+     * {@code ##[start-action}</b>: the record quoted a {@code tar} an earlier action had run, as if it had
+     * failed.
      */
     static String excerpt(String log) {
         java.util.LinkedHashSet<String> kept = new java.util.LinkedHashSet<>();
@@ -175,10 +190,21 @@ public final class Actions {
                 lastCommand = text.substring("[command]".length());
                 continue;
             }
+            // A new group or action starts, so a command seen before it did not cause what follows. The step
+            // column cannot say this: a composite action's steps all log under the step that called it.
+            if (text.startsWith("##[group]") || text.startsWith("##[start-action")) {
+                lastCommand = "";
+                continue;
+            }
+            String prefix = job.isEmpty() ? "" : job + ": ";
             boolean maven = text.startsWith("[ERROR]");
             boolean runner = text.startsWith("##[error]");
             boolean node = text.startsWith("Error: ");
             if (!maven && !runner && !node) {
+                java.util.regex.Matcher exception = EXCEPTION.matcher(text.strip());
+                if (exception.matches()) {
+                    kept.add(prefix + exception.group(1));
+                }
                 continue;
             }
             String message = text.substring(maven ? "[ERROR]".length()
@@ -186,7 +212,6 @@ public final class Actions {
             if (message.isEmpty() || BOILERPLATE.stream().anyMatch(message::startsWith)) {
                 continue;
             }
-            String prefix = job.isEmpty() ? "" : job + ": ";
             if (runner && !lastCommand.isBlank()) {
                 kept.add(prefix + "$ " + lastCommand);
             }
