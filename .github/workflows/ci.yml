@@ -28,13 +28,13 @@ jobs:
       - name: Check out botmaker-studio-api
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-studio-api
+          repository: BotMakerDev/botmaker-studio-api
           path: .deps/botmaker-studio-api
 
       - name: Check out botmaker-plugin-host
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-plugin-host
+          repository: BotMakerDev/botmaker-plugin-host
           path: .deps/botmaker-plugin-host
 
       - uses: actions/setup-java@v6
@@ -75,13 +75,13 @@ jobs:
       - name: Check out botmaker-studio-api
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-studio-api
+          repository: BotMakerDev/botmaker-studio-api
           path: .deps/botmaker-studio-api
 
       - name: Check out botmaker-plugin-host
         uses: actions/checkout@v7
         with:
-          repository: LiQiyeDev/botmaker-plugin-host
+          repository: BotMakerDev/botmaker-plugin-host
           path: .deps/botmaker-plugin-host
 
       - uses: actions/setup-java@v6

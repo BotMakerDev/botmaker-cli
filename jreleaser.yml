@@ -38,7 +38,7 @@ project:
   copyright: LiQiyeDev
   inceptionYear: '2026'
   links:
-    homepage: https://github.com/LiQiyeDev/botmaker-cli
+    homepage: https://github.com/BotMakerDev/botmaker-cli
   languages:
     java:
       groupId: com.github.LiQiyeDev
@@ -47,7 +47,7 @@ project:
 
 release:
   github:
-    owner: LiQiyeDev
+    owner: BotMakerDev
     name: botmaker-cli
     tagName: 'v{{projectVersion}}'
     releaseName: 'v{{projectVersion}}'
