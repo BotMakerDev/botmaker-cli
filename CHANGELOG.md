@@ -22,6 +22,11 @@ at all. A section is invisible to a parser that has never heard of it, and the r
 
 ### Changed
 
+- **The package page looks like the rest of the project, and its commands copy.** The stylesheet and the
+  copy button now come from `botmakerdev.github.io/assets/`, the organization's front page — the same
+  origin this site is served from, so nothing new has to stay up for it — instead of a `<style>` block that
+  existed in four identical copies. The page also links to that front page, where one command installs
+  every BotMaker tool at once. The published repository, the `.repo` file and the key are untouched.
 - **The release waits on JitPack only where a later build resolves the artifact.** A wait exists because a
   downstream JitPack build started while its upstream is still building fails, and the failure is cached
   for that tag. So a module is waited on only when something tagged after it in the same release is itself
