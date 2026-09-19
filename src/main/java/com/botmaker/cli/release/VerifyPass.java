@@ -51,7 +51,7 @@ public final class VerifyPass {
                     : done.withJitpack("ok (resolves clean)", "");
         }
         Actions.Poll actions = Actions.poll(row.module(), row.version());
-        return done.withActions(actions.verdict(), actions.error());
+        return done.withActions(actions.verdict(), actions.error(), actions.url());
     }
 
     /**

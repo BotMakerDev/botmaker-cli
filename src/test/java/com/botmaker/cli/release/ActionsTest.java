@@ -216,4 +216,52 @@ class ActionsTest {
                 ci: timed_out — https://example.invalid/1
                 release: cancelled — https://example.invalid/2""", poll.error());
     }
+
+    // -------------------------------------------------------------------------
+    // The one run worth a click
+    // -------------------------------------------------------------------------
+
+    /**
+     * The verdict is the worst of several runs, and so is the link: an operator opening the page is opening
+     * it to read the failure, not the matrix job beside it that passed.
+     */
+    @Test
+    void theRunToOpenIsTheFailingOneWhenThereIsOne() {
+        String tsv = """
+                package\tcompleted\tsuccess\thttps://example.invalid/1
+                release\tcompleted\tfailure\thttps://example.invalid/2
+                """;
+
+        assertEquals("https://example.invalid/2", Actions.verdict(tsv, V).url());
+    }
+
+    @Test
+    void whileOneRunIsStillGoingThatIsTheOneToOpen() {
+        String tsv = """
+                package\tcompleted\tsuccess\thttps://example.invalid/1
+                release\tin_progress\t\thttps://example.invalid/2
+                """;
+
+        assertEquals("https://example.invalid/2", Actions.verdict(tsv, V).url());
+    }
+
+    /** Everything passed: the newest run, which is the first line {@code gh run list} returns. */
+    @Test
+    void aTagWhereEverythingPassedOpensTheNewestRun() {
+        String tsv = """
+                package\tcompleted\tsuccess\thttps://example.invalid/1
+                release\tcompleted\tskipped\thttps://example.invalid/2
+                """;
+
+        assertEquals("https://example.invalid/1", Actions.verdict(tsv, V).url());
+    }
+
+    /** No run at all: no link, and the caller falls back to the repository's filtered list. */
+    @Test
+    void aTagWithNoRunHasNothingToOpen() {
+        Actions.Poll poll = Actions.verdict("", V);
+
+        assertEquals("no run on v1.1.7", poll.verdict());
+        assertEquals("", poll.url());
+    }
 }

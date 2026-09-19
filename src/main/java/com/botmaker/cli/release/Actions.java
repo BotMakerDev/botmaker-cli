@@ -21,8 +21,16 @@ public final class Actions {
     /**
      * @param verdict the cell for the log
      * @param error   the failing runs and their URLs, empty when nothing failed
+     * @param url     the one run worth opening for this tag, or empty when none was seen — see
+     *                {@link #bestRun}. It is what the dashboard's <b>Actions ↗</b> chip goes to, and what
+     *                the log records beside the verdict so a release read months later still reaches it.
      */
-    public record Poll(String verdict, String error) {
+    public record Poll(String verdict, String error, String url) {
+
+        /** The two-argument shape from before a run had a URL, for a verdict that names no run. */
+        public Poll(String verdict, String error) {
+            this(verdict, error, "");
+        }
     }
 
     private Actions() {
@@ -103,7 +111,7 @@ public final class Actions {
                 error.append("\n\n").append(excerpt);
             }
         }
-        return new Poll(poll.verdict(), error.toString());
+        return new Poll(poll.verdict(), error.toString(), poll.url());
     }
 
     /** The failure annotations of a run's failed jobs, {@code <job>: <message>} per line; "" when none. */
@@ -246,17 +254,53 @@ public final class Actions {
                 errors.add(name + ": " + conclusion + " — " + url);
             }
         }
+        String best = bestRun(tsv);
         if (total == 0) {
             // NOT the same as a pull request with no check run yet: a tag is finished, so nothing more will
             // fire and this is a finding rather than a state on the way to one.
             return new Poll("no run on " + version.tag(), "");
         }
         if (!failed.isEmpty()) {
-            return new Poll("FAILED — " + String.join(", ", failed), String.join("\n", errors));
+            return new Poll("FAILED — " + String.join(", ", failed), String.join("\n", errors), best);
         }
         if (running > 0) {
-            return new Poll("running (" + running + " of " + total + ")", "");
+            return new Poll("running (" + running + " of " + total + ")", "", best);
         }
-        return new Poll("success (" + total + ")", "");
+        return new Poll("success (" + total + ")", "", best);
+    }
+
+    /**
+     * The one run of this tag worth a click, out of the several a tag can fire.
+     *
+     * <p>In order: a run that <b>failed</b>, because that is the one an operator is opening the page to
+     * read; then one still <b>running</b>, because that is the one whose answer is not in yet; then simply
+     * the first, which {@code gh run list} returns newest first. A tag with no run at all has no URL, and
+     * the caller falls back to the repository's filtered run list.
+     */
+    static String bestRun(String tsv) {
+        String running = "";
+        String latest = "";
+        for (String line : tsv.lines().filter(l -> !l.isBlank()).toList()) {
+            String[] cells = line.split("\t", -1);
+            if (cells.length < 4 || cells[0].strip().isEmpty()) {
+                continue;
+            }
+            String status = cells[1].strip();
+            String conclusion = cells[2].strip();
+            String url = cells[3].strip();
+            if (url.isEmpty()) {
+                continue;
+            }
+            if ("completed".equals(status) && !"success".equals(conclusion) && !"skipped".equals(conclusion)) {
+                return url;
+            }
+            if (!"completed".equals(status) && running.isEmpty()) {
+                running = url;
+            }
+            if (latest.isEmpty()) {
+                latest = url;
+            }
+        }
+        return running.isEmpty() ? latest : running;
     }
 }

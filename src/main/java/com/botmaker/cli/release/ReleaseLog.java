@@ -96,30 +96,51 @@ public final class ReleaseLog {
      * @param elapsed how long this module's own turn in the chain took, {@link #elapsed(Duration)}-formatted,
      *                or empty for a row nothing timed — every log written before 2026-09-19, and every row a
      *                run never reached
+     * @param actionsUrl the run {@link Actions#bestRun} picked, or empty. It is written into the cell as a
+     *                   markdown link so one click reaches the run itself months later, rather than the
+     *                   repository's run list filtered by a tag
      */
     public record Row(Module module, Version version, Stage stage, String failure, String jitpack,
-                      String actions, String jitpackError, String actionsError, String elapsed) {
+                      String actions, String jitpackError, String actionsError, String elapsed,
+                      String actionsUrl) {
+
+        public Row {
+            actionsUrl = actionsUrl == null ? "" : actionsUrl;
+        }
+
+        /** The nine-argument shape from before a row carried the run's URL. */
+        public Row(Module module, Version version, Stage stage, String failure, String jitpack,
+                   String actions, String jitpackError, String actionsError, String elapsed) {
+            this(module, version, stage, failure, jitpack, actions, jitpackError, actionsError, elapsed, "");
+        }
 
         public Row(Module module, Version version) {
-            this(module, version, Stage.PENDING, "", "", "", "", "", "");
+            this(module, version, Stage.PENDING, "", "", "", "", "", "", "");
         }
 
         public Row withStage(Stage next) {
             return new Row(module, version, next, failure, jitpack, actions, jitpackError, actionsError,
-                    elapsed);
+                    elapsed, actionsUrl);
         }
 
         public Row failed(String step, String message) {
             return new Row(module, version, Stage.FAILED, step + ": " + message, jitpack, actions,
-                    jitpackError, actionsError, elapsed);
+                    jitpackError, actionsError, elapsed, actionsUrl);
         }
 
         public Row withJitpack(String verdict, String error) {
-            return new Row(module, version, stage, failure, verdict, actions, error, actionsError, elapsed);
+            return new Row(module, version, stage, failure, verdict, actions, error, actionsError, elapsed,
+                    actionsUrl);
         }
 
         public Row withActions(String verdict, String error) {
-            return new Row(module, version, stage, failure, jitpack, verdict, jitpackError, error, elapsed);
+            return withActions(verdict, error, actionsUrl);
+        }
+
+        /** The same, with the run the verdict is about. */
+        public Row withActions(String verdict, String error, String url) {
+            return new Row(module, version, stage, failure, jitpack, verdict, jitpackError, error, elapsed,
+                    url);
         }
 
         /**
@@ -130,7 +151,7 @@ public final class ReleaseLog {
          */
         public Row withElapsed(Duration took) {
             return new Row(module, version, stage, failure, jitpack, actions, jitpackError, actionsError,
-                    ReleaseLog.elapsed(took));
+                    ReleaseLog.elapsed(took), actionsUrl);
         }
 
         /**
@@ -148,9 +169,14 @@ public final class ReleaseLog {
             return untagged() ? "not tagged" : "pending";
         }
 
+        /**
+         * The Actions cell: the verdict, and — when the poll saw a run — the verdict as a markdown link to
+         * it. A reader of the file gets a click, and every parser that knows the spelling (this one and the
+         * dashboard's) reads the verdict back out of it; one that does not simply shows the link text.
+         */
         String actionsCell() {
             if (!actions.isBlank()) {
-                return actions;
+                return actionsUrl.isBlank() ? actions : "[" + actions + "](" + actionsUrl + ")";
             }
             return untagged() ? "not tagged" : "pending";
         }
@@ -370,15 +396,35 @@ public final class ReleaseLog {
             }
             Stage stage = cell(cells, column, "stage").map(Stage::fromCell).orElse(Stage.TAGGED);
             String dir = module.directory();
+            String actions = verdict(cells, column, "actions");
             rows.add(new Row(module, version, stage,
                     errors.getOrDefault(dir + " — release", ""),
                     verdict(cells, column, "jitpack"),
-                    verdict(cells, column, "actions"),
+                    linkText(actions),
                     errors.getOrDefault(dir + " — jitpack", ""),
                     errors.getOrDefault(dir + " — actions", ""),
-                    timings.getOrDefault(dir, "")));
+                    timings.getOrDefault(dir, ""),
+                    linkTarget(actions)));
         }
         return List.copyOf(rows);
+    }
+
+    /**
+     * A cell that may be {@code [text](url)}, split back in two — {@link #linkText} and
+     * {@link #linkTarget}. A cell that is not a link is its own text and has no target, which is every
+     * Actions cell written before 2026-09-19.
+     */
+    private static final java.util.regex.Pattern LINK =
+            java.util.regex.Pattern.compile("\\[(?<text>[^]]*)]\\((?<url>[^)]*)\\)");
+
+    static String linkText(String cell) {
+        java.util.regex.Matcher link = LINK.matcher(cell);
+        return link.matches() ? link.group("text").strip() : cell;
+    }
+
+    static String linkTarget(String cell) {
+        java.util.regex.Matcher link = LINK.matcher(cell);
+        return link.matches() ? link.group("url").strip() : "";
     }
 
     /** A verdict cell as the poller wrote it; the placeholders a render supplies read back as unpolled. */

@@ -90,6 +90,41 @@ class ReleaseLogTest {
         assertTrue(rendered.contains("**botmaker-session — actions**"));
     }
 
+    /**
+     * The Actions cell carries the run, and reads back as the verdict it always was.
+     *
+     * <p>A log is read months later, by {@code --status} and by the dashboard, and a verdict with no way to
+     * the run behind it left the reader to filter the repository's run list by tag themselves. The link is
+     * written into the cell rather than into a column of its own, because a new column shifts every reader
+     * that counts cells — the reason the timings are a section and not a column.
+     */
+    @Test
+    void theActionsCellLinksToTheRunAndReadsBackAsTheVerdict() {
+        ReleaseLog.Row row = new ReleaseLog.Row(Module.SDK, new Version(1, 1, 7))
+                .withStage(ReleaseLog.Stage.TAGGED)
+                .withActions("success (2)", "", "https://example.invalid/run/9");
+
+        String rendered = ReleaseLog.render(WHEN, List.of(row));
+        assertTrue(rendered.contains("| [success (2)](https://example.invalid/run/9) |"), rendered);
+
+        ReleaseLog.Row back = ReleaseLog.parse(rendered.lines().toList()).getFirst();
+        assertEquals("success (2)", back.actions());
+        assertEquals("https://example.invalid/run/9", back.actionsUrl());
+    }
+
+    /** Every log written before 2026-09-19: a plain verdict, and no run to open. */
+    @Test
+    void aCellWithNoLinkIsStillReadAsAVerdict() {
+        ReleaseLog.Row back = ReleaseLog.parse(ReleaseLog.render(WHEN, List.of(
+                        new ReleaseLog.Row(Module.SDK, new Version(1, 1, 7))
+                                .withStage(ReleaseLog.Stage.TAGGED)
+                                .withActions("success (2)", "")))
+                .lines().toList()).getFirst();
+
+        assertEquals("success (2)", back.actions());
+        assertEquals("", back.actionsUrl());
+    }
+
     @Test
     void rowsAreInTagOrderRatherThanTheCallersOwn() {
         Map<Module, Version> released = new EnumMap<>(Module.class);

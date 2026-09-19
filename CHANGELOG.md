@@ -7,9 +7,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.0.18; re-released for updated upstream pins.
-
 ### Added
+
+- **The release log links each Actions verdict to the run behind it.** The poll now picks one run per tag —
+  the failing one if there is one, else one still going, else the newest — and the log's Actions cell
+  becomes `[success (2)](https://…/actions/runs/…)`. A release read months later is one click from the run,
+  instead of a repository's run list to filter by hand. A cell with no link is still read as a verdict, so
+  every log written before this keeps working.
 
 - **The release log records where the minutes went.** A `## Timing` section under the table gives each
   module's own turn in the chain, then the verify pass and the whole run, and the terminal ends with the
