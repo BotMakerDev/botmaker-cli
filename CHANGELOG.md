@@ -5,6 +5,45 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.0.18; re-released for updated upstream pins.
+
+### Added
+
+- **The release log records where the minutes went.** A `## Timing` section under the table gives each
+  module's own turn in the chain, then the verify pass and the whole run, and the terminal ends with the
+  same two numbers. A module that threw is timed too: how long it ran before it failed is the first thing
+  asked about a release that stopped, and it used to vanish with the terminal.
+- **`--status` keeps those timings.** It rewrites the whole file, and re-rendering a log it did not produce
+  must not delete a measurement it was in no position to take.
+
+**Not a column.** `botmaker-dashboard`'s own reader takes a release row of exactly six or seven cells and
+drops anything else, so an eighth column would make every installed dashboard draw a release with no lanes
+at all. A section is invisible to a parser that has never heard of it, and the release table is unchanged.
+
+### Changed
+
+- **The package page looks like the rest of the project, and its commands copy.** The stylesheet and the
+  copy button now come from `botmakerdev.github.io/assets/`, the organization's front page — the same
+  origin this site is served from, so nothing new has to stay up for it — instead of a `<style>` block that
+  existed in four identical copies. The page also links to that front page, where one command installs
+  every BotMaker tool at once. The published repository, the `.repo` file and the key are untouched.
+- **The release waits on JitPack only where a later build resolves the artifact.** A wait exists because a
+  downstream JitPack build started while its upstream is still building fails, and the failure is cached
+  for that tag. So a module is waited on only when something tagged after it in the same release is itself
+  built by JitPack and pins it. A full release drops three waits of nine — `plugin-archetype` (nothing pins
+  it), `cli` (the dashboard builds it from source) and `sdk` (nothing after it resolves it) — and says so:
+  `not waiting on botmaker-sdk:v1.1.12 — nothing in this release resolves it from JitPack`. The rule is read
+  off the tag order and the `.deps.env` pins (`Waits.owed`), never kept as a list. The verify pass still
+  resolves all nine, and `--no-wait-jitpack` still turns every wait off.
+- **The verify pass checks four modules at once.** After the last tag, each row's clean-room resolve and
+  Actions poll ran one module after the other, though no row depends on another. `VerifyPass` runs them on
+  a pool of four — each resolve is a real `mvn` downloading ~120 MB, so not nine — and prints each module's
+  lines together, in tag order, as soon as that module and every module before it are done. A check that
+  throws becomes that row's Actions cell; it never stops the log from being written. `--status` and the
+  dashboard's re-poll use the same pass: a 14-module re-poll takes 1m41s including the jar rebuild.
+
 ## [0.0.18] — 2026-09-19
 
 ### Added
