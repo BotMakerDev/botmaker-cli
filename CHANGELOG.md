@@ -20,6 +20,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 drops anything else, so an eighth column would make every installed dashboard draw a release with no lanes
 at all. A section is invisible to a parser that has never heard of it, and the release table is unchanged.
 
+### Changed
+
+- **The release waits on JitPack only where a later build resolves the artifact.** A wait exists because a
+  downstream JitPack build started while its upstream is still building fails, and the failure is cached
+  for that tag. So a module is waited on only when something tagged after it in the same release is itself
+  built by JitPack and pins it. A full release drops three waits of nine — `plugin-archetype` (nothing pins
+  it), `cli` (the dashboard builds it from source) and `sdk` (nothing after it resolves it) — and says so:
+  `not waiting on botmaker-sdk:v1.1.12 — nothing in this release resolves it from JitPack`. The rule is read
+  off the tag order and the `.deps.env` pins (`Waits.owed`), never kept as a list. The verify pass still
+  resolves all nine, and `--no-wait-jitpack` still turns every wait off.
+
 ## [0.0.17] — 2026-09-19
 
 ### Changed

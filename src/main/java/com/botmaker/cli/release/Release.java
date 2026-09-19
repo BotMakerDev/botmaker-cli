@@ -244,7 +244,10 @@ public final class Release {
             runner.say("botmaker-studio " + version.tag()
                     + " tagged — last, so every tag its package matrix checks out is already on origin.");
         }
-        if (wait && ReleaseLog.onJitpack(module)) {
+        if (wait && ReleaseLog.onJitpack(module) && !Waits.owed(module, releasing.keySet())) {
+            // Still TAGGED, which is true: the verify pass fills its JitPack cell exactly as before.
+            runner.say(Waits.notWaiting(module, version));
+        } else if (wait && ReleaseLog.onJitpack(module)) {
             at.accept("jitpack wait");
             return Jitpack.waitFor(runner, module, version, Jitpack.Sleeper.real())
                     ? ReleaseLog.Stage.BUILT : ReleaseLog.Stage.TIMEOUT;
