@@ -106,22 +106,8 @@ public final class Release {
         if (log != null) {
             // Every tag is pushed by now, so this blocks nothing: it fills the log's columns in.
             java.time.Instant verifyStarted = java.time.Instant.now();
-            List<ReleaseLog.Row> polled = new ArrayList<>();
-            for (ReleaseLog.Row row : chain.rows()) {
-                ReleaseLog.Row done = row;
-                if (!row.stage().tagged()) {
-                    polled.add(row);
-                    continue;
-                }
-                if (ReleaseLog.onJitpack(row.module())) {
-                    Optional<String> broken = CleanRoom.resolve(runner, row.module(), row.version());
-                    done = broken.isPresent()
-                            ? done.withJitpack("BROKEN", broken.get())
-                            : done.withJitpack("ok (resolves clean)", "");
-                }
-                Actions.Poll actions = Actions.poll(row.module(), row.version());
-                polled.add(done.withActions(actions.verdict(), actions.error()));
-            }
+            List<ReleaseLog.Row> polled = VerifyPass.run(runner, chain.rows(),
+                    (own, row) -> row.stage().tagged() ? VerifyPass.verify(own, row) : row);
             ReleaseLog.Timing timing = new ReleaseLog.Timing(
                     ReleaseLog.elapsed(java.time.Duration.between(verifyStarted, java.time.Instant.now())),
                     ReleaseLog.elapsed(java.time.Duration.between(started, java.time.Instant.now())));

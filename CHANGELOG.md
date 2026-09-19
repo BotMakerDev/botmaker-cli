@@ -30,6 +30,12 @@ at all. A section is invisible to a parser that has never heard of it, and the r
   `not waiting on botmaker-sdk:v1.1.12 — nothing in this release resolves it from JitPack`. The rule is read
   off the tag order and the `.deps.env` pins (`Waits.owed`), never kept as a list. The verify pass still
   resolves all nine, and `--no-wait-jitpack` still turns every wait off.
+- **The verify pass checks four modules at once.** After the last tag, each row's clean-room resolve and
+  Actions poll ran one module after the other, though no row depends on another. `VerifyPass` runs them on
+  a pool of four — each resolve is a real `mvn` downloading ~120 MB, so not nine — and prints each module's
+  lines together, in tag order, as soon as that module and every module before it are done. A check that
+  throws becomes that row's Actions cell; it never stops the log from being written. `--status` and the
+  dashboard's re-poll use the same pass: a 14-module re-poll takes 1m41s including the jar rebuild.
 
 ## [0.0.17] — 2026-09-19
 

@@ -3,7 +3,6 @@ package com.botmaker.cli.release;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,32 +37,20 @@ public final class ReleaseStatus {
         }
         runner.say("Re-polling " + log.getFileName());
 
-        List<ReleaseLog.Row> rows = new ArrayList<>();
-        for (ReleaseLog.Row row : ReleaseLog.read(log)) {
-            ReleaseLog.Row polled = row;
+        // The release's own verify pass, so a re-poll is as concurrent and as ordered as the release was.
+        List<ReleaseLog.Row> rows = VerifyPass.run(runner, ReleaseLog.read(log), (own, row) -> {
             if (!row.stage().tagged()) {
                 // A row the release never tagged keeps its stage and its failure: there is no tag to ask
                 // JitPack or Actions about, and the reason it stopped is not something a poll can re-derive.
-                runner.say("    " + row.module().directory() + " " + row.version().tag()
+                own.say("    " + row.module().directory() + " " + row.version().tag()
                         + " — " + row.stage().cell() + ", not polled");
-                rows.add(row);
-                continue;
+                return row;
             }
-
-            if (ReleaseLog.onJitpack(row.module())) {
-                Optional<String> broken = CleanRoom.resolve(runner, row.module(), row.version());
-                polled = broken.isPresent()
-                        ? polled.withJitpack("BROKEN", broken.get())
-                        : polled.withJitpack("ok (resolves clean)", "");
-            }
-
-            Actions.Poll actions = Actions.poll(row.module(), row.version());
-            polled = polled.withActions(actions.verdict(), actions.error());
-
-            runner.say("    " + row.module().directory() + " " + row.version().tag()
+            ReleaseLog.Row polled = VerifyPass.verify(own, row);
+            own.say("    " + row.module().directory() + " " + row.version().tag()
                     + " — jitpack: " + polled.jitpackCell() + " · actions: " + polled.actionsCell());
-            rows.add(polled);
-        }
+            return polled;
+        });
 
         // Rewritten whole, never patched in place: a half-updated table is the one output worse than a
         // stale one, because it looks current. The timings are read back and written out again for the same
