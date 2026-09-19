@@ -66,8 +66,10 @@ public final class ReleaseStatus {
         }
 
         // Rewritten whole, never patched in place: a half-updated table is the one output worse than a
-        // stale one, because it looks current.
-        runner.write(log, ReleaseLog.render(stampOf(log), rows));
+        // stale one, because it looks current. The timings are read back and written out again for the same
+        // reason the heading keeps the original stamp: this command re-polls verdicts, and a rewrite must
+        // not delete a measurement it was never in a position to take.
+        runner.write(log, ReleaseLog.render(stampOf(log), rows, ReleaseLog.timing(log)));
         return List.copyOf(rows);
     }
 

@@ -56,6 +56,9 @@ public final class Release {
      */
     public static Outcome run(Runner runner, Path umbrella, Map<Module, String> requested,
                               boolean force, boolean wait, boolean why) {
+        // From here rather than from the first tag: "how long does a release take" is asked by somebody
+        // about to start one, and the decide pass and the gates are part of the wait.
+        java.time.Instant started = java.time.Instant.now();
         Plan plan = Plan.decide(umbrella, requested, force);
 
         runner.say("Release plan:");
@@ -102,6 +105,7 @@ public final class Release {
         }
         if (log != null) {
             // Every tag is pushed by now, so this blocks nothing: it fills the log's columns in.
+            java.time.Instant verifyStarted = java.time.Instant.now();
             List<ReleaseLog.Row> polled = new ArrayList<>();
             for (ReleaseLog.Row row : chain.rows()) {
                 ReleaseLog.Row done = row;
@@ -118,7 +122,11 @@ public final class Release {
                 Actions.Poll actions = Actions.poll(row.module(), row.version());
                 polled.add(done.withActions(actions.verdict(), actions.error()));
             }
-            runner.write(log, ReleaseLog.render(when, polled));
+            ReleaseLog.Timing timing = new ReleaseLog.Timing(
+                    ReleaseLog.elapsed(java.time.Duration.between(verifyStarted, java.time.Instant.now())),
+                    ReleaseLog.elapsed(java.time.Duration.between(started, java.time.Instant.now())));
+            runner.write(log, ReleaseLog.render(when, polled, timing));
+            runner.say("Timing: verify pass " + timing.verifyPass() + " · total " + timing.total());
         }
 
         String pointers = Umbrella.recordPointers(runner, umbrella, releasing, log != null);
@@ -160,15 +168,20 @@ public final class Release {
         for (int i = 0; i < rows.size(); i++) {
             ReleaseLog.Row row = rows.get(i);
             at[0] = "start";
+            java.time.Instant moduleStarted = java.time.Instant.now();
             try {
                 ReleaseLog.Stage stage = step.release(row.module(), row.version(), current -> at[0] = current);
-                rows.set(i, row.withStage(stage));
+                rows.set(i, row.withStage(stage)
+                        .withElapsed(java.time.Duration.between(moduleStarted, java.time.Instant.now())));
                 if (stage.tagged()) {
                     tagged.put(row.module(), row.version());
                 }
             } catch (RuntimeException e) {
+                // Timed too: how long a module ran before it threw is the first thing asked about a release
+                // that stopped, and it is gone the moment the terminal is closed.
                 rows.set(i, row.failed(at[0], e.getMessage() == null ? e.getClass().getSimpleName()
-                        : e.getMessage()));
+                                : e.getMessage())
+                        .withElapsed(java.time.Duration.between(moduleStarted, java.time.Instant.now())));
                 for (int rest = i + 1; rest < rows.size(); rest++) {
                     rows.set(rest, rows.get(rest).withStage(ReleaseLog.Stage.NOT_REACHED));
                 }

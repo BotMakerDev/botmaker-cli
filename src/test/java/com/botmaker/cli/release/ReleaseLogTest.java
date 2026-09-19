@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.EnumMap;
 import java.util.List;
@@ -137,5 +138,52 @@ class ReleaseLogTest {
         assertEquals("success (1)", read.get(0).actions());
         assertEquals("", read.get(0).jitpack());
         assertEquals("", read.get(1).actions());
+        assertEquals("", read.get(0).elapsed(), "a log written before the section was timed by nobody");
+    }
+
+    @Test
+    void aDurationIsSpelledOneWay() {
+        assertEquals("41s", ReleaseLog.elapsed(Duration.ofSeconds(41)));
+        assertEquals("3m41s", ReleaseLog.elapsed(Duration.ofSeconds(221)));
+        assertEquals("1m00s", ReleaseLog.elapsed(Duration.ofMinutes(1)));
+        // Seconds are noise at this scale, and the column is read to find the module worth looking at.
+        assertEquals("1h04m", ReleaseLog.elapsed(Duration.ofSeconds(3859)));
+        assertEquals("0s", ReleaseLog.elapsed(Duration.ofSeconds(-5)));
+    }
+
+    @Test
+    void theTimingsAreASectionAndTheyRoundTrip(@TempDir Path umbrella) throws IOException {
+        Path log = ReleaseLog.path(umbrella, WHEN);
+        Files.createDirectories(log.getParent());
+        List<ReleaseLog.Row> written = List.of(
+                new ReleaseLog.Row(Module.SHARED, new Version(0, 0, 20)).withStage(ReleaseLog.Stage.BUILT)
+                        .withElapsed(Duration.ofSeconds(221)),
+                new ReleaseLog.Row(Module.STUDIO, new Version(1, 1, 0)).withStage(ReleaseLog.Stage.TAGGED)
+                        .withElapsed(Duration.ofSeconds(12)));
+        ReleaseLog.Timing timing = new ReleaseLog.Timing("6m40s", "24m03s");
+        String rendered = ReleaseLog.render(WHEN, written, timing);
+        Files.writeString(log, rendered);
+
+        // The release table is unchanged: an eighth column would be dropped by every dashboard already
+        // installed, which takes a row of six or seven cells and nothing else.
+        assertTrue(rendered.contains("| module | version | tag | stage | changelog | jitpack | actions |"));
+        assertTrue(rendered.contains("## Timing"));
+        assertTrue(rendered.contains("| botmaker-shared | 3m41s |"));
+        assertTrue(rendered.contains("| verify pass | 6m40s |"));
+        assertTrue(rendered.contains("| total | 24m03s |"));
+
+        assertEquals(written, ReleaseLog.read(log));
+        assertEquals(timing, ReleaseLog.timing(log));
+        // The second table's rows name modules too, so a parser that did not stop at the heading would
+        // read this release as four modules.
+        assertEquals(2, ReleaseLog.read(log).size());
+    }
+
+    @Test
+    void aReleaseThatTimedNothingWritesNoSection() {
+        String rendered = ReleaseLog.render(WHEN,
+                List.of(new ReleaseLog.Row(Module.SDK, new Version(1, 1, 7))));
+
+        assertFalse(rendered.contains("## Timing"));
     }
 }

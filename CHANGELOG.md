@@ -5,6 +5,21 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **The release log records where the minutes went.** A `## Timing` section under the table gives each
+  module's own turn in the chain, then the verify pass and the whole run, and the terminal ends with the
+  same two numbers. A module that threw is timed too: how long it ran before it failed is the first thing
+  asked about a release that stopped, and it used to vanish with the terminal.
+- **`--status` keeps those timings.** It rewrites the whole file, and re-rendering a log it did not produce
+  must not delete a measurement it was in no position to take.
+
+**Not a column.** `botmaker-dashboard`'s own reader takes a release row of exactly six or seven cells and
+drops anything else, so an eighth column would make every installed dashboard draw a release with no lanes
+at all. A section is invisible to a parser that has never heard of it, and the release table is unchanged.
+
 ## [0.0.17] — 2026-09-19
 
 ### Changed

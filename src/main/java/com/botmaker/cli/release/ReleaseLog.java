@@ -3,6 +3,7 @@ package com.botmaker.cli.release;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -92,29 +93,44 @@ public final class ReleaseLog {
      * One module's line, plus whatever the release and the two pollers have filled in so far.
      *
      * @param failure {@code "<step>: <message>"} when {@link Stage#FAILED}, else empty
+     * @param elapsed how long this module's own turn in the chain took, {@link #elapsed(Duration)}-formatted,
+     *                or empty for a row nothing timed — every log written before 2026-09-19, and every row a
+     *                run never reached
      */
     public record Row(Module module, Version version, Stage stage, String failure, String jitpack,
-                      String actions, String jitpackError, String actionsError) {
+                      String actions, String jitpackError, String actionsError, String elapsed) {
 
         public Row(Module module, Version version) {
-            this(module, version, Stage.PENDING, "", "", "", "", "");
+            this(module, version, Stage.PENDING, "", "", "", "", "", "");
         }
 
         public Row withStage(Stage next) {
-            return new Row(module, version, next, failure, jitpack, actions, jitpackError, actionsError);
+            return new Row(module, version, next, failure, jitpack, actions, jitpackError, actionsError,
+                    elapsed);
         }
 
         public Row failed(String step, String message) {
             return new Row(module, version, Stage.FAILED, step + ": " + message, jitpack, actions,
-                    jitpackError, actionsError);
+                    jitpackError, actionsError, elapsed);
         }
 
         public Row withJitpack(String verdict, String error) {
-            return new Row(module, version, stage, failure, verdict, actions, error, actionsError);
+            return new Row(module, version, stage, failure, verdict, actions, error, actionsError, elapsed);
         }
 
         public Row withActions(String verdict, String error) {
-            return new Row(module, version, stage, failure, jitpack, verdict, jitpackError, error);
+            return new Row(module, version, stage, failure, jitpack, verdict, jitpackError, error, elapsed);
+        }
+
+        /**
+         * How long this module took, as {@link ReleaseLog#elapsed(Duration)} spells it.
+         *
+         * <p>Qualified, because inside a record the component accessor {@code elapsed()} hides the enclosing
+         * class's static method of the same name.
+         */
+        public Row withElapsed(Duration took) {
+            return new Row(module, version, stage, failure, jitpack, actions, jitpackError, actionsError,
+                    ReleaseLog.elapsed(took));
         }
 
         /**
@@ -154,7 +170,40 @@ public final class ReleaseLog {
         }
     }
 
+    /**
+     * The two durations that belong to the run rather than to a module.
+     *
+     * <p>Both empty is the ordinary state of a log until its release finishes, and of every log written
+     * before this section existed.
+     *
+     * @param verifyPass the clean-room resolves and the Actions polls, which run after every tag is pushed
+     * @param total      the whole run, decide pass included
+     */
+    public record Timing(String verifyPass, String total) {
+
+        public static final Timing NONE = new Timing("", "");
+
+        boolean isEmpty() {
+            return verifyPass.isBlank() && total.isBlank();
+        }
+    }
+
     private ReleaseLog() {
+    }
+
+    /**
+     * A duration as the log spells it — {@code 41s}, {@code 3m41s}, {@code 1h04m}.
+     *
+     * <p>One formatter for the cells and the summary line, so two numbers a reader compares are written the
+     * same way. Seconds are dropped past an hour: at that scale they are noise, and the column is read to
+     * find the module worth looking at.
+     */
+    public static String elapsed(Duration took) {
+        long seconds = Math.max(0, took.toSeconds());
+        if (seconds >= 3600) {
+            return String.format("%dh%02dm", seconds / 3600, (seconds % 3600) / 60);
+        }
+        return seconds >= 60 ? String.format("%dm%02ds", seconds / 60, seconds % 60) : seconds + "s";
     }
 
     /** Whether anybody resolves this module as a Maven artifact — {@code on_jitpack}; {@link Module#onJitpack}. */
@@ -167,8 +216,20 @@ public final class ReleaseLog {
         return umbrella.resolve("releases").resolve(FILE.format(when) + ".md");
     }
 
-    /** The whole file. Pure: the same rows always render the same bytes, which is what makes it diffable. */
+    /** The whole file, with whatever timings the rows carry and none of the run's own. */
     public static String render(LocalDateTime when, List<Row> rows) {
+        return render(when, rows, Timing.NONE);
+    }
+
+    /**
+     * The whole file. Pure: the same rows always render the same bytes, which is what makes it diffable.
+     *
+     * <p><b>The timings are a section under the table and not a column in it</b>, and that is not a layout
+     * preference. {@code botmaker-dashboard}'s own reader takes a row of exactly six or seven cells and
+     * drops anything else, so an eighth column would make every dashboard already installed draw a release
+     * with no lanes at all. A section is invisible to a parser that does not know it.
+     */
+    public static String render(LocalDateTime when, List<Row> rows, Timing timing) {
         StringBuilder out = new StringBuilder("# Release " + HEADING.format(when) + "\n\n");
         out.append("| module | version | tag | stage | changelog | jitpack | actions |\n");
         out.append("|---|---|---|---|---|---|---|\n");
@@ -192,6 +253,33 @@ public final class ReleaseLog {
                 append(out, row.module(), "jitpack", row.jitpackError());
                 append(out, row.module(), "actions", row.actionsError());
             }
+        }
+        out.append(timingSection(rows, timing));
+        return out.toString();
+    }
+
+    /**
+     * {@code ## Timing}, or nothing at all when there is nothing to say.
+     *
+     * <p>The first column is spelled {@code step} rather than {@code module} so that neither this table's
+     * header nor its rows can be mistaken for the release table's by a parser looking for one — the rows
+     * name modules, and the two tables would otherwise be one.
+     */
+    private static String timingSection(List<Row> rows, Timing timing) {
+        List<Row> timed = rows.stream().filter(row -> !row.elapsed().isBlank()).toList();
+        if (timed.isEmpty() && timing.isEmpty()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder("\n## Timing\n\n| step | elapsed |\n|---|---|\n");
+        for (Row row : timed) {
+            out.append("| ").append(row.module().directory())
+                    .append(" | ").append(row.elapsed()).append(" |\n");
+        }
+        if (!timing.verifyPass().isBlank()) {
+            out.append("| verify pass | ").append(timing.verifyPass()).append(" |\n");
+        }
+        if (!timing.total().isBlank()) {
+            out.append("| total | ").append(timing.total()).append(" |\n");
         }
         return out.toString();
     }
@@ -256,8 +344,14 @@ public final class ReleaseLog {
     static List<Row> parse(List<String> lines) {
         Map<String, Integer> column = new HashMap<>();
         Map<String, String> errors = errors(lines);
+        Map<String, String> timings = timings(lines);
         List<Row> rows = new ArrayList<>();
         for (String line : lines) {
+            // Every section under the release table has its own shape, and one of them is a second table
+            // whose rows also start with a module name. The release table is the one before any heading.
+            if (line.startsWith("## ")) {
+                break;
+            }
             if (line.startsWith("| module |")) {
                 String[] names = line.split("\\|");
                 for (int i = 0; i < names.length; i++) {
@@ -281,7 +375,8 @@ public final class ReleaseLog {
                     verdict(cells, column, "jitpack"),
                     verdict(cells, column, "actions"),
                     errors.getOrDefault(dir + " — jitpack", ""),
-                    errors.getOrDefault(dir + " — actions", "")));
+                    errors.getOrDefault(dir + " — actions", ""),
+                    timings.getOrDefault(dir, "")));
         }
         return List.copyOf(rows);
     }
@@ -318,6 +413,44 @@ public final class ReleaseLog {
             i = j;
         }
         return errors;
+    }
+
+    /**
+     * The {@code ## Timing} table as {@code step -> elapsed}, or empty for a log that has none.
+     *
+     * <p>Read back so that {@code --status} — which rewrites the whole file — cannot silently drop a
+     * measurement it was in no position to take.
+     */
+    private static Map<String, String> timings(List<String> lines) {
+        Map<String, String> timings = new HashMap<>();
+        boolean inSection = false;
+        for (String line : lines) {
+            if (line.startsWith("## ")) {
+                inSection = line.strip().equals("## Timing");
+                continue;
+            }
+            if (!inSection || !line.startsWith("| ") || line.startsWith("| step |")
+                    || line.startsWith("|---")) {
+                continue;
+            }
+            String[] cells = line.split("\\|");
+            if (cells.length > 2) {
+                timings.put(cells[1].strip(), cells[2].strip());
+            }
+        }
+        return timings;
+    }
+
+    /** What the run itself took, for a caller rewriting a log it did not produce. */
+    public static Timing timing(Path log) {
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(log);
+        } catch (IOException e) {
+            throw new ReleaseRefusal(log + ": could not be read (" + e.getMessage() + ")");
+        }
+        Map<String, String> timings = timings(lines);
+        return new Timing(timings.getOrDefault("verify pass", ""), timings.getOrDefault("total", ""));
     }
 
     /** The newest log in {@code releases/}, which is what {@code --status} with no argument re-polls. */
