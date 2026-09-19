@@ -34,13 +34,13 @@ public final class Jitpack {
 
     /** The pom a consumer would download — its presence is what "built" means for a waiting downstream. */
     public static String pomUrl(Module module, Version version) {
-        return "https://jitpack.io/com/github/" + CleanRoom.OWNER + "/" + module.directory()
+        return "https://jitpack.io/com/github/" + CleanRoom.COORDINATE_OWNER + "/" + module.directory()
                 + "/" + version.tag() + "/" + module.directory() + "-" + version.tag() + ".pom";
     }
 
     /** The endpoint that asks JitPack to start a build rather than waiting for somebody to request it. */
     public static String buildUrl(Module module, Version version) {
-        return "https://jitpack.io/api/builds/com.github." + CleanRoom.OWNER + "/"
+        return "https://jitpack.io/api/builds/com.github." + CleanRoom.COORDINATE_OWNER + "/"
                 + module.directory() + "/" + version.tag();
     }
 
@@ -69,7 +69,7 @@ public final class Jitpack {
             }
         }
         runner.say("warn: " + module.directory() + ":" + version.tag() + " not built on JitPack after 10 min"
-                + " — check https://jitpack.io/#" + CleanRoom.OWNER + "/" + module.directory());
+                + " — check https://jitpack.io/#" + CleanRoom.COORDINATE_OWNER + "/" + module.directory());
         return false;
     }
 

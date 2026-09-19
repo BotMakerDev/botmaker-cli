@@ -58,7 +58,7 @@ import java.util.concurrent.Callable;
         mixinStandardHelpOptions = true)
 final class BotPublishCommand implements Callable<Integer> {
 
-    private static final String GALLERY_REPO = "LiQiyeDev/botmaker-gallery";
+    private static final String GALLERY_REPO = "BotMakerDev/botmaker-gallery";
 
     private final GalleryFacts facts = GalleryFacts.github();
 

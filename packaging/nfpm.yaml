@@ -50,7 +50,7 @@ description: |
   Four verbs around the plugin platform, and a `bot` noun that creates a bot project and
   publishes it to the gallery as a starting template.
 vendor: BotMaker
-homepage: https://github.com/LiQiyeDev/botmaker-cli
+homepage: https://github.com/BotMakerDev/botmaker-cli
 license: CC0-1.0
 
 contents:

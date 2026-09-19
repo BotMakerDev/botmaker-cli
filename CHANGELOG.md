@@ -7,14 +7,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.0.16; re-released for updated upstream pins.
+### Changed
 
-### Fixed
-
-- **A failed run's excerpt in the release record names the actual failure.** A Java exception line
-  (`java.io.IOException: Server returned HTTP response code: 504 …`, and any `Caused by:`) is now quoted,
-  where before no line of it was. The command quoted before a runner error is now always one from the same
-  action: botmaker-session v0.0.15's record showed a `tar` an earlier action had run, as if it had failed.
+- **Releases, publishing and CI name the `BotMakerDev` organization.** `botmaker plugin publish` opens its
+  pull request on `BotMakerDev/botmaker-plugin-registry`, `botmaker bot publish` on
+  `BotMakerDev/botmaker-gallery`, the gallery gate reads both from there, and the release's Actions and CI
+  checks ask about `BotMakerDev/<module>`. JReleaser publishes each GitHub Release there, and the jbang alias
+  on the repository page is `botmaker@BotMakerDev`.
+- **Maven coordinates did not move.** Artifacts are still `com.github.LiQiyeDev:<module>`, and the JitPack
+  wait, build trigger and clean-room check keep using that coordinate (`CleanRoom.COORDINATE_OWNER`).
+  Maven treats the two spellings as unrelated artifacts, so moving the coordinate would put two copies of
+  shared into any bot that ended up with both.
 
 ## [0.0.16] — 2026-09-18
 

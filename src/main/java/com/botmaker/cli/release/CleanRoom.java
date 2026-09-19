@@ -24,8 +24,20 @@ import java.util.stream.Stream;
  */
 public final class CleanRoom {
 
-    /** The account every published artifact lives under. */
-    public static final String OWNER = "LiQiyeDev";
+    /** The organization every repository lives under since 2026-09-18 — what {@code gh} and git are given. */
+    public static final String OWNER = "BotMakerDev";
+
+    /**
+     * The owner in a <b>Maven coordinate</b>, which is deliberately still the old one.
+     *
+     * <p>JitPack names an artifact after the address it is asked for, so moving the repositories would have
+     * renamed every coordinate — {@code com.github.LiQiyeDev:botmaker-sdk} — in every bot's pom, in every
+     * published pom already baked by flatten, and in the registry's entries. Maven treats the two spellings
+     * as unrelated artifacts, so a project that ended up with both would carry two copies of shared. The
+     * coordinate therefore stays put and resolves through GitHub's redirect; the day that stops working, it
+     * moves in one release with the Studio change that rewrites a bot pom's groupId.
+     */
+    public static final String COORDINATE_OWNER = "LiQiyeDev";
 
     private CleanRoom() {
     }
@@ -70,7 +82,7 @@ public final class CleanRoom {
                     <groupId>com.github.%s</groupId><artifactId>%s</artifactId><version>%s</version>
                   </dependency></dependencies>
                 </project>
-                """.formatted(OWNER, module.directory(), version.tag());
+                """.formatted(COORDINATE_OWNER, module.directory(), version.tag());
     }
 
     /**

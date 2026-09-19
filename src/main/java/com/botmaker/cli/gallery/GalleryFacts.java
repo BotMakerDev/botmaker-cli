@@ -63,7 +63,7 @@ public interface GalleryFacts {
             @Override
             public Optional<List<RegistryEntry>> registry() {
                 try {
-                    return raw("https://raw.githubusercontent.com/LiQiyeDev/botmaker-plugin-registry/main/"
+                    return raw("https://raw.githubusercontent.com/BotMakerDev/botmaker-plugin-registry/main/"
                             + Registry.INDEX)
                             .map(body -> {
                                 try {
@@ -79,7 +79,7 @@ public interface GalleryFacts {
 
             @Override
             public Optional<GalleryEntry> listedEntry(String path) throws IOException {
-                Optional<byte[]> body = raw("https://raw.githubusercontent.com/LiQiyeDev/botmaker-gallery/main/"
+                Optional<byte[]> body = raw("https://raw.githubusercontent.com/BotMakerDev/botmaker-gallery/main/"
                         + path);
                 return body.isEmpty() ? Optional.empty()
                         : Optional.of(Registry.mapper().readValue(body.get(), GalleryEntry.class));

@@ -57,7 +57,7 @@ import java.util.concurrent.Callable;
         mixinStandardHelpOptions = true)
 final class PluginPublishCommand implements Callable<Integer> {
 
-    private static final String REGISTRY_REPO = "LiQiyeDev/botmaker-plugin-registry";
+    private static final String REGISTRY_REPO = "BotMakerDev/botmaker-plugin-registry";
 
     @ParentCommand
     private PluginCommand parent;

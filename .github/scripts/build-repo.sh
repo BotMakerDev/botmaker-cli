@@ -29,7 +29,7 @@ ARTIFACTS="${1:?usage: build-repo.sh <artifacts-dir> <site-dir> <tag>}"
 SITE="${2:?usage: build-repo.sh <artifacts-dir> <site-dir> <tag>}"
 TAG="${3:?usage: build-repo.sh <artifacts-dir> <site-dir> <tag>}"
 
-REPO_SLUG="${GITHUB_REPOSITORY:-LiQiyeDev/botmaker-cli}"
+REPO_SLUG="${GITHUB_REPOSITORY:-BotMakerDev/botmaker-cli}"
 # Pages serves <owner>.github.io/<repo>, lowercased.
 PAGES_URL="${PAGES_URL:-https://$(echo "${REPO_SLUG%%/*}" | tr '[:upper:]' '[:lower:]').github.io/${REPO_SLUG##*/}}"
 
@@ -175,7 +175,7 @@ package manager like anything else on the system.</p>
 <code>sudo apt-get update &amp;&amp; sudo apt-get install --only-upgrade botmaker</code>.</p>
 
 <h2>Anywhere else</h2>
-<p>One jar, every OS: <code>jbang botmaker@LiQiyeDev</code>, or download
+<p>One jar, every OS: <code>jbang botmaker@BotMakerDev</code>, or download
 <code>botmaker-cli-all.jar</code> from the
 <a href="https://github.com/${REPO_SLUG}/releases">Releases</a> page and run it with
 <code>java -jar</code>.</p>
