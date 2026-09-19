@@ -13,7 +13,7 @@ botmaker plugin publish --repo me/discord-notifier
 
 ```bash
 botmaker bot new gamebot                     # a blank bot project — no plugin, no SDK
-botmaker bot new farmer --from LiQiyeDev/botmaker-gamebot   # …or somebody's published template
+botmaker bot new farmer --from BotMakerDev/botmaker-gamebot   # …or somebody's published template
 cd gamebot
 botmaker bot publish --repo me/gamebot --template --description "A game bot to start from"
 ```
@@ -23,7 +23,7 @@ botmaker bot publish --repo me/gamebot --template --description "A game bot to s
 **Fedora / RHEL** — `botmaker` on your `PATH`, updated with the rest of the system:
 
 ```bash
-sudo curl -fsSL -o /etc/yum.repos.d/botmaker.repo https://liqiyedev.github.io/botmaker-cli/botmaker.repo
+sudo curl -fsSL -o /etc/yum.repos.d/botmaker.repo https://botmakerdev.github.io/botmaker-cli/botmaker.repo
 sudo dnf install botmaker
 ```
 
@@ -31,8 +31,8 @@ sudo dnf install botmaker
 
 ```bash
 sudo install -d -m 755 /etc/apt/keyrings
-sudo curl -fsSL -o /etc/apt/keyrings/botmaker.asc https://liqiyedev.github.io/botmaker-cli/botmaker.asc
-echo "deb [signed-by=/etc/apt/keyrings/botmaker.asc] https://liqiyedev.github.io/botmaker-cli/deb stable main" \
+sudo curl -fsSL -o /etc/apt/keyrings/botmaker.asc https://botmakerdev.github.io/botmaker-cli/botmaker.asc
+echo "deb [signed-by=/etc/apt/keyrings/botmaker.asc] https://botmakerdev.github.io/botmaker-cli/deb stable main" \
   | sudo tee /etc/apt/sources.list.d/botmaker.list
 sudo apt-get update && sudo apt-get install botmaker
 ```
@@ -48,13 +48,13 @@ command line, so it cannot offer a verb the binary does not have.
 **With JBang** (no install step, and it keeps itself up to date):
 
 ```bash
-jbang botmaker@LiQiyeDev plugin validate
+jbang botmaker@BotMakerDev plugin validate
 ```
 
 **Without** — one jar, every OS, no JavaFX inside it:
 
 ```bash
-curl -LO https://github.com/LiQiyeDev/botmaker-cli/releases/latest/download/botmaker-cli-all.jar
+curl -LO https://github.com/BotMakerDev/botmaker-cli/releases/latest/download/botmaker-cli-all.jar
 java -jar botmaker-cli-all.jar plugin validate
 ```
 
@@ -157,7 +157,7 @@ hand-written gallery entry, in that order, with nothing failing until somebody e
 
 ```bash
 botmaker bot new gamebot                                     # blank
-botmaker bot new farmer --from LiQiyeDev/botmaker-gamebot     # from a published template
+botmaker bot new farmer --from BotMakerDev/botmaker-gamebot   # from a published template
 ```
 
 **Blank means blank**: a pom, one `main()` that prints a line, and `botmaker-template.properties`. No SDK,
@@ -181,7 +181,7 @@ botmaker bot publish --repo me/gamebot --template --description "A game bot to s
 Four steps, each refusing before the next: create the repository and push (a dirty tree is refused; a
 directory that is not a repository yet is initialised and committed), cut the release `--tag` names
 (default `v0.1.0`), **download that release archive** to check an install can actually fetch it, then fork
-`LiQiyeDev/botmaker-gallery`, write `bots/<owner>-<repo>.json` and open the pull request.
+`BotMakerDev/botmaker-gallery`, write `bots/<owner>-<repo>.json` and open the pull request.
 
 `--template` adds the reserved `template` tag, which is what offers the bot in Studio's **New Project**
 rather than as something to install and run. Nothing else about a template is different — so anybody can

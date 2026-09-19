@@ -6,5 +6,5 @@
       "main": "com.botmaker.cli.Main"
     }
   },
-  "description": "BotMaker plugin tooling. Run with: jbang botmaker@LiQiyeDev --help"
+  "description": "BotMaker plugin tooling. Run with: jbang botmaker@BotMakerDev --help"
 }

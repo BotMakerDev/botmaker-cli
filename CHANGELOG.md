@@ -13,7 +13,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   pull request on `BotMakerDev/botmaker-plugin-registry`, `botmaker bot publish` on
   `BotMakerDev/botmaker-gallery`, the gallery gate reads both from there, and the release's Actions and CI
   checks ask about `BotMakerDev/<module>`. JReleaser publishes each GitHub Release there, and the jbang alias
-  on the repository page is `botmaker@BotMakerDev`.
+  on the repository page is `botmaker@BotMakerDev`, in `jbang-catalog.json` as well as on the page.
+  `README.md`'s install snippets take the dnf/apt repository from `botmakerdev.github.io/botmaker-cli`.
 - **Maven coordinates did not move.** Artifacts are still `com.github.LiQiyeDev:<module>`, and the JitPack
   wait, build trigger and clean-room check keep using that coordinate (`CleanRoom.COORDINATE_OWNER`).
   Maven treats the two spellings as unrelated artifacts, so moving the coordinate would put two copies of
