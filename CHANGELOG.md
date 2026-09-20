@@ -7,6 +7,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- **`botmaker plugin validate` offers an editor's predicate a Java expression, not a stored value.** The
+  contract's `ValueContext` now carries the Java a value is written as, so `StubContexts` hands over
+  `"440"` where it used to hand over `440`. A plugin whose predicate reads the value's *text* to decide
+  whether to claim it — rare, and always discouraged — sees the quoted form.
+
 ### Added
 
 - **The release log links each Actions verdict to the run behind it.** The poll now picks one run per tag —

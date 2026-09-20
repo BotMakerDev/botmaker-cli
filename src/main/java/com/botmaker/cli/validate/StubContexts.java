@@ -6,9 +6,12 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.TypeRef;
 import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.value.ValueForm;
+import com.botmaker.plugin.api.value.ValueType;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The contexts {@link PluginValidator} offers a plugin's editor predicates.
@@ -43,12 +46,17 @@ final class StubContexts {
             }
 
             @Override
-            public List<String> value() {
-                return List.of(currentSource == null ? "" : currentSource);
+            public ValueForm form() {
+                return leafForm(typeName);
             }
 
             @Override
-            public void set(List<String> value) {
+            public String source() {
+                return currentSource == null ? "" : currentSource;
+            }
+
+            @Override
+            public void set(String javaExpression, String... importsNeeded) {
             }
 
             @Override
@@ -57,18 +65,13 @@ final class StubContexts {
             }
 
             @Override
-            public String currentSource() {
-                return currentSource == null ? "" : currentSource;
+            public Optional<String> enclosingClassName() {
+                return Optional.ofNullable(enclosingClass);
             }
 
             @Override
-            public String enclosingClass() {
-                return enclosingClass;
-            }
-
-            @Override
-            public String enclosingMethod() {
-                return enclosingMethod;
+            public Optional<String> enclosingMethodName() {
+                return Optional.ofNullable(enclosingMethod);
             }
 
             @Override
@@ -77,17 +80,18 @@ final class StubContexts {
             }
 
             @Override
-            public void replaceWith(String javaExpression, String... importsNeeded) {
+            public Optional<String> enclosingCall() {
+                return Optional.empty();
             }
         };
     }
 
     /**
-     * A Parameters row: a stored value of {@code typeName} with no call behind it. An editor chosen by the
-     * call must decline this one, which is the property the archetype's generated test holds and the reason
-     * the validator asks both shapes rather than only the slot.
+     * A value of {@code typeName} with no call behind it — a Parameters row, or a {@code @Managed} method.
+     * An editor chosen by the call must decline this one, which is the property the archetype's generated
+     * test holds and the reason the validator asks both shapes rather than only the slot.
      */
-    static ValueContext row(String typeName, String storedValue) {
+    static ValueContext row(String typeName, String source) {
         return new ValueContext() {
             @Override
             public TypeRef type() {
@@ -95,12 +99,17 @@ final class StubContexts {
             }
 
             @Override
-            public List<String> value() {
-                return List.of(storedValue == null ? "" : storedValue);
+            public ValueForm form() {
+                return leafForm(typeName);
             }
 
             @Override
-            public void set(List<String> value) {
+            public String source() {
+                return source == null ? "" : source;
+            }
+
+            @Override
+            public void set(String javaExpression, String... importsNeeded) {
             }
 
             @Override
@@ -108,6 +117,14 @@ final class StubContexts {
                 return SERVICES;
             }
         };
+    }
+
+    // Not named `form`, for the reason `typeRef` is not named `type`: a call to it sits inside an anonymous
+    // class that already declares `form()`, and Java resolves against the innermost enclosing declaration
+    // holding that NAME — arity does not widen the search.
+    private static ValueForm leafForm(String name) {
+        String safe = name == null ? "" : name;
+        return ValueForm.of(ValueType.of(safe.isEmpty() ? "?" : safe).source(safe).build());
     }
 
     // Not named `type`: a call to it sits inside an anonymous class that already declares `type()`, and
