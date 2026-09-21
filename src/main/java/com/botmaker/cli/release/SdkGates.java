@@ -1,6 +1,5 @@
 package com.botmaker.cli.release;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -64,6 +63,18 @@ public final class SdkGates {
      * that turns a directory into a subject — Maven, the classpath, the pom — belongs to the command.
      * Running the command is the only way to exercise what a plugin author actually runs, which is the whole
      * point: this gate and {@code botmaker plugin validate} in an author's terminal are one program.
+     *
+     * <p><b>And it rebuilds that jar every run, which is not a convenience.</b> {@code PluginLoader} is
+     * parent-first for {@code com.botmaker.plugin.api.**}, so the contract the plugin links against is the
+     * host's — this jar's — and never the plugin's own resolved classpath. The jar <i>is</i> the contract
+     * under test. Until 2026-09-21 this built only when the jar was <b>absent</b>, and a jar two days old,
+     * still carrying {@code ValueShape} from before the shape axis was deleted, failed {@code value-types}
+     * with {@code NoClassDefFoundError: …/ValueContainer} — a refusal that read as a defect in the SDK and
+     * was a defect in the gate's own tooling. {@code release.sh} rebuilds on every run and never showed it;
+     * the dashboard calls this library in-process and did. The reactor form ({@code -pl … -am} from the
+     * umbrella, the line {@code release.sh} uses) is the point of the rebuild: {@code -f botmaker-cli/pom.xml}
+     * would resolve studio-api and plugin-host from {@code ~/.m2} and shade a contract nobody in this
+     * checkout wrote.
      */
     public static GateVerdict sdkPlugin(Path umbrella, boolean force) {
         if (!Proc.onPath("mvn")) {
@@ -71,20 +82,18 @@ public final class SdkGates {
         }
         Path cli = umbrella.resolve(Module.CLI.directory());
         Path jar = cli.resolve("target/botmaker-cli-0.0.0-SNAPSHOT-all.jar");
-        if (!Files.isRegularFile(jar)) {
-            Proc.Result build = Proc.run(umbrella, "mvn", "-B", "-q",
-                    "-f", cli.resolve("pom.xml").toString(), "package", "-DskipTests");
-            if (!build.ok()) {
-                if (force) {
-                    return GateVerdict.forced("  sdk: botmaker-cli would not build — plugin gate FORCED");
-                }
-                return GateVerdict.refused("sdk: botmaker-cli will not build, so the plugin gate cannot"
-                        + " run.\n"
-                        + "     It is the same validator the plugin registry runs on every submission, and"
-                        + " the SDK is plugin #1.\n"
-                        + "     Fix the CLI build, or --force.\n\n"
-                        + errors(build));
+        Proc.Result build = Proc.run(umbrella, "mvn", "-B", "-q",
+                "-pl", Module.CLI.directory(), "-am", "package", "-DskipTests");
+        if (!build.ok()) {
+            if (force) {
+                return GateVerdict.forced("  sdk: botmaker-cli would not build — plugin gate FORCED");
             }
+            return GateVerdict.refused("sdk: botmaker-cli will not build, so the plugin gate cannot"
+                    + " run.\n"
+                    + "     It is the same validator the plugin registry runs on every submission, and"
+                    + " the SDK is plugin #1.\n"
+                    + "     Fix the CLI build, or --force.\n\n"
+                    + errors(build));
         }
         // `plugin validate`, not `validate`: the noun-first tree landed 2026-09-05 and the bare verb is a
         // hidden MovedCommand that prints its replacement and exits 2. A gate spelling it the old way would

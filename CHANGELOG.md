@@ -7,6 +7,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- **The SDK plugin gate rebuilds the jar it validates with, every run.** `SdkGates.sdkPlugin` runs the CLI's
+  shaded jar as the host, and `PluginLoader` is parent-first for `com.botmaker.plugin.api.**` — so that jar
+  *is* the contract the SDK is linked against. It used to build the jar only when none was there, and a jar
+  left in `target` by an earlier build pinned the gate to an older contract: a two-day-old one still carrying
+  `ValueShape` failed `value-types` with `NoClassDefFoundError: …/ValueContainer`, a refusal that read as a
+  defect in the SDK and was a defect in the gate's own tooling. `release.sh` rebuilds on every run and never
+  showed this; the dashboard calls this library in-process and did. The build is now the reactor form
+  `mvn -pl botmaker-cli -am package -DskipTests` from the umbrella, the same line `release.sh` uses, so
+  studio-api and plugin-host come from the checkout rather than from `~/.m2`.
+
 ### Changed
 
 - **`botmaker plugin validate` offers an editor's predicate a Java expression, not a stored value.** The
