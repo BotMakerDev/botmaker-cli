@@ -32,8 +32,10 @@ import java.util.stream.Collectors;
 public final class Plan {
 
     /** The label and parenthetical each module gets in the plan block, spaced as the script spaces them. */
-    // Map.ofEntries rather than Map.of: there are eleven modules and Map.of stops at ten pairs.
-    private static final Map<Module, String> LABEL = new EnumMap<>(Map.ofEntries(
+    // Map.ofEntries rather than Map.of: there are fifteen modules and Map.of stops at ten pairs.
+    // Package-private for the one test that asserts it is total: a module missing here printed `null:
+    // 0.3.0 -> v0.3.0` in the plan block, which is the kind of defect only the next new module finds.
+    static final Map<Module, String> LABEL = new EnumMap<>(Map.ofEntries(
             Map.entry(Module.STUDIO_API, "studio-api"),
             Map.entry(Module.PLUGIN_TOOLKIT, "toolkit   "),
             Map.entry(Module.PLUGIN_HOST, "host      "),
@@ -47,19 +49,22 @@ public final class Plan {
             Map.entry(Module.PILOT, "pilot  "),
             Map.entry(Module.REMOTE_SERVER, "remote-server"),
             Map.entry(Module.REMOTE, "remote       "),
-            Map.entry(Module.DASHBOARD, "dashboard    ")));
+            Map.entry(Module.DASHBOARD, "dashboard    "),
+            Map.entry(Module.GAMEBOT, "gamebot      ")));
 
-    private static final Map<Module, String> NOTE = new EnumMap<>(Map.of(
-            Module.STUDIO_API, "  (the plugin contract)",
-            Module.PLUGIN_TOOLKIT, "  (the plugin widget toolkit)",
-            Module.PLUGIN_HOST, "  (the plugin loader)",
-            Module.PLUGIN_ARCHETYPE, "  (mvn archetype:generate)",
-            Module.PLUGIN_BASICS, "  (plugin #2: values, Settings, the store)",
-            Module.CLI, "  (the botmaker command + the validator)",
-            Module.PILOT, "  (tags -> APK GitHub Release)",
-            Module.REMOTE_SERVER, "  (tags -> jar GitHub Release)",
-            Module.REMOTE, "  (tags -> APK GitHub Release)",
-            Module.DASHBOARD, "  (tags -> rpm + deb GitHub Release)"));
+    // Map.ofEntries here too, since 2026-09-21: the worked bot made it eleven.
+    private static final Map<Module, String> NOTE = new EnumMap<>(Map.ofEntries(
+            Map.entry(Module.STUDIO_API, "  (the plugin contract)"),
+            Map.entry(Module.PLUGIN_TOOLKIT, "  (the plugin widget toolkit)"),
+            Map.entry(Module.PLUGIN_HOST, "  (the plugin loader)"),
+            Map.entry(Module.PLUGIN_ARCHETYPE, "  (mvn archetype:generate)"),
+            Map.entry(Module.PLUGIN_BASICS, "  (plugin #2: values, Settings, the store)"),
+            Map.entry(Module.CLI, "  (the botmaker command + the validator)"),
+            Map.entry(Module.PILOT, "  (tags -> APK GitHub Release)"),
+            Map.entry(Module.REMOTE_SERVER, "  (tags -> jar GitHub Release)"),
+            Map.entry(Module.REMOTE, "  (tags -> APK GitHub Release)"),
+            Map.entry(Module.DASHBOARD, "  (tags -> rpm + deb GitHub Release)"),
+            Map.entry(Module.GAMEBOT, "  (the worked bot a new project copies)")));
 
     /** What one module was asked for, what that resolves to, and what was decided about it. */
     public record Decision(Module module, VersionSpec spec, Version version,

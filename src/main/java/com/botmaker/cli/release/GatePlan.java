@@ -18,6 +18,13 @@ import java.util.Set;
  *       own CI, and nothing reads notes out of it), no pom pin and no JitPack build.</li>
  *   <li>{@code botmaker-studio} is exempt from the JitPack plugin gate only: JitPack never builds it — it
  *       ships installers from its own per-OS matrix — so its plugin pins are bounded by its own CI.</li>
+ *   <li>A <b>template</b> ({@link Module#template}) takes neither CI gate, and for the plainest possible
+ *       reason: {@code botmaker-gamebot} has no {@code .github/workflows} at all. A CI verdict on a
+ *       repository with no CI is not a pass and not a failure, and {@code CiDepsGate}'s question — can this
+ *       module's own CI build it standalone — has no subject. It is exempt from the JitPack gates through
+ *       {@link Module#onJitpack} already, nobody resolving a template as an artifact. What it does take is
+ *       the template gate, which is the one question worth asking a project a user copies: does it
+ *       compile.</li>
  *   <li>The SDK-only gates are SDK-only because their subject is: {@code check_api_pointers} runs
  *       {@code ApiPointersTest} against the version being cut, and {@code check_sdk_plugin} runs the plugin
  *       registry's own validator over the SDK, which is Studio's plugin #1 with no exemption — a rule the
@@ -40,9 +47,12 @@ public final class GatePlan {
                 .toList();
     }
 
-    /** Modules whose newest CI run on {@code main} must not be red — every one being cut. */
+    /** Modules whose newest CI run on {@code main} must not be red — every one being cut that has CI. */
     public static List<Module> ci(Set<Module> releasing) {
-        return Order.TAG.stream().filter(releasing::contains).toList();
+        return Order.TAG.stream()
+                .filter(releasing::contains)
+                .filter(module -> !module.template())
+                .toList();
     }
 
     /** Modules whose own CI must be able to build them standalone. */
@@ -50,6 +60,7 @@ public final class GatePlan {
         return Order.DECIDE.stream()
                 .filter(releasing::contains)
                 .filter(Module::mavenBuild)
+                .filter(module -> !module.template())
                 .toList();
     }
 

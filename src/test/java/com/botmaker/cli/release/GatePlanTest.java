@@ -33,9 +33,24 @@ class GatePlanTest {
     }
 
     @Test
+    void aTemplateTakesNeitherCiGate() {
+        // botmaker-gamebot has no .github/workflows at all, so a CI verdict on it is neither a pass nor a
+        // failure, and "can this module's own CI build it standalone" has no subject. It is out of the
+        // JitPack gate through onJitpack() and out of the changelog gate through hasChangelog(), both
+        // already. What it takes is the template gate: does the project a user copies compile.
+        assertFalse(GatePlan.ci(ALL).contains(Module.GAMEBOT));
+        assertFalse(GatePlan.ciDeps(ALL).contains(Module.GAMEBOT));
+        assertFalse(GatePlan.changelog(ALL).contains(Module.GAMEBOT));
+        assertFalse(GatePlan.jitpackPlugins(ALL).contains(Module.GAMEBOT));
+        // …and it is not exempt by being un-buildable: it has a pom, which is what the gate compiles.
+        assertTrue(Module.GAMEBOT.mavenBuild());
+    }
+
+    @Test
     void theCountsAreTheScriptsOwnLoops() {
-        // Fourteen modules: two APKs take no gate; Studio, remote-server and the dashboard take every gate
-        // but JitPack's.
+        // Fifteen modules: two APKs take no gate, and the template takes none of these four; Studio,
+        // remote-server and the dashboard take every gate but JitPack's.
+        assertEquals(14, GatePlan.ci(ALL).size());
         assertEquals(12, GatePlan.changelog(ALL).size());
         assertEquals(12, GatePlan.ciDeps(ALL).size());
         assertEquals(9, GatePlan.jitpackPlugins(ALL).size());
@@ -57,6 +72,6 @@ class GatePlanTest {
     @Test
     void gatesAreListedInDecideOrderSoTheOutputReadsAsThePlanDid() {
         assertEquals(GatePlan.ciDeps(ALL),
-                Order.DECIDE.stream().filter(Module::mavenBuild).toList());
+                Order.DECIDE.stream().filter(Module::mavenBuild).filter(m -> !m.template()).toList());
     }
 }

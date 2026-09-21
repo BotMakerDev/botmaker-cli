@@ -111,6 +111,11 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "The operator's window, as a Linux package. " + SPEC_HELP)
     private String dashboard;
 
+    @Option(names = "--gamebot", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
+            description = "The worked bot, the template a new project copies. Its pom's SDK pin moves to "
+                    + "the SDK this run cuts. " + SPEC_HELP)
+    private String gamebot;
+
     @Option(names = "--force", description = "Release every requested module, changes or not.")
     private boolean force;
 
@@ -230,6 +235,7 @@ public final class ReleaseCommand implements Callable<Integer> {
         put(explicit, Module.REMOTE_SERVER, remoteServer);
         put(explicit, Module.REMOTE, remote);
         put(explicit, Module.DASHBOARD, dashboard);
+        put(explicit, Module.GAMEBOT, gamebot);
         return Requested.of(Optional.ofNullable(all), explicit);
     }
 

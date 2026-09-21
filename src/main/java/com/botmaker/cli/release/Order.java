@@ -23,6 +23,7 @@ import java.util.List;
  *     → session → plugin-basics → sdk
  *     → studio (per-OS package matrix, ~6m)
  *     → dashboard (Linux package job)
+ *     → gamebot (the worked bot, whose pom pins the sdk above)
  * </pre>
  *
  * <p>{@code botmaker-remote} is the pilot's case again: an APK depending on nothing of ours, tagged with the
@@ -61,11 +62,12 @@ public final class Order {
             Module.SESSION,
             Module.SDK,
             Module.STUDIO,
-            Module.DASHBOARD);
+            Module.DASHBOARD,
+            Module.GAMEBOT);
 
     /**
      * Tag order: the pilot, the JitPack chain in dependency order, then Studio once all its pins exist, then
-     * the dashboard once the cli's do.
+     * the dashboard once the cli's do, then the worked bot once the SDK it pins is on origin.
      */
     public static final List<Module> TAG = List.of(
             Module.PILOT,
@@ -85,8 +87,12 @@ public final class Order {
             Module.SDK,
             // Its package job checks out every upstream at the tag its .deps.env names.
             Module.STUDIO,
-            // Last: the same shape over the cli, whose tag is far above; nothing pins the dashboard.
-            Module.DASHBOARD);
+            // The same shape over the cli, whose tag is far above; nothing pins the dashboard.
+            Module.DASHBOARD,
+            // Last of all, and Studio's reason once more: the worked bot's pom pins the SDK this run is
+            // cutting, so that tag has to be on origin before anybody clones the template and builds it.
+            // It waits on nothing itself — JitPack never builds a template, and nothing resolves one.
+            Module.GAMEBOT);
 
     private Order() {
     }

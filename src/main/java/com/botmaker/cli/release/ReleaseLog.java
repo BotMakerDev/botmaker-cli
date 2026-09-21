@@ -156,7 +156,7 @@ public final class ReleaseLog {
 
         /**
          * The JitPack cell: {@code pending} until polled, {@code n/a} for the modules nobody resolves —
-         * the two APKs, Studio and remote-server, each packaged by its own CI — and
+         * the two APKs, Studio, remote-server and the templates — and
          * {@code not tagged} for a row the run never tagged, which no poll can change.
          */
         String jitpackCell() {
@@ -177,6 +177,9 @@ public final class ReleaseLog {
         String actionsCell() {
             if (!actions.isBlank()) {
                 return actionsUrl.isBlank() ? actions : "[" + actions + "](" + actionsUrl + ")";
+            }
+            if (module.template()) {
+                return "n/a (no workflows)";
             }
             return untagged() ? "not tagged" : "pending";
         }

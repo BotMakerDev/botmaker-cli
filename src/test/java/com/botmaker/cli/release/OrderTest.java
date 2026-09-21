@@ -31,12 +31,17 @@ class OrderTest {
     }
 
     @Test
-    void thePilotIsTaggedFirstAndTheDashboardIsDecidedLast() {
+    void thePilotIsTaggedFirstAndTheWorkedBotLast() {
         // The pilot's APK build depends on nothing of ours, so it runs while the chain is being cut. The
-        // dashboard depends on the cli and nothing depends on it, so it closes both lists.
+        // worked bot's pom pins the SDK this run cuts, so that tag must be on origin before anybody clones
+        // the template — Studio's own reason, one door further out.
         assertEquals(Module.PILOT, Order.TAG.get(0));
-        assertEquals(Module.DASHBOARD, Order.DECIDE.get(Order.DECIDE.size() - 1));
-        assertEquals(Module.DASHBOARD, Order.TAG.get(Order.TAG.size() - 1));
+        assertEquals(Module.GAMEBOT, Order.DECIDE.get(Order.DECIDE.size() - 1));
+        assertEquals(Module.GAMEBOT, Order.TAG.get(Order.TAG.size() - 1));
+        assertTrue(Order.TAG.indexOf(Module.SDK) < Order.TAG.indexOf(Module.GAMEBOT),
+                "the template pins the SDK, so the SDK is tagged first");
+        // The dashboard closed both lists until 2026-09-21 and is still last of the reactor's own modules.
+        assertEquals(Module.DASHBOARD, Order.TAG.get(Order.TAG.size() - 2));
     }
 
     @Test

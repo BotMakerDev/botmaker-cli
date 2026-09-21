@@ -212,14 +212,22 @@ public final class Release {
             at.accept("fallback versions");
             Fallback.bump(runner, umbrella, releasing);
         }
+        if (module.template()) {
+            // The other path into a project: what a bot copied FROM A TEMPLATE pins, which is the template's
+            // own pom. Same sentence as the line above, about the other door.
+            at.accept("template pins");
+            TemplatePin.bump(runner, umbrella, module, releasing);
+        }
         // Silent for every module without the property, which is nine of the eleven.
         at.accept("japicmp baseline");
         Japicmp.bump(runner, umbrella, module);
         at.accept("changelog stamp");
         Stamp.changelog(runner, umbrella, module, version);
         // An APK has no CHANGELOG.md and nothing else to commit, so it takes no message — as the pilot has
-        // since the stamp arrived and the other three stopped passing an empty one.
-        String message = module.hasChangelog()
+        // since the stamp arrived and the other three stopped passing an empty one. The question is what a
+        // release COMMITS and not what it stamps: a template has no changelog either, and a pom pin to
+        // rewrite, so conditioning this on hasChangelog() would have tagged the bump without committing it.
+        String message = module.commitsOnRelease()
                 ? "release: " + module.shortName() + " " + version.tag() : "";
         at.accept("commit, tag and push");
         if (!CommitTagPush.run(runner, umbrella, module, version, message)) {

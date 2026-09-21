@@ -50,6 +50,11 @@ public final class VerifyPass {
                     ? done.withJitpack("BROKEN", broken.get())
                     : done.withJitpack("ok (resolves clean)", "");
         }
+        if (row.module().template()) {
+            // A template repository has no .github/workflows, so `no run on <tag>` — the failure this column
+            // exists to catch — is the answer it would always give, and it would always be wrong.
+            return done;
+        }
         Actions.Poll actions = Actions.poll(row.module(), row.version());
         return done.withActions(actions.verdict(), actions.error(), actions.url());
     }

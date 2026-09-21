@@ -75,6 +75,18 @@ class ReleaseLogTest {
     }
 
     @Test
+    void aTemplateRowHasNothingForAnyOfTheThreeColumns() {
+        // No CHANGELOG.md, nobody resolving it as an artifact, and no .github/workflows at all — so the
+        // Actions cell must say n/a rather than sit at `pending` forever waiting for a run that cannot exist.
+        String rendered = ReleaseLog.render(WHEN, List.of(
+                new ReleaseLog.Row(Module.GAMEBOT, new Version(0, 3, 0)).withStage(ReleaseLog.Stage.TAGGED)));
+
+        assertTrue(rendered.contains(
+                        "| n/a (no CHANGELOG.md) | n/a (not a Maven artifact) | n/a (no workflows) |"),
+                rendered);
+    }
+
+    @Test
     void errorsGoUnderTheTableInFullRatherThanIntoACell() {
         ReleaseLog.Row row = new ReleaseLog.Row(Module.SESSION, new Version(0, 0, 13))
                 .withStage(ReleaseLog.Stage.BUILT)
