@@ -22,9 +22,11 @@
  * <h2>What is here so far — slices 1 to 6</h2>
  *
  * <ul>
- *   <li>{@link com.botmaker.cli.release.Module} — the ten modules a tag can be cut for, with the flag
+ *   <li>{@link com.botmaker.cli.release.Module} — the fifteen modules a tag can be cut for, with the flag
  *       derived from the directory name. This package is the <i>owner</i> of that list, which is why it
- *       keeps one where {@code botmaker-dashboard}, a reader, deliberately does not.</li>
+ *       keeps one where {@code botmaker-dashboard}, a reader, deliberately does not. What a module is
+ *       <i>exempt</i> from is asked of it ({@code mavenBuild}, {@code onJitpack}, {@code hasChangelog},
+ *       {@code commitsOnRelease}, {@code template}) and never decided by naming it.</li>
  *   <li>{@link com.botmaker.cli.release.Version} and {@link com.botmaker.cli.release.Level} — the
  *       {@code x.y.z} arithmetic of {@code bump}, ordered as {@code sort -V} orders it.</li>
  *   <li>{@link com.botmaker.cli.release.Tags} — {@code latest_version}: the newest tag a bump is computed
@@ -100,7 +102,46 @@
  *       than lost ({@code Release.tagChain}).</li>
  *   <li>{@link com.botmaker.cli.release.ReleaseStatus} — {@code --status}, re-polling both columns through
  *       those same two readers.</li>
+ *   <li>{@link com.botmaker.cli.release.TemplatePin} and {@link com.botmaker.cli.release.TemplateGate} — no
+ *       script counterpart (2026-09-21): the worked bot, {@code --gamebot}. See below.</li>
  * </ul>
+ *
+ * <h2>The templates, which the script never released (2026-09-21)</h2>
+ *
+ * <p><b>{@code botmaker-gamebot} is the only published thing a release did not touch, and it went stale
+ * silently.</b> It is the template <i>New project from a template</i> copies; its pom pins one released SDK,
+ * by hand. On 2026-09-21 its source was migrated to {@code @Param}, {@code @Managed} and a flow written in
+ * Java while the pin still said {@code 1.1.9} — the template did not compile at its own pin for a day —
+ * and a working copy of it also declared {@code botmaker-plugin-toolkit} beside the SDK that brings it, so
+ * Maven's nearest-wins pinned the toolkit four contract releases back and opening the project died on
+ * {@code com/botmaker/plugin/api/ValueContext}.
+ *
+ * <p>{@link com.botmaker.cli.release.TemplatePin} is {@link com.botmaker.cli.release.Fallback} for the other
+ * bot pom this project owns. {@code Fallback} rewrites what a <i>freshly generated</i> bot pins
+ * ({@code MavenService.SDK_FALLBACK_VERSION}, Studio's source); this rewrites what a bot copied <i>from the
+ * template</i> pins, which is the template's own pom. Same anchored regex, same rule: it rewrites only when
+ * the run is cutting the module it names, and {@link com.botmaker.cli.release.Runner#replace} refuses when
+ * the pattern stops matching, so a bump that quietly moved nothing is impossible.
+ *
+ * <p><b>{@link com.botmaker.cli.release.TemplateGate} compiles the template rather than comparing its
+ * pin</b>, because a pin comparison would have caught neither failure above. It runs whenever the release
+ * cuts the SDK <b>or</b> a template — which is what a forcing edge would otherwise have been, and
+ * deliberately is not: an SDK patch must not demand a template version, but an SDK release is exactly the
+ * moment an untouched template can stop compiling. It is asked of a <i>directory</i>, so it covers
+ * {@code botmaker-base} too, which names no SDK and so has no pin and no flag.
+ *
+ * <p>A template takes neither CI gate ({@code botmaker-gamebot} has no {@code .github/workflows} at all), is
+ * out of the JitPack gates through {@code onJitpack()} and out of the changelog gate through
+ * {@code hasChangelog()} — and it still <b>commits</b> on release, which is why
+ * {@code Module.commitsOnRelease()} exists: the release commit was derived from {@code hasChangelog()}, true
+ * for everything that had something to commit until a module arrived with no changelog and a pom pin to
+ * rewrite.
+ *
+ * <p>{@link com.botmaker.cli.release.Order} puts it last in both orders: its pom pins tags this run is
+ * cutting, so every one of them must be on origin before anybody clones the template — Studio's own reason,
+ * one door further out. {@code botmaker-dashboard}'s Release tab is the one caller that hides it, and not by
+ * declining a flag: a template is published as a <i>bot</i>, so its fast update sits on its row in the
+ * Catalog tab, reaching this same library.
  *
  * <p>{@link com.botmaker.cli.release.Release} is the whole run, {@link com.botmaker.cli.release.Plan} the
  * decide pass, {@link com.botmaker.cli.release.Gates} the gate loop,

@@ -5,6 +5,36 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **`--gamebot`: the worked bot is released like every other module.** `botmaker-gamebot` is the template
+  *New project from a template* copies, and it was the one published thing the release did not touch — its
+  pom pinned an SDK by hand, so it went stale silently. It is `Module.GAMEBOT` now, last in the flag list and
+  last in both `Order.DECIDE` and `Order.TAG`, because its pom pins tags the same run is cutting.
+  `TemplatePin` moves that pin to the SDK the run just cut, which is `Fallback.bump` for the other bot pom
+  this project owns. Forced by nothing: a small SDK patch must not demand a template version.
+- **`TemplateGate`: the templates are compiled before anything is tagged.** `mvn -B -q compile` on each
+  template whenever the release cuts the SDK **or** a template — which is what a forcing edge would
+  otherwise have been, since an SDK release is exactly the moment an untouched template can stop compiling.
+  A pin comparison would have caught neither of the two failures on 2026-09-21: source migrated past its own
+  pin, and a toolkit declared beside the SDK that brings it. The gate is asked of a *directory*, so
+  `botmaker-base` is covered too — it has no pin to move and no flag, and it can still stop compiling.
+
+### Changed
+
+- **What a module is exempt from is asked of the module, never by naming it**, and a template answers no to
+  four things the repository genuinely lacks: `onJitpack()` (nobody resolves a template), `hasChangelog()`
+  (there is no `CHANGELOG.md`), and both CI gates (there is no `.github/workflows`). New
+  `Module.commitsOnRelease()`: the release commit was derived from `hasChangelog()`, which was true for
+  everything that had something to commit until a module arrived with no changelog and a pom pin to rewrite.
+- **A template's release-log row says `n/a` in all three columns.** `VerifyPass` skips the Actions poll for
+  it: `no run on <tag>` is the failure that column exists to catch, and for a repository with no workflows it
+  would be the only answer it could ever give.
+- `Plan.LABEL` is package-private with a test asserting it is total. A module missing from it printed
+  `null: 0.3.0 -> v0.3.0` in the plan block — a defect only the next new module would have found.
+
 ## [0.0.20] — 2026-09-21
 
 ### Changed
