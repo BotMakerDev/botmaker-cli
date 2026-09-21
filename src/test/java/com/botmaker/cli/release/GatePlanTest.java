@@ -44,6 +44,7 @@ class GatePlanTest {
         assertFalse(GatePlan.jitpackPlugins(ALL).contains(Module.GAMEBOT));
         // …and it is not exempt by being un-buildable: it has a pom, which is what the gate compiles.
         assertTrue(Module.GAMEBOT.mavenBuild());
+        assertTrue(GatePlan.templates(Set.of(Module.GAMEBOT)).contains(Module.GAMEBOT.directory()));
     }
 
     @Test

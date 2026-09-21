@@ -71,6 +71,20 @@ public final class GatePlan {
                 .toList();
     }
 
+    /**
+     * The template directories to compile — {@link TemplateGate}.
+     *
+     * <p>Every template whenever the release cuts the SDK <b>or</b> a template, and none otherwise. Not
+     * "the template being cut": the SDK is what a template pins, so an SDK release is the moment a template
+     * that has not been touched can stop compiling, which is the failure this gate was added for. Templates
+     * are not forced by an SDK release — a small SDK patch must not demand a template version — so the gate
+     * is what a forcing edge would otherwise have been.
+     */
+    public static List<String> templates(Set<Module> releasing) {
+        boolean relevant = releasing.contains(Module.SDK) || releasing.stream().anyMatch(Module::template);
+        return relevant ? TemplateGate.directories() : List.of();
+    }
+
     /** Whether the two SDK-only gates run: only when this release cuts the SDK. */
     public static boolean sdkGates(Set<Module> releasing) {
         return releasing.contains(Module.SDK);

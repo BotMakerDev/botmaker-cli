@@ -54,6 +54,11 @@ public final class Gates {
             record(runner, refusals, SdkGates.apiPointers(umbrella, releasing.get(Module.SDK), force));
             record(runner, refusals, SdkGates.sdkPlugin(umbrella, force));
         }
+        // After the SDK gates, because the SDK is what a template pins: asking whether the templates still
+        // compile is worth more once the thing they compile against has answered for itself.
+        for (String directory : GatePlan.templates(modules)) {
+            record(runner, refusals, TemplateGate.check(umbrella, directory, force));
+        }
         return List.copyOf(refusals);
     }
 
