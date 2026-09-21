@@ -5,6 +5,14 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- **Recompiled against the contract's new packages** — the validator and its stub contexts import
+  `com.botmaker.plugin.api.slot`, `.parameters`, `.toolbar` and `.source` now. Imports only; every check
+  behaves exactly as it did. See `botmaker-studio-api`'s changelog for the old → new table.
+
 ## [0.0.19] — 2026-09-21
 
 ### Fixed

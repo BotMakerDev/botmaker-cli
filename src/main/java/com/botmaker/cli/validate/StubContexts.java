@@ -1,11 +1,11 @@
 package com.botmaker.cli.validate;
 
 import com.botmaker.plugin.api.Dialogs;
-import com.botmaker.plugin.api.SlotContext;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.Theme;
-import com.botmaker.plugin.api.TypeRef;
-import com.botmaker.plugin.api.ValueContext;
+import com.botmaker.plugin.api.slot.SlotContext;
+import com.botmaker.plugin.api.slot.TypeRef;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.value.ValueForm;
 import com.botmaker.plugin.api.value.ValueType;
 

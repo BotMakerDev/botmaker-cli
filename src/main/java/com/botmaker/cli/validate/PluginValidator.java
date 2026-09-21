@@ -1,7 +1,7 @@
 package com.botmaker.cli.validate;
 
 import com.botmaker.cli.project.Poms;
-import com.botmaker.plugin.api.SlotEditor;
+import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.api.catalog.FacadeEntry;
 import com.botmaker.plugin.api.catalog.MemberEntry;
