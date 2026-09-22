@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -26,17 +27,28 @@ class RegistryTest {
 
     @Test
     void claimed_ids_exclude_the_plugin_being_submitted() throws IOException {
-        Path plugins = write(
-                entry("com.example.one", List.of("one.channel")),
-                entry("com.example.two", List.of("two.colour", "two.shade")));
+        Path plugins = write(entry("com.example.one"), entry("com.example.two"));
 
         Registry registry = Registry.read(plugins);
 
-        // An UPDATE is the case this exists for: a plugin re-verified at a new version still registers the
-        // value types it registered before, and counting its own would refuse every plugin its second time.
+        // An UPDATE is the case this exists for: counting a plugin's own id would refuse it its second time.
         assertEquals(Set.of("com.example.two"), registry.claimedPluginIds("com.example.one"));
-        assertEquals(Set.of("two.colour", "two.shade"), registry.claimedValueTypeIds("com.example.one"));
-        assertEquals(Set.of("one.channel"), registry.claimedValueTypeIds("com.example.two"));
+    }
+
+    /**
+     * An entry written before 2026-09-23 carries {@code valueTypeIds}. It still reads, and the index
+     * generated from it no longer carries the field — nothing rewrites the entry file itself.
+     */
+    @Test
+    void an_entry_that_still_lists_value_type_ids_reads_and_drops_them_from_the_index() throws IOException {
+        Path plugins = Files.createDirectories(root.resolve(Registry.ENTRIES_DIRECTORY));
+        Files.writeString(plugins.resolve("com.example.old.json"),
+                "{\"id\":\"com.example.old\",\"coordinate\":\"g:a\",\"valueTypeIds\":[\"TEXT\"]}");
+
+        Registry registry = Registry.read(plugins);
+
+        assertEquals("com.example.old", registry.entries().getFirst().entry().id());
+        assertFalse(registry.index().contains("valueTypeIds"), registry.index());
     }
 
     @Test
@@ -46,7 +58,7 @@ class RegistryTest {
 
     @Test
     void the_filename_is_the_id() throws IOException {
-        Path plugins = write(entry("com.example.one", List.of()));
+        Path plugins = write(entry("com.example.one"));
         Registry.Entry only = Registry.read(plugins).entries().getFirst();
 
         assertEquals(only.entry().id(), only.idFromFilename());
@@ -64,7 +76,7 @@ class RegistryTest {
 
     @Test
     void the_generated_index_is_an_array_in_id_order() throws IOException {
-        Path plugins = write(entry("com.example.two", List.of()), entry("com.example.one", List.of()));
+        Path plugins = write(entry("com.example.two"), entry("com.example.one"));
 
         String index = Registry.read(plugins).index();
 
@@ -82,9 +94,9 @@ class RegistryTest {
         assertEquals(0, RegistryGate.run(new String[]{root.toString(), "README.md"}));
     }
 
-    private RegistryEntry entry(String id, List<String> valueTypeIds) {
+    private RegistryEntry entry(String id) {
         return new RegistryEntry(id, id, "com.github.someone:" + id, "someone/" + id, "", List.of(),
-                "1.0.0", valueTypeIds, List.of(), "v1.0.0", "2026-08-28");
+                "1.0.0", List.of(), "v1.0.0", "2026-08-28");
     }
 
     private Path write(RegistryEntry... entries) throws IOException {

@@ -20,7 +20,7 @@ import java.util.List;
  */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @JsonPropertyOrder({"id", "name", "coordinate", "repo", "description", "tags", "minContractVersion",
-        "valueTypeIds", "editorDependencies", "verifiedVersion", "verifiedAt"})
+        "editorDependencies", "verifiedVersion", "verifiedAt"})
 public record RegistryEntry(
         /** The plugin's own {@code StudioPlugin.id()} — the registry's primary key, and unrenameable. */
         String id,
@@ -37,12 +37,9 @@ public record RegistryEntry(
          * Read from the pom rather than asserted, because a plugin cannot know what a future Studio does.
          */
         String minContractVersion,
-        /**
-         * Every {@code ValueType} id the plugin registers. Present so the registry can refuse a second
-         * plugin claiming one without downloading every plugin it already holds — a value type id is
-         * written into project files and so can never be corrected afterwards.
-         */
-        List<String> valueTypeIds,
+        // valueTypeIds stood here until 2026-09-23: every ValueType id the plugin registered, so the gate
+        // could refuse a second plugin claiming one. A type is a class now, named by its own package, and an
+        // older entry's field is ignored on read (Registry disables FAIL_ON_UNKNOWN_PROPERTIES).
         /**
          * {@code groupId:artifactId:version} of everything this plugin needs on the <b>editor's</b> classpath
          * and does not bring itself — read from its pom as the dependencies it declares {@code optional}.
@@ -74,7 +71,6 @@ public record RegistryEntry(
 
     public RegistryEntry {
         tags = tags == null ? List.of() : List.copyOf(tags);
-        valueTypeIds = valueTypeIds == null ? List.of() : List.copyOf(valueTypeIds);
         editorDependencies = editorDependencies == null ? List.of() : List.copyOf(editorDependencies);
     }
 }

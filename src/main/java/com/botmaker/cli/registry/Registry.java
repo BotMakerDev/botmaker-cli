@@ -22,9 +22,10 @@ import java.util.stream.Stream;
  * {@code plugins/com.example.discord.json}, and two pull requests adding two plugins touch no common line.
  * The index is generated from these files and is nobody's source of truth.
  *
- * <p>Value type ids are <em>not</em> filenames, so they still need the scan — {@link #claimedValueTypeIds}
- * is what fills the {@code claimedValueTypeIds} parameter a local {@code botmaker validate} always leaves
- * empty.
+ * <p>Value type ids were the one claim that needed a scan, and they went on 2026-09-23: a plugin declares
+ * its types as classes now, named by their own package. An entry file written before that date still
+ * carries {@code valueTypeIds}; it is read, ignored and dropped from the next generated index, and nothing
+ * rewrites the file.
  */
 public final class Registry {
 
@@ -78,23 +79,6 @@ public final class Registry {
         for (Entry held : entries) {
             if (!held.entry().id().equals(except)) {
                 ids.add(held.entry().id());
-            }
-        }
-        return ids;
-    }
-
-    /**
-     * Every value type id the registry already holds, except the submitting plugin's own.
-     *
-     * <p>Excluding its own matters on an <em>update</em>: a plugin re-verified at a new version still
-     * registers the value types it registered before, and a gate that counted those as claimed would refuse
-     * every plugin its second time.
-     */
-    public Set<String> claimedValueTypeIds(String exceptPluginId) {
-        Set<String> ids = new LinkedHashSet<>();
-        for (Entry held : entries) {
-            if (!held.entry().id().equals(exceptPluginId)) {
-                ids.addAll(held.entry().valueTypeIds());
             }
         }
         return ids;

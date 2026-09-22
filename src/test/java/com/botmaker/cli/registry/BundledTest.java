@@ -35,6 +35,5 @@ class BundledTest {
     @Test
     void nothing_is_reserved_when_no_coordinates_are_named() {
         assertTrue(Bundled.none().pluginIds().isEmpty());
-        assertTrue(Bundled.none().valueTypeIds().isEmpty());
     }
 }

@@ -4,8 +4,6 @@ import com.botmaker.cli.Console;
 import com.botmaker.cli.Subjects;
 import com.botmaker.cli.validate.PluginSubject;
 import com.botmaker.plugin.api.StudioPlugin;
-import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.host.PluginLoader;
 
 import java.io.IOException;
@@ -19,24 +17,23 @@ import java.util.Set;
  * entry file claims.
  *
  * <p>Without this the gate has a hole with no symptom at submission time: {@code plugins/<id>.json} makes
- * entry-vs-entry uniqueness a property of git, and {@link Registry#claimedValueTypeIds} covers the value
- * types entries declare — but a plugin the host <em>ships</em> has no entry file, so nothing claims its ids.
- * A submission taking {@code com.botmaker.sdk}, or registering {@code TEXT}, would pass every check and then
- * lose silently in {@code ValueCatalog.merge}, which drops the second registration of an id rather than
- * reporting it.
+ * entry-vs-entry uniqueness a property of git — but a plugin the host <em>ships</em> has no entry file, so
+ * nothing claims its id, and a submission taking {@code com.botmaker.sdk} would pass every check.
  *
- * <p><b>The ids are read from the bundled plugin itself, never listed here.</b> A hand-kept list of the
- * SDK's seventeen value type ids would be a second answer to a question the SDK already answers, and it
- * would drift the first time one was added — the shape this repository has rejected repeatedly (the frozen
- * per-version catalogs, {@code api-surface.txt}). So the gate resolves the coordinate and asks it, exactly
- * as it resolves and asks a submission.
+ * <p>It reserved value type ids as well until 2026-09-23. A type is a class now, named by its own package,
+ * so there is no string for one plugin to take from another.
+ *
+ * <p><b>The ids are read from the bundled plugin itself, never listed here.</b> A hand-kept list would be a
+ * second answer to a question the plugin already answers, and it would drift — the shape this repository
+ * has rejected repeatedly (the frozen per-version catalogs, {@code api-surface.txt}). So the gate resolves
+ * the coordinate and asks it, exactly as it resolves and asks a submission.
  *
  * <p><b>Which coordinates are bundled is an input, not a constant.</b> "Bundled" is a fact about a
  * <em>host</em> — the SDK is Studio's plugin #1 — and this module is a host among others, so hard-coding the
  * SDK here would make the CLI the owner of somebody else's list. The registry names them in
  * {@value #ENVIRONMENT_VARIABLE}, because the registry is the thing that has a host in mind.
  */
-record Bundled(Set<String> pluginIds, Set<String> valueTypeIds) {
+record Bundled(Set<String> pluginIds) {
 
     /**
      * Comma-separated {@code groupId:artifactId:version}. Unset means nothing is reserved and nobody said
@@ -46,7 +43,7 @@ record Bundled(Set<String> pluginIds, Set<String> valueTypeIds) {
     static final String ENVIRONMENT_VARIABLE = "BOTMAKER_BUNDLED_PLUGINS";
 
     static Bundled none() {
-        return new Bundled(Set.of(), Set.of());
+        return new Bundled(Set.of());
     }
 
     /**
@@ -69,9 +66,8 @@ record Bundled(Set<String> pluginIds, Set<String> valueTypeIds) {
             return none();
         }
         Set<String> pluginIds = new LinkedHashSet<>();
-        Set<String> valueTypeIds = new LinkedHashSet<>();
-        read(console, subjects, list, pluginIds, valueTypeIds);
-        return new Bundled(Set.copyOf(pluginIds), Set.copyOf(valueTypeIds));
+        read(console, subjects, list, pluginIds);
+        return new Bundled(Set.copyOf(pluginIds));
     }
 
     /**
@@ -87,9 +83,9 @@ record Bundled(Set<String> pluginIds, Set<String> valueTypeIds) {
      * dependency, and one classpath for all of them is what a host has anyway.
      */
     private static void read(Console console, Subjects subjects, List<String> coordinates,
-                             Set<String> pluginIds, Set<String> valueTypeIds) throws IOException {
+                             Set<String> pluginIds) throws IOException {
         String coordinate = String.join(" + ", coordinates);
-        PluginSubject subject = subjects.fromCoordinates(coordinates, Set.of(), Set.of());
+        PluginSubject subject = subjects.fromCoordinates(coordinates, Set.of());
         try (PluginLoader loaded = PluginLoader.open(
                 subject.classpath().stream().map(Object::toString).toList())) {
             List<StudioPlugin> plugins = loaded == null ? List.of() : List.copyOf(loaded.plugins());
@@ -103,19 +99,9 @@ record Bundled(Set<String> pluginIds, Set<String> valueTypeIds) {
                 if (plugin.id() != null && !plugin.id().isBlank()) {
                     pluginIds.add(plugin.id());
                 }
-                ValueCatalog catalog = plugin.valueTypes();
-                if (catalog == null) {
-                    continue;
-                }
-                for (ValueType type : catalog.types()) {
-                    if (type.id() != null && !type.id().isBlank()) {
-                        valueTypeIds.add(type.id());
-                    }
-                }
             }
         }
-        console.out("reserved from " + coordinate + ": " + String.join(", ", pluginIds)
-                + " (" + valueTypeIds.size() + " value type id(s))");
+        console.out("reserved from " + coordinate + ": " + String.join(", ", pluginIds));
     }
 
     /** This set plus {@code others} — the ids an entry may not take, from both sources at once. */

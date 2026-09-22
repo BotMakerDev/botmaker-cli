@@ -65,7 +65,7 @@ public final class Subjects {
         List<Path> classpath = new ArrayList<>();
         classpath.add(classes);
         classpath.addAll(runtimeClasspath(dir, pom));
-        return PluginSubject.local(classpath, pom, version(dir));
+        return PluginSubject.local(classpath, pom);
     }
 
     /**
@@ -75,10 +75,8 @@ public final class Subjects {
      * asks what the <em>published</em> pom declares — and a plugin whose working copy is right and whose
      * published pom says {@code 0.0.0-SNAPSHOT} is a real failure mode this project has shipped before.
      */
-    public PluginSubject fromCoordinate(String coordinate, Set<String> claimedIds,
-                                        Set<String> claimedValueTypeIds)
-            throws IOException {
-        return fromCoordinates(List.of(coordinate), claimedIds, claimedValueTypeIds);
+    public PluginSubject fromCoordinate(String coordinate, Set<String> claimedIds) throws IOException {
+        return fromCoordinates(List.of(coordinate), claimedIds);
     }
 
     /**
@@ -90,12 +88,9 @@ public final class Subjects {
      * what that plugin needs — Studio does it with a {@code runtime} dependency, and this does it by naming
      * both coordinates.
      *
-     * <p>The first coordinate is the subject: its version is the pin {@code catalog(pin)} is asked about,
-     * and its published pom is the one the scope check reads.
+     * <p>The first coordinate is the subject: its published pom is the one the scope check reads.
      */
-    public PluginSubject fromCoordinates(List<String> coordinates, Set<String> claimedIds,
-                                         Set<String> claimedValueTypeIds)
-            throws IOException {
+    public PluginSubject fromCoordinates(List<String> coordinates, Set<String> claimedIds) throws IOException {
         if (coordinates.isEmpty()) {
             throw new IOException("no coordinate to resolve");
         }
@@ -128,17 +123,16 @@ public final class Subjects {
                     + "; the dependency-scope check will be skipped");
             published = null;
         }
-        return new PluginSubject(classpath, published, parts[2], claimedIds, claimedValueTypeIds);
+        return new PluginSubject(classpath, published, claimedIds);
     }
 
     /**
      * {@code dependency:build-classpath} at runtime scope.
      *
      * <p>Runtime rather than test, and runtime rather than compile: it is exactly the set a host would put
-     * on the loader, so the {@code provided} contract is absent from it — which is the point. A contract
-     * that appeared here would be resolved child-first and become a second {@code Class} object, the failure
-     * the {@code provided} scope exists to prevent, and the validator would then be testing something no
-     * host will ever run.
+     * on the loader. A {@code compile} contract does appear in it, as it does on a bot's classpath, and is
+     * harmless for the same reason there: {@code PluginLoader} is parent-first for the contract's package,
+     * so the copy on this list is never the one a plugin links against.
      */
     private List<Path> runtimeClasspath(Path dir, Path pom) throws IOException {
         Path out = dir.resolve("target/botmaker-classpath.txt");
@@ -163,20 +157,6 @@ public final class Subjects {
             }
         }
         return classpath;
-    }
-
-    /**
-     * The version the plugin gives itself, which is what {@code catalog(pin)} is asked about.
-     *
-     * <p>A plugin decides what that string means — only it knows its own versioning — so the honest value
-     * to pass locally is the one this build would publish under, not the one a hypothetical project pins.
-     */
-    private static String version(Path dir) {
-        try {
-            return com.botmaker.cli.project.Poms.coordinate(dir.resolve("pom.xml")).version();
-        } catch (IOException e) {
-            return "";
-        }
     }
 
     /**

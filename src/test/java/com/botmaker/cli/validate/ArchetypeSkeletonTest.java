@@ -73,8 +73,12 @@ class ArchetypeSkeletonTest {
 
         // ---- the generated project, minus the archetype's own machinery --------------------------------
         Path sources = Files.createDirectories(work.resolve("src/main/java/" + PACKAGE.replace('.', '/')));
-        for (String name : List.of("ExamplePlugin.java", "ExampleApi.java")) {
-            copySubstituted(resources.resolve("src/main/java").resolve(name), sources.resolve(name));
+        // Every source the archetype ships, rather than a list: a file added to the skeleton and missing
+        // here would be a class the plugin names and this test never compiles.
+        try (Stream<Path> shipped = Files.list(resources.resolve("src/main/java"))) {
+            for (Path source : shipped.toList()) {
+                copySubstituted(source, sources.resolve(source.getFileName().toString()));
+            }
         }
         Path pom = work.resolve("pom.xml");
         copySubstituted(resources.resolve("pom.xml"), pom);
@@ -95,6 +99,16 @@ class ArchetypeSkeletonTest {
         int status = javac.run(null, null, null, arguments.toArray(String[]::new));
         assertEquals(0, status, "the archetype's skeleton no longer compiles against this toolkit");
 
+        // ---- and so does its test, the first thing an author runs ------------------------------------
+        // Compiled, not run: running it wants a JUnit launcher. Compiling is what caught the 2026-09-23
+        // drift — the test still called catalog(null) and valueTypes(), neither of which exists.
+        Path testSource = Files.createDirectories(work.resolve("src/test/java")).resolve("ExamplePluginTest.java");
+        copySubstituted(resources.resolve("src/test/java/ExamplePluginTest.java"), testSource);
+        Path testClasses = Files.createDirectories(work.resolve("target/test-classes"));
+        assertEquals(0, javac.run(null, null, null, "-cp", classpath + java.io.File.pathSeparator + classes,
+                        "-d", testClasses.toString(), testSource.toString()),
+                "the archetype's own test no longer compiles against its skeleton");
+
         // ---- a host loads it --------------------------------------------------------------------------
         List<Path> pluginClasspath = List.of(classes, toolkitClasses);
         try (PluginLoader loaded = PluginLoader.open(
@@ -110,7 +124,7 @@ class ArchetypeSkeletonTest {
 
         // ---- and the gate that decides a pull request passes it ---------------------------------------
         List<CheckResult> results = PluginValidator.validate(
-                PluginSubject.local(pluginClasspath, pom, "0.1.0-SNAPSHOT"));
+                PluginSubject.local(pluginClasspath, pom));
 
         assertTrue(PluginValidator.passed(results), () -> "a freshly generated plugin fails the registry's"
                 + " own gate: " + results.stream().filter(CheckResult::failed)
@@ -118,6 +132,10 @@ class ArchetypeSkeletonTest {
         // Every check ran on something rather than skipping: a green run of eight skips proves nothing.
         assertTrue(results.stream().filter(CheckResult::failed).findAny().isEmpty());
         assertEquals(Check.values().length, results.size(), "a check was not run at all");
+        // The skeleton's one type is what an author copies, so it has to be the round-tripping kind.
+        CheckResult types = results.stream().filter(r -> r.check() == Check.TYPES).findFirst().orElseThrow();
+        assertEquals(Status.PASS, types.status(), types::toString);
+        assertTrue(types.detail().getFirst().contains("1 round-tripped"), types.detail()::toString);
     }
 
     private static void copySubstituted(Path from, Path to) throws IOException {

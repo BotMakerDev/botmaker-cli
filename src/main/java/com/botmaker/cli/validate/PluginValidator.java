@@ -7,16 +7,19 @@ import com.botmaker.plugin.api.catalog.FacadeEntry;
 import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
-import com.botmaker.plugin.api.value.ValueCatalog;
-import com.botmaker.plugin.api.value.ValueType;
+import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.host.PluginLoader;
 
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -74,7 +77,7 @@ public final class PluginValidator {
         CheckResult classpath = checkClasspath(subject);
         results.add(classpath);
         if (classpath.failed()) {
-            for (Check check : List.of(Check.LOADS, Check.ID, Check.PALETTE, Check.VALUE_TYPES, Check.EDITORS)) {
+            for (Check check : List.of(Check.LOADS, Check.ID, Check.PALETTE, Check.TYPES, Check.EDITORS)) {
                 results.add(CheckResult.skip(check, "the classpath did not resolve"));
             }
             results.add(checkPomScopes(subject));
@@ -95,14 +98,14 @@ public final class PluginValidator {
                                 + " a class that is not there, and a plugin whose own dependency is missing",
                         "check that src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin"
                                 + " exists and names your plugin's fully qualified class")));
-                for (Check check : List.of(Check.ID, Check.PALETTE, Check.VALUE_TYPES, Check.EDITORS)) {
+                for (Check check : List.of(Check.ID, Check.PALETTE, Check.TYPES, Check.EDITORS)) {
                     results.add(CheckResult.skip(check, "nothing loaded"));
                 }
             } else {
                 results.add(CheckResult.pass(Check.LOADS, plugins.size() + " plugin(s): " + ids(plugins)));
                 results.add(checkIds(plugins, subject));
-                results.add(checkPalette(plugins, subject));
-                results.add(checkValueTypes(plugins, subject));
+                results.add(checkPalette(plugins));
+                results.add(checkTypes(plugins, subject));
                 results.add(checkEditors(plugins));
             }
         }
@@ -170,14 +173,14 @@ public final class PluginValidator {
     // 4 — palette
     // -------------------------------------------------------------------------------------------------
 
-    private static CheckResult checkPalette(List<StudioPlugin> plugins, PluginSubject subject) {
+    private static CheckResult checkPalette(List<StudioPlugin> plugins) {
         List<String> problems = new ArrayList<>();
         int facades = 0;
         int members = 0;
         for (StudioPlugin plugin : plugins) {
             PaletteCatalog catalog;
             try {
-                catalog = plugin.catalog(subject.pinnedVersion());
+                catalog = plugin.catalog();
             } catch (RuntimeException | LinkageError e) {
                 problems.add(safeId(plugin) + "#catalog() threw " + e);
                 continue;
@@ -223,60 +226,231 @@ public final class PluginValidator {
     }
 
     // -------------------------------------------------------------------------------------------------
-    // 5 — value types
+    // 5 — types
     // -------------------------------------------------------------------------------------------------
 
-    private static CheckResult checkValueTypes(List<StudioPlugin> plugins, PluginSubject subject) {
+    /**
+     * What a plugin says about its values holds: {@code types()} and {@code componentTypes()} answer, every
+     * {@code PluginType} names a class and a fresh value of it, no class is declared twice in this build,
+     * and a {@code ComponentType} takes its fresh value apart and puts it back.
+     *
+     * <p><b>The clash rule is the host's and no stricter.</b> {@code PluginHost.compose} leaves out a plugin
+     * whose {@code types()} names a class another plugin already declared, and says so in Manage Plugins;
+     * this is the same rule asked before anyone installs the pair. It replaced a registry-wide check on
+     * string ids, which existed because an id was chosen by its author and written into project files. A
+     * class is named by its package, which is its author's, so two plugins meet over one only when they
+     * are loaded together — and a plugin brought by the one submitted is loaded here, beside it.
+     *
+     * <p><b>The round trip compares parts, never values.</b> {@code components(build(components(fresh())))}
+     * must equal {@code components(fresh())}. Most classes a plugin writes have no {@code equals}, so asking
+     * for equal values would refuse sound types; the parts are what the host writes, so parts that survive
+     * the trip are the property the host relies on. A component type with no declared type of the same
+     * class — the SDK's flow parts, which are never picked — has no fresh value to take apart and is only
+     * checked for answering its component list.
+     *
+     * <p>Soundness is asked only of the plugin being judged: a plugin the classpath carries because the
+     * submitted one depends on it answers for its own types under its own entry. The clash is asked of
+     * everyone, because it is a fact about the two together.
+     */
+    private static CheckResult checkTypes(List<StudioPlugin> plugins, PluginSubject subject) {
         List<String> problems = new ArrayList<>();
-        List<String> registered = new ArrayList<>();
-        // Merged as the host merges, so a clash between two plugins in ONE build is caught here rather
-        // than at the registry — clashesWith is the contract's own answer to this question and is reused
-        // rather than reimplemented.
-        ValueCatalog accumulated = ValueCatalog.empty();
+        List<String> declared = new ArrayList<>();
+        List<String> unlinked = new ArrayList<>();
+        Map<String, String> owners = new HashMap<>();
+        int roundTrips = 0;
         for (StudioPlugin plugin : plugins) {
-            ValueCatalog catalog;
+            String id = safeId(plugin);
+            boolean judged = subject.judges(id);
+            List<PluginType<?>> types;
+            List<ComponentType<?>> components;
             try {
-                catalog = plugin.valueTypes();
-            } catch (RuntimeException | LinkageError e) {
-                problems.add(safeId(plugin) + "#valueTypes() threw " + e);
+                types = plugin.types();
+                components = plugin.componentTypes();
+            } catch (LinkageError e) {
+                // PluginType.editor returns a javafx Node, so a plugin's types can fail to link on a host
+                // with no JavaFX — which this CLI is. That is the host's limit, not the plugin's fault.
+                if (!javafx()) {
+                    unlinked.add(id);
+                } else {
+                    problems.add(id + "#types() threw " + e);
+                }
+                continue;
+            } catch (RuntimeException e) {
+                problems.add(id + "#types() or #componentTypes() threw " + e);
                 continue;
             }
-            if (catalog == null) {
-                problems.add(safeId(plugin) + "#valueTypes() returned null; return ValueCatalog.empty()");
-                continue;
+            if (types == null) {
+                problems.add(id + "#types() returned null; return List.of()");
+                types = List.of();
             }
-            accumulated.clashesWith(catalog).forEach(id ->
-                    problems.add(safeId(plugin) + ": value type id '" + id
-                            + "' is already registered by another plugin in this build"));
-            for (ValueType type : catalog.types()) {
-                String id = type.id();
-                if (id == null || id.isBlank()) {
-                    problems.add(safeId(plugin) + " registers a value type with a blank id");
+            if (components == null) {
+                problems.add(id + "#componentTypes() returned null; return List.of()");
+                components = List.of();
+            }
+
+            Map<String, Object> fresh = new HashMap<>();
+            List<ComponentType<?>> shapes = new ArrayList<>(components);
+            for (int i = 0; i < types.size(); i++) {
+                PluginType<?> type = types.get(i);
+                if (type == null) {
+                    problems.add(id + ": types()[" + i + "] is null");
                     continue;
                 }
-                registered.add(id);
-                // A plugin this classpath carries only because the submitted plugin depends on it
-                // registers its own ids, under its own entry. Judging them here would refuse the SDK for
-                // plugin-basics' nine, and the advice in the message would be to rename them.
-                if (subject.judges(safeId(plugin)) && subject.claimedValueTypeIds().contains(id)) {
-                    problems.add(safeId(plugin) + ": value type id '" + id
-                            + "' is already registered by another plugin — a registry entry, or one the"
-                            + " host itself ships; prefix yours");
+                Class<?> cls;
+                try {
+                    cls = type.type();
+                } catch (RuntimeException | LinkageError e) {
+                    problems.add(id + ": types()[" + i + "].type() threw " + e);
+                    continue;
                 }
-                // NOT checked here: whether the id is prefixed. The contract asks an author to "prefix an
-                // id that is not obviously yours" and that is advice, not a rule anything can enforce —
-                // the SDK's own seventeen ids are bare (TEXT, NUMBER, …) because they are the old enum
-                // constant names and every project ever written holds them. A gate that refused a bare id
-                // would refuse the plugin the platform was built around, and one that carved out an
-                // exception for all-caps would be guessing. The collision it guards against is caught for
-                // real, by name, two branches up.
+                if (cls == null) {
+                    problems.add(id + ": types()[" + i + "].type() returned null");
+                    continue;
+                }
+                String name = cls.getName();
+                declared.add(cls.getSimpleName());
+                String owner = owners.putIfAbsent(name, id);
+                if (owner != null) {
+                    problems.add(owner.equals(id)
+                            ? id + " declares " + name + " twice; list each type once in types()"
+                            : id + " declares " + name + ", which " + owner + " already declares. A host loads"
+                                    + " the first and leaves the other plugin out");
+                }
+                if (type instanceof ComponentType<?> shape && !shapes.contains(shape)) {
+                    shapes.add(shape);
+                }
+                if (!judged) {
+                    continue;
+                }
+                Object value;
+                try {
+                    value = type.fresh();
+                } catch (RuntimeException | LinkageError e) {
+                    problems.add(id + ": " + name + " fresh() threw " + e);
+                    continue;
+                }
+                if (value == null) {
+                    // The contract's one exception: a type whose fresh form is a call the bot evaluates
+                    // (the SDK's MatchResult starts as Vision.lastMatch()) answers freshSource() instead.
+                    String source;
+                    try {
+                        source = type.freshSource();
+                    } catch (RuntimeException | LinkageError e) {
+                        problems.add(id + ": " + name + " freshSource() threw " + e);
+                        continue;
+                    }
+                    if (source == null || source.isBlank()) {
+                        problems.add(id + ": " + name + " answers neither fresh() nor freshSource(); a new"
+                                + " value has to start as something, and the host writes it into the bot's"
+                                + " source");
+                    }
+                } else if (!boxed(cls).isInstance(value)) {
+                    problems.add(id + ": " + name + " fresh() returned a " + value.getClass().getName()
+                            + ", which is not a " + name);
+                } else {
+                    fresh.put(name, value);
+                }
             }
-            accumulated = accumulated.merge(catalog);
+
+            if (!judged) {
+                continue;
+            }
+            for (ComponentType<?> shape : shapes) {
+                List<String> found = shapeProblems(id, shape, fresh);
+                if (found == null) {
+                    roundTrips++;
+                } else {
+                    problems.addAll(found);
+                }
+            }
         }
-        return problems.isEmpty()
-                ? CheckResult.pass(Check.VALUE_TYPES, registered.isEmpty() ? "none registered"
-                        : String.join(", ", registered))
-                : CheckResult.fail(Check.VALUE_TYPES, problems);
+        if (!problems.isEmpty()) {
+            return CheckResult.fail(Check.TYPES, problems);
+        }
+        if (!unlinked.isEmpty()) {
+            return CheckResult.skip(Check.TYPES, "no JavaFX on this classpath, and the declared types of "
+                    + String.join(", ", unlinked) + " could not be linked without it. Put javafx-controls on"
+                    + " the classpath to check them here");
+        }
+        return CheckResult.pass(Check.TYPES, declared.isEmpty() ? "none declared"
+                : String.join(", ", declared) + (roundTrips == 0 ? "" : "; " + roundTrips + " round-tripped"));
+    }
+
+    /**
+     * What is wrong with one component type, or {@code null} when it took a fresh value apart and put it
+     * back. An empty list means it answered and there was no value to try it on.
+     */
+    private static List<String> shapeProblems(String id, ComponentType<?> shape, Map<String, Object> fresh) {
+        List<String> problems = new ArrayList<>();
+        Class<?> cls;
+        List<Class<?>> kinds;
+        try {
+            cls = shape.type();
+            kinds = shape.componentTypes();
+        } catch (RuntimeException | LinkageError e) {
+            problems.add(id + ": a component type threw answering type() or componentTypes(): " + e);
+            return problems;
+        }
+        if (cls == null || kinds == null) {
+            problems.add(id + ": a component type answered null from "
+                    + (cls == null ? "type()" : cls.getName() + ".componentTypes()"));
+            return problems;
+        }
+        String name = cls.getName();
+        Object value = fresh.get(name);
+        if (value == null) {
+            return problems;
+        }
+        try {
+            List<Object> parts = shape.componentsOf(value);
+            if (parts == null) {
+                problems.add(id + ": " + name + " components(fresh()) returned null");
+                return problems;
+            }
+            if (parts.size() != kinds.size()) {
+                problems.add(id + ": " + name + " components(fresh()) answered " + parts.size()
+                        + " part(s), where componentTypes() declares " + kinds.size());
+                return problems;
+            }
+            for (int i = 0; i < parts.size(); i++) {
+                Object part = parts.get(i);
+                if (part != null && !boxed(kinds.get(i)).isInstance(part)) {
+                    problems.add(id + ": " + name + " part " + i + " is a " + part.getClass().getName()
+                            + ", where componentTypes() declares " + kinds.get(i).getName());
+                }
+            }
+            if (!problems.isEmpty()) {
+                return problems;
+            }
+            Object rebuilt = shape.build(parts);
+            if (rebuilt == null) {
+                problems.add(id + ": " + name + " build(components(fresh())) returned null");
+                return problems;
+            }
+            List<Object> again = shape.componentsOf(rebuilt);
+            if (!parts.equals(again)) {
+                problems.add(id + ": " + name + " does not survive build(components(…)): " + parts
+                        + " came back as " + again + ". The host writes the parts and reads them back"
+                        + " through build(), so a value that changes on the way is rewritten on every save");
+            }
+        } catch (RuntimeException | LinkageError e) {
+            problems.add(id + ": " + name + " threw taking its fresh value apart or putting it back: " + e);
+        }
+        return problems.isEmpty() ? null : problems;
+    }
+
+    /** {@code int.class} as {@code Integer.class}: a value handed around as an {@code Object} is boxed. */
+    private static Class<?> boxed(Class<?> type) {
+        return MethodType.methodType(type).wrap().returnType();
+    }
+
+    private static boolean javafx() {
+        try {
+            Class.forName("javafx.scene.Node");
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
     }
 
     // -------------------------------------------------------------------------------------------------
@@ -357,14 +531,20 @@ public final class PluginValidator {
     // -------------------------------------------------------------------------------------------------
 
     /**
-     * The contract is {@code provided} and the toolkit is not.
+     * The contract is on the compile classpath and the toolkit is not {@code provided}.
      *
-     * <p>Both mistakes compile, both produce a jar, and both fail only once a host loads the result. A
-     * {@code compile}-scoped contract ships a second copy of the boundary types, which the loader's
-     * parent-first arm exists to make impossible — the symptom is a {@code ClassCastException} between two
-     * classes with identical names. A {@code provided}-scoped toolkit is simply absent at load time, because
-     * the host does not have one to provide: {@code botmaker-studio} must never depend on the toolkit, or
-     * two plugins could not hold two versions of it.
+     * <p><b>A {@code compile} contract is accepted since 2026-09-23.</b> It was refused because a second
+     * copy of the boundary types would be two {@code Class} objects with one name — but
+     * {@code PluginLoader} is parent-first for {@code com.botmaker.plugin.api.**}, so the copy on a plugin's
+     * classpath is never the one loaded, and the refusal guarded against something the loader already makes
+     * impossible. It started to matter when {@code @Param} and {@code @Managed} moved into the contract: a
+     * bot writes them on its own fields, so a plugin whose jar a bot compiles against — the SDK — has to
+     * hand the contract on, and {@code provided} is not transitive. Every other scope still fails, since
+     * nothing but those two puts the contract where a plugin's source can name it.
+     *
+     * <p>A {@code provided}-scoped toolkit is simply absent at load time, because the host does not have one
+     * to provide: {@code botmaker-studio} must never depend on the toolkit, or two plugins could not hold two
+     * versions of it.
      */
     private static CheckResult checkPomScopes(PluginSubject subject) {
         if (subject.pom() == null) {
@@ -381,11 +561,11 @@ public final class PluginValidator {
         if (contract == null) {
             problems.add("no dependency on " + CONTRACT_GROUP + ":" + CONTRACT_ARTIFACT
                     + "; a plugin implements the contract, so it must declare it");
-        } else if (!"provided".equals(contract.scope())) {
-            problems.add(CONTRACT_ARTIFACT + " is declared at scope '"
-                    + (contract.scope().isEmpty() ? "compile" : contract.scope())
-                    + "'; it must be `provided`. The host has the contract already, and a second copy makes"
-                    + " a contract class two different Class objects");
+        } else if (!"provided".equals(scope(contract)) && !"compile".equals(scope(contract))) {
+            problems.add(CONTRACT_ARTIFACT + " is declared at scope '" + scope(contract)
+                    + "'; it must be `provided` or `compile`, the two scopes a plugin's own source compiles"
+                    + " against. `provided` for a plugin nothing else builds on, `compile` for one a bot"
+                    + " compiles against, since a bot writes the contract's @Param and @Managed");
         }
         Poms.Dependency toolkit = Poms.find(declared, CONTRACT_GROUP, TOOLKIT_ARTIFACT).orElse(null);
         if (toolkit != null && "provided".equals(toolkit.scope())) {
@@ -394,10 +574,14 @@ public final class PluginValidator {
                     + " botmaker-studio must never depend on it");
         }
         return problems.isEmpty()
-                ? CheckResult.pass(Check.POM_SCOPES, toolkit == null ? "contract provided, no toolkit"
-                        : "contract provided, toolkit "
-                                + (toolkit.scope().isEmpty() ? "compile" : toolkit.scope()))
+                ? CheckResult.pass(Check.POM_SCOPES, "contract " + scope(contract)
+                        + (toolkit == null ? ", no toolkit" : ", toolkit " + scope(toolkit)))
                 : CheckResult.fail(Check.POM_SCOPES, problems);
+    }
+
+    /** A dependency's scope as Maven reads it: an absent {@code <scope>} is {@code compile}. */
+    private static String scope(Poms.Dependency dependency) {
+        return dependency.scope().isEmpty() ? "compile" : dependency.scope();
     }
 
     // -------------------------------------------------------------------------------------------------

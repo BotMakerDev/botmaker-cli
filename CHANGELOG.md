@@ -24,6 +24,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **`value-types` checks what a plugin declares, not which strings it claims.** The contract's value
+  vocabulary is gone, so the check asks `types()` and `componentTypes()` instead: every `PluginType` answers
+  a class and a fresh value of it (or, per the contract, a null `fresh()` beside a `freshSource()`), no class
+  is declared by two plugins on the classpath — the host's own composition rule — and every component type
+  gives the same components back from `build(components(fresh()))`. That last one is a real check the id
+  comparison could never make. The check's id is still `value-types`; the constant is `Check.TYPES`. A host
+  with no JavaFX that cannot link a plugin's types reports a skip rather than a failure. Run against the SDK
+  working copy it reports 23 types across the SDK and plugin-basics, 9 of them round-tripped.
+- **`pom-scopes` accepts a `compile` contract.** `@Param` and `@Managed` moved into `botmaker-studio-api`,
+  so the SDK — the plugin a bot compiles against — declares it at `compile` to hand it on. The refusal
+  guarded against a second `Class` object, which `PluginLoader`'s parent-first rule for
+  `com.botmaker.plugin.api.**` already makes impossible. Any scope but `provided` or `compile` still fails.
+- **The archetype's skeleton is compiled whole.** `ArchetypeSkeletonTest` copies every source the archetype
+  ships rather than a list of two, compiles the skeleton's own `ExamplePluginTest` too, and asserts its one
+  type round-trips.
+- **`PluginValidatorTest`'s fixtures fail when they stop compiling.** They were compiled under
+  `assumeTrue`, so a fixture that drifted from the contract skipped every test that used it and reported
+  green.
+- **Value type ids are removed everywhere they were a claim.** `PluginSubject.claimedValueTypeIds`,
+  `Registry.claimedValueTypeIds`, `Bundled.valueTypeIds`, the third argument of
+  `Subjects.fromCoordinate`/`fromCoordinates`, and `RegistryEntry.valueTypeIds`. A type is its class now,
+  named by its own package. An entry file that still carries the field reads as before; the generated index
+  stops carrying it, and nothing rewrites the file.
+- **`PluginSubject.pinnedVersion` is removed**: it was the argument to `catalog(pin)`, and the contract's
+  `catalog()` takes none.
 - **What a module is exempt from is asked of the module, never by naming it**, and a template answers no to
   four things the repository genuinely lacks: `onJitpack()` (nobody resolves a template), `hasChangelog()`
   (there is no `CHANGELOG.md`), and both CI gates (there is no `.github/workflows`). New

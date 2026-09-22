@@ -6,8 +6,6 @@ import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.TypeRef;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.api.value.ValueForm;
-import com.botmaker.plugin.api.value.ValueType;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -46,8 +44,12 @@ final class StubContexts {
             }
 
             @Override
-            public ValueForm form() {
-                return leafForm(typeName);
+            public <T> Optional<T> value(Class<T> type) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void set(Object value) {
             }
 
             @Override
@@ -56,7 +58,7 @@ final class StubContexts {
             }
 
             @Override
-            public void set(String javaExpression, String... importsNeeded) {
+            public void setSource(String javaExpression, Class<?>... imports) {
             }
 
             @Override
@@ -99,8 +101,12 @@ final class StubContexts {
             }
 
             @Override
-            public ValueForm form() {
-                return leafForm(typeName);
+            public <T> Optional<T> value(Class<T> type) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void set(Object value) {
             }
 
             @Override
@@ -109,7 +115,7 @@ final class StubContexts {
             }
 
             @Override
-            public void set(String javaExpression, String... importsNeeded) {
+            public void setSource(String javaExpression, Class<?>... imports) {
             }
 
             @Override
@@ -117,14 +123,6 @@ final class StubContexts {
                 return SERVICES;
             }
         };
-    }
-
-    // Not named `form`, for the reason `typeRef` is not named `type`: a call to it sits inside an anonymous
-    // class that already declares `form()`, and Java resolves against the innermost enclosing declaration
-    // holding that NAME — arity does not widen the search.
-    private static ValueForm leafForm(String name) {
-        String safe = name == null ? "" : name;
-        return ValueForm.of(ValueType.of(safe.isEmpty() ? "?" : safe).source(safe).build());
     }
 
     // Not named `type`: a call to it sits inside an anonymous class that already declares `type()`, and

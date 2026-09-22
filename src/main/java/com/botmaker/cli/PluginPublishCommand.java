@@ -8,7 +8,6 @@ import com.botmaker.cli.validate.CheckResult;
 import com.botmaker.cli.validate.PluginSubject;
 import com.botmaker.cli.validate.PluginValidator;
 import com.botmaker.plugin.api.StudioPlugin;
-import com.botmaker.plugin.api.value.ValueType;
 import com.botmaker.plugin.host.PluginLoader;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -230,7 +229,7 @@ final class PluginPublishCommand implements Callable<Integer> {
         Console console = parent.main().console();
         String coordinate = entry.coordinate() + ":" + entry.verifiedVersion();
         try {
-            parent.main().subjects().fromCoordinate(coordinate, Set.of(), Set.of());
+            parent.main().subjects().fromCoordinate(coordinate, Set.of());
             return true;
         } catch (IOException e) {
             console.error("nobody can download " + coordinate + " yet, so the registry's gate could not"
@@ -343,7 +342,6 @@ final class PluginPublishCommand implements Callable<Integer> {
         Console console = parent.main().console();
         String id = "";
         String name = "";
-        List<String> valueTypeIds = new ArrayList<>();
         try (PluginLoader loaded =
                      PluginLoader.open(subject.classpath().stream().map(Object::toString).toList())) {
             // The validator has already refused an empty load, so there is at least one plugin here. The
@@ -357,9 +355,6 @@ final class PluginPublishCommand implements Callable<Integer> {
             StudioPlugin plugin = plugins.getFirst();
             id = plugin.id();
             name = plugin.displayName();
-            for (ValueType type : plugin.valueTypes().types()) {
-                valueTypeIds.add(type.id());
-            }
         }
 
         Poms.Dependency self = Poms.coordinate(subject.pom());
@@ -372,7 +367,6 @@ final class PluginPublishCommand implements Callable<Integer> {
                 description,
                 List.of(tags.split("\\s*,\\s*")).stream().filter(t -> !t.isBlank()).toList(),
                 contractVersion,
-                valueTypeIds,
                 editorDependencies(console, Poms.dependencies(subject.pom())),
                 // The tag the world can download, which is the version the registry's gate will resolve and
                 // run the same checks against. A verifiedAt with no version beside it is a date attached to

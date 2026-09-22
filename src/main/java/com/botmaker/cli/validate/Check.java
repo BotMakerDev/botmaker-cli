@@ -24,16 +24,25 @@ public enum Check {
     /** Every plugin's {@code id()} is well formed, and claimed by nobody else. */
     ID("id", "Every plugin id is well formed and unclaimed"),
 
-    /** {@code catalog(pin).problems()} is empty and every entry names a real public member. */
+    /** {@code catalog().problems()} is empty and every entry names a real public member. */
     PALETTE("palette", "The palette catalog is clean and every entry resolves"),
 
-    /** No {@code valueTypes()} id is blank, duplicated within the subject, or already registered. */
-    VALUE_TYPES("value-types", "No value type id collides"),
+    /**
+     * Every declared type answers a class and a fresh value, no two plugins in the build declare one class,
+     * and a component type takes its fresh value apart and puts it back.
+     *
+     * <p>The id is still {@code value-types}: it is what a report prints and a CI job greps for, and the
+     * question — is what this plugin says about its values sound — is the one it always asked.
+     */
+    TYPES("value-types", "Every declared type is sound and declared once"),
 
     /** {@code slotEditors()} builds, and every predicate answers without throwing. */
     EDITORS("editors", "Every slot editor builds and answers"),
 
-    /** {@code botmaker-studio-api} is {@code provided}; {@code botmaker-plugin-toolkit} is not. */
+    /**
+     * {@code botmaker-studio-api} is {@code provided} or {@code compile}; {@code botmaker-plugin-toolkit} is
+     * not {@code provided}.
+     */
     POM_SCOPES("pom-scopes", "The plugin's dependency scopes are right"),
 
     /**

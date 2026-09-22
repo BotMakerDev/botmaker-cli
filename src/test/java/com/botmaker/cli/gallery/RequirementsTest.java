@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class RequirementsTest {
 
     private static RegistryEntry plugin(String id, String coordinate) {
-        return new RegistryEntry(id, id, coordinate, "", "", List.of(), "", List.of(), List.of(), "v1", "");
+        return new RegistryEntry(id, id, coordinate, "", "", List.of(), "", List.of(), "v1", "");
     }
 
     @Test

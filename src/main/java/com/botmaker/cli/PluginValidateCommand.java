@@ -53,7 +53,7 @@ final class PluginValidateCommand implements Callable<Integer> {
         Console console = parent.main().console();
         PluginSubject subject;
         if (coordinate != null) {
-            subject = parent.main().subjects().fromCoordinate(coordinate, Set.of(), Set.of());
+            subject = parent.main().subjects().fromCoordinate(coordinate, Set.of());
         } else {
             String directory = dirArgument != null ? dirArgument : dirOption != null ? dirOption : ".";
             subject = parent.main().subjects()

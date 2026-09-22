@@ -13,53 +13,49 @@ import java.util.Set;
  * that both get the same verdict. Everything to do with processes, downloads and command lines lives in
  * {@code com.botmaker.cli}.
  *
- * @param classpath         every jar and classes directory the plugin would be loaded from, the plugin's own
- *                          output first. Handed straight to {@code PluginLoader.open}
- * @param pom               the plugin's {@code pom.xml} — the working copy's, or the {@code .pom} resolved
- *                          alongside a published jar. {@code null} when there is none to read, which makes
- *                          {@link Check#POM_SCOPES} a skip rather than a failure
- * @param pinnedVersion     the version to ask {@code catalog(pin)} about, as a project's pom would spell it
- * @param claimedPluginIds  plugin ids the registry already holds, so a submission cannot take one
- * @param claimedValueTypeIds value type ids the registry already holds. Empty when validating locally, which
- *                          is why a clean local run is not a promise the PR will pass — say so in the report
- * @param entryPluginId     the id of the plugin this run is <b>about</b>, when something knows it — the
- *                          registry's entry filename. Blank when nothing does (a local run, where the
- *                          author has not said which of the plugins on their classpath is theirs), and
- *                          then every plugin found is judged, which is what it has always done.
- *                          <p><b>It exists because a plugin may depend on a plugin</b> (the umbrella's SDK
- *                          on {@code botmaker-plugin-basics}): resolving the SDK puts two plugins on one
- *                          classpath, {@code ServiceLoader} finds both, and the second one's id and value
- *                          types are registered — by its own entry, correctly. Without this the gate
- *                          refuses the SDK for claiming ids it does not claim, and the fix an author
- *                          would read out of the message is to rename somebody else's types.
+ * <p>Two components went on 2026-09-23. {@code pinnedVersion} was the argument {@code catalog(pin)} was
+ * asked with, and the contract's {@code catalog()} takes none. {@code claimedValueTypeIds} reserved the
+ * string ids a registry entry listed, and a type is identified by its class now — which is named by its
+ * package, so two plugins can collide only inside one build, where {@link Check#TYPES} sees both.
+ *
+ * @param classpath        every jar and classes directory the plugin would be loaded from, the plugin's own
+ *                         output first. Handed straight to {@code PluginLoader.open}
+ * @param pom              the plugin's {@code pom.xml} — the working copy's, or the {@code .pom} resolved
+ *                         alongside a published jar. {@code null} when there is none to read, which makes
+ *                         {@link Check#POM_SCOPES} a skip rather than a failure
+ * @param claimedPluginIds plugin ids the registry already holds, so a submission cannot take one
+ * @param entryPluginId    the id of the plugin this run is <b>about</b>, when something knows it — the
+ *                         registry's entry filename. Blank when nothing does (a local run, where the author
+ *                         has not said which of the plugins on their classpath is theirs), and then every
+ *                         plugin found is judged, which is what it has always done.
+ *                         <p><b>It exists because a plugin may depend on a plugin</b> (the umbrella's SDK on
+ *                         {@code botmaker-plugin-basics}): resolving the SDK puts two plugins on one
+ *                         classpath, {@code ServiceLoader} finds both, and the second one's id belongs to
+ *                         its own entry. Without this the gate refuses the SDK for claiming an id it does
+ *                         not claim.
  */
-public record PluginSubject(List<Path> classpath, Path pom, String pinnedVersion,
-                            Set<String> claimedPluginIds, Set<String> claimedValueTypeIds,
+public record PluginSubject(List<Path> classpath, Path pom, Set<String> claimedPluginIds,
                             String entryPluginId) {
 
     public PluginSubject {
         classpath = List.copyOf(classpath);
-        pinnedVersion = pinnedVersion == null ? "" : pinnedVersion;
         claimedPluginIds = Set.copyOf(claimedPluginIds);
-        claimedValueTypeIds = Set.copyOf(claimedValueTypeIds);
         entryPluginId = entryPluginId == null ? "" : entryPluginId.strip();
     }
 
     /** Everything but the entry id, which only the registry knows. */
-    public PluginSubject(List<Path> classpath, Path pom, String pinnedVersion,
-                         Set<String> claimedPluginIds, Set<String> claimedValueTypeIds) {
-        this(classpath, pom, pinnedVersion, claimedPluginIds, claimedValueTypeIds, "");
+    public PluginSubject(List<Path> classpath, Path pom, Set<String> claimedPluginIds) {
+        this(classpath, pom, claimedPluginIds, "");
     }
 
     /** A local run: nothing is claimed yet, because nothing has been submitted. */
-    public static PluginSubject local(List<Path> classpath, Path pom, String pinnedVersion) {
-        return new PluginSubject(classpath, pom, pinnedVersion, Set.of(), Set.of(), "");
+    public static PluginSubject local(List<Path> classpath, Path pom) {
+        return new PluginSubject(classpath, pom, Set.of(), "");
     }
 
     /** The same subject, told which plugin the submission is about. */
     public PluginSubject about(String pluginId) {
-        return new PluginSubject(classpath, pom, pinnedVersion, claimedPluginIds, claimedValueTypeIds,
-                pluginId);
+        return new PluginSubject(classpath, pom, claimedPluginIds, pluginId);
     }
 
     /**
