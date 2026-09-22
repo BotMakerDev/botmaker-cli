@@ -95,10 +95,10 @@ The eight checks, and the same code the registry's CI runs on a pull request:
 | `classpath` | the plugin's classpath resolves and every entry exists |
 | `loads` | `ServiceLoader` finds at least one `StudioPlugin` through the real loader |
 | `id` | every id is well formed and claimed by nobody else |
-| `palette` | `catalog(pin).problems()` is empty and every entry names a real public member |
-| `value-types` | no `ValueType` id collides |
+| `palette` | `catalog().problems()` is empty and every entry names a real public member |
+| `value-types` | every declared type has a class and a fresh value (or a `freshSource()`), no class is declared by two plugins, and a `ComponentType` gives back the same parts through `build(components(fresh()))` |
 | `editors` | `slotEditors()` builds and every predicate answers without throwing |
-| `pom-scopes` | `botmaker-studio-api` is `provided`; `botmaker-plugin-toolkit` is not |
+| `pom-scopes` | `botmaker-studio-api` is `provided` or `compile`; `botmaker-plugin-toolkit` is not `provided` |
 | `plugin-deps` | `botmaker-plugin-toolkit` is not `optional` — `optional` means *not transitive*, so a host resolves a plugin without it |
 
 `--coordinate G:A:V` validates a **published** artifact instead of your working copy. That is the one that

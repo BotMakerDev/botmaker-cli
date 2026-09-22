@@ -275,10 +275,17 @@ opens a pull request, so the check that refuses one is the check its author alre
 `com.botmaker.cli.registry.RegistryGate` is what `botmaker-plugin-registry`'s CI runs on a pull request. It
 lives here for the same reason the validator is a library: **it must be the code the author already ran.**
 The registry's workflow resolves this module's *main* artifact and calls the gate; everything the gate adds
-on top of `botmaker plugin validate` is what only the registry knows — the ids every other entry claims
-(`Registry.claimedValueTypeIds`, which fills the `PluginSubject` parameter a local run always leaves empty),
-the ids the **host's own bundled plugins** own (`Bundled`), and the rule that `index.json` is generated. A
-check belongs in `PluginValidator`, never here.
+on top of `botmaker plugin validate` is what only the registry knows — the plugin ids the **host's own
+bundled plugins** own (`Bundled`), which entry the pull request is about, and the rule that `index.json` is
+generated. A check belongs in `PluginValidator`, never here.
+
+**Value type ids left on 2026-09-23** — `Registry.claimedValueTypeIds`, `Bundled`'s type half,
+`PluginSubject`'s parameter for them and `RegistryEntry.valueTypeIds`. A type is identified by its Java
+class now, which carries its own package, so two plugins can only collide by declaring *the same class*,
+and that is only detectable with both loaded: `checkTypes` refuses it within one classpath, the same rule
+`PluginHost.compose` applies. An old entry's `valueTypeIds` is read and ignored, and dropped from the
+generated index; no converter was written. The paragraphs below describe the id era where they say *value
+type ids*.
 
 **An entry is about one plugin, and the gate has to say which** (`PluginSubject.about`/`judges`, 2026-09-17).
 A plugin may depend on a plugin — the SDK on `botmaker-plugin-basics`, an ordinary Maven dependency — so
