@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **`validate` has a `records` check.** Every `@Records` method of the plugin must be `public static` with
+  no parameter a recording cannot fill — asked through `botmaker-plugin-host`'s `Recordings`, the code Studio
+  records with. Skipped on a host with no JavaFX when the plugin's types cannot be linked.
 - **`validate` judges the palette the host discovers.** A plugin whose `catalog()` is the empty default is
   checked against every `@Palette` class in its jar (`botmaker-plugin-host`'s `Palettes`), exactly the
   palette Studio will show; a hand-built catalog is checked as before.

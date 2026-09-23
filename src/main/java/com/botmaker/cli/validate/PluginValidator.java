@@ -11,6 +11,7 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.host.Palettes;
 import com.botmaker.plugin.host.PluginLoader;
+import com.botmaker.plugin.host.Recordings;
 
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
@@ -78,7 +79,8 @@ public final class PluginValidator {
         CheckResult classpath = checkClasspath(subject);
         results.add(classpath);
         if (classpath.failed()) {
-            for (Check check : List.of(Check.LOADS, Check.ID, Check.PALETTE, Check.TYPES, Check.EDITORS)) {
+            for (Check check : List.of(Check.LOADS, Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES,
+                    Check.EDITORS)) {
                 results.add(CheckResult.skip(check, "the classpath did not resolve"));
             }
             results.add(checkPomScopes(subject));
@@ -99,13 +101,14 @@ public final class PluginValidator {
                                 + " a class that is not there, and a plugin whose own dependency is missing",
                         "check that src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin"
                                 + " exists and names your plugin's fully qualified class")));
-                for (Check check : List.of(Check.ID, Check.PALETTE, Check.TYPES, Check.EDITORS)) {
+                for (Check check : List.of(Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES, Check.EDITORS)) {
                     results.add(CheckResult.skip(check, "nothing loaded"));
                 }
             } else {
                 results.add(CheckResult.pass(Check.LOADS, plugins.size() + " plugin(s): " + ids(plugins)));
                 results.add(checkIds(plugins, subject));
                 results.add(checkPalette(plugins));
+                results.add(checkRecords(plugins, subject));
                 results.add(checkTypes(plugins, subject));
                 results.add(checkEditors(plugins));
             }
@@ -214,6 +217,39 @@ public final class PluginValidator {
         return problems.isEmpty()
                 ? CheckResult.pass(Check.PALETTE, facades + " facade(s), " + members + " member(s)")
                 : CheckResult.fail(Check.PALETTE, problems);
+    }
+
+    /**
+     * Every {@code @Records} method of the judged plugins is {@code public static} and has no parameter the host
+     * cannot fill — asked through {@link Recordings}, the code Studio records with, so a method this passes is
+     * one Studio can write. Another plugin on the classpath may answer a parameter type, so all are asked.
+     *
+     * <p>Skipped on a host with no JavaFX when a plugin's types do not link: whether a type has components or a
+     * fresh value is part of the answer, and it cannot be read here.
+     */
+    private static CheckResult checkRecords(List<StudioPlugin> plugins, PluginSubject subject) {
+        for (StudioPlugin plugin : plugins) {
+            try {
+                plugin.types();
+                plugin.componentTypes();
+            } catch (LinkageError e) {
+                return CheckResult.skip(Check.RECORDS, "no JavaFX on this classpath, and " + safeId(plugin)
+                        + "'s types could not be linked without it");
+            } catch (RuntimeException e) {
+                // A throwing surface is TYPES' finding; here it only means that plugin fills nothing.
+            }
+        }
+        List<String> problems = new ArrayList<>();
+        int writers = 0;
+        for (StudioPlugin plugin : plugins) {
+            if (!subject.judges(safeId(plugin))) continue;
+            problems.addAll(Recordings.problems(plugin, plugins).stream()
+                    .map(problem -> safeId(plugin) + ": " + problem).toList());
+            writers += Recordings.of(List.of(plugin)).size();
+        }
+        return problems.isEmpty()
+                ? CheckResult.pass(Check.RECORDS, writers == 0 ? "none declared" : writers + " method(s)")
+                : CheckResult.fail(Check.RECORDS, problems);
     }
 
     private static boolean resolves(MemberId id) {

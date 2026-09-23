@@ -27,6 +27,8 @@ public enum Check {
     /** {@code catalog().problems()} is empty and every entry names a real public member. */
     PALETTE("palette", "The palette catalog is clean and every entry resolves"),
 
+    RECORDS("records", "Every @Records method can be filled from a recording"),
+
     /**
      * Every declared type answers a class and a fresh value, no two plugins in the build declare one class,
      * and a component type takes its fresh value apart and puts it back.
