@@ -371,18 +371,21 @@ public final class PluginValidator {
                 }
                 if (value == null) {
                     // The contract's one exception: a type whose fresh form is a call the bot evaluates
-                    // (the SDK's MatchResult starts as Vision.lastMatch()) answers freshSource() instead.
-                    String source;
+                    // (the SDK's MatchResult starts as Vision.lastMatch()) answers freshCall() instead.
+                    Method call;
                     try {
-                        source = type.freshSource();
+                        call = type.freshCall();
                     } catch (RuntimeException | LinkageError e) {
-                        problems.add(id + ": " + name + " freshSource() threw " + e);
+                        problems.add(id + ": " + name + " freshCall() threw " + e);
                         continue;
                     }
-                    if (source == null || source.isBlank()) {
-                        problems.add(id + ": " + name + " answers neither fresh() nor freshSource(); a new"
+                    if (call == null) {
+                        problems.add(id + ": " + name + " answers neither fresh() nor freshCall(); a new"
                                 + " value has to start as something, and the host writes it into the bot's"
                                 + " source");
+                    } else {
+                        String why = freshCallProblem(call, name);
+                        if (why != null) problems.add(id + ": " + name + " freshCall() " + call + " " + why);
                     }
                 } else if (!boxed(cls).isInstance(value)) {
                     problems.add(id + ": " + name + " fresh() returned a " + value.getClass().getName()
@@ -414,6 +417,24 @@ public final class PluginValidator {
         }
         return CheckResult.pass(Check.TYPES, declared.isEmpty() ? "none declared"
                 : String.join(", ", declared) + (roundTrips == 0 ? "" : "; " + roundTrips + " round-tripped"));
+    }
+
+    /**
+     * Why the host could not write {@code call} as a fresh {@code typeName}, or {@code null} when it can: the
+     * contract's shape is a public static method with no parameters returning the type by name. A host skips
+     * one of any other shape, which leaves the type declarable with nothing to start as.
+     */
+    static String freshCallProblem(Method call, String typeName) {
+        if (!Modifier.isPublic(call.getModifiers()) || !Modifier.isStatic(call.getModifiers())) {
+            return "is not public static; the host writes Owner." + call.getName() + "() with no instance";
+        }
+        if (call.getParameterCount() != 0) {
+            return "takes parameters; the host writes the call with no arguments";
+        }
+        if (!call.getReturnType().getName().equals(typeName)) {
+            return "returns " + call.getReturnType().getName() + ", not " + typeName;
+        }
+        return null;
     }
 
     /**

@@ -2,6 +2,15 @@
 
 ## Done
 
+### 2026-09-23 — `value-types` checks a `freshCall()`'s shape
+
+`PluginType.freshSource()` (text) became `freshCall()` (a `Method`). A type answering a null `fresh()` must
+answer a public static method with no parameters whose return type is the declared class by name; any other
+shape is a failure naming the method and what is wrong (`PluginValidator.freshCallProblem`), since a host
+skips it and the type is left with nothing to start as. Studio's grammar checks the same shape again before
+writing, rather than trusting that validate ran. `botmaker plugin validate botmaker-sdk` passes: the four
+vision results answer `Vision.lastMatch` and its siblings.
+
 ### 2026-09-06 — the release port's dry-run matrix was run for the first time, and the diff is not empty
 
 `package-info.java` said *"the plan's cutover test passes — the script's `--dry-run` and this library's

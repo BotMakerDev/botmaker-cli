@@ -268,24 +268,50 @@ class PluginValidatorTest {
                 GOOD_PLUGIN.replace("return new Greeting(\"world\", 1);", "return null;"), GOOD_API);
         CheckResult types = result(PluginValidator.validate(subject), Check.TYPES);
         assertEquals(Status.FAIL, types.status());
-        assertTrue(types.detail().getFirst().contains("neither fresh() nor freshSource()"),
+        assertTrue(types.detail().getFirst().contains("neither fresh() nor freshCall()"),
                 types.detail()::toString);
+    }
+
+    /** {@code GreetingType} answering a null {@code fresh()} and {@code freshCall()} as {@code body}. */
+    private static String startingAsCall(String body) {
+        return GOOD_PLUGIN.replace(
+                "@Override public Greeting fresh() { return new Greeting(\"world\", 1); }",
+                "@Override public Greeting fresh() { return null; }"
+                        + " @Override public java.lang.reflect.Method freshCall() {"
+                        + " try { " + body + " } catch (NoSuchMethodException e) { throw new IllegalStateException(e); } }"
+                        + " public static Greeting last() { return new Greeting(\"last\", 1); }"
+                        + " public Greeting mine() { return null; }");
     }
 
     /**
      * The contract's exception, and the SDK's case: a type whose fresh form is a call the bot evaluates
-     * answers {@code freshSource()} and a null {@code fresh()}. The first real SDK validation refused six of
+     * answers {@code freshCall()} and a null {@code fresh()}. The first real SDK validation refused six of
      * its types for exactly this before the check knew it.
      */
     @Test
-    void a_type_that_starts_as_a_live_expression_passes(@TempDir Path dir) throws IOException {
-        PluginSubject subject = subject(dir, GOOD_POM, GOOD_PLUGIN.replace(
-                "@Override public Greeting fresh() { return new Greeting(\"world\", 1); }",
-                "@Override public Greeting fresh() { return null; }"
-                        + " @Override public String freshSource() { return \"p.Api.lastGreeting()\"; }"),
-                GOOD_API);
+    void a_type_that_starts_as_a_call_passes(@TempDir Path dir) throws IOException {
+        PluginSubject subject = subject(dir, GOOD_POM,
+                startingAsCall("return GreetingType.class.getMethod(\"last\");"), GOOD_API);
         CheckResult types = result(PluginValidator.validate(subject), Check.TYPES);
         assertEquals(Status.PASS, types.status(), types::toString);
+    }
+
+    /** A fresh call the host could not write — here an instance method — is refused, never thrown. */
+    @Test
+    void a_fresh_call_of_the_wrong_shape_fails(@TempDir Path dir) throws IOException {
+        PluginSubject subject = subject(dir, GOOD_POM,
+                startingAsCall("return GreetingType.class.getMethod(\"mine\");"), GOOD_API);
+        CheckResult types = result(PluginValidator.validate(subject), Check.TYPES);
+        assertEquals(Status.FAIL, types.status());
+        assertTrue(types.detail().getFirst().contains("is not public static"), types.detail()::toString);
+    }
+
+    @Test
+    void a_fresh_call_with_arguments_or_another_type_is_named() throws NoSuchMethodException {
+        assertEquals("takes parameters; the host writes the call with no arguments",
+                PluginValidator.freshCallProblem(String.class.getMethod("valueOf", int.class), "java.lang.String"));
+        assertEquals("returns java.lang.String, not p.Greeting",
+                PluginValidator.freshCallProblem(System.class.getMethod("lineSeparator"), "p.Greeting"));
     }
 
     /**

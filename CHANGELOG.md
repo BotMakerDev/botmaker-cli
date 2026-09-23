@@ -39,7 +39,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - **`value-types` checks what a plugin declares, not which strings it claims.** The contract's value
   vocabulary is gone, so the check asks `types()` and `componentTypes()` instead: every `PluginType` answers
-  a class and a fresh value of it (or, per the contract, a null `fresh()` beside a `freshSource()`), no class
+  a class and a fresh value of it (or, per the contract, a null `fresh()` beside a `freshCall()` that is a
+  public static method with no parameters returning the type — any other shape is a failure naming it), no class
   is declared by two plugins on the classpath — the host's own composition rule — and every component type
   gives the same components back from `build(components(fresh()))`. That last one is a real check the id
   comparison could never make. The check's id is still `value-types`; the constant is `Check.TYPES`. A host
