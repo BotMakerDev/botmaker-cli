@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **`validate` judges the palette the host discovers.** A plugin whose `catalog()` is the empty default is
+  checked against every `@Palette` class in its jar (`botmaker-plugin-host`'s `Palettes`), exactly the
+  palette Studio will show; a hand-built catalog is checked as before.
 - **`ArchetypeSkeletonTest` walks the skeleton instead of listing one directory.** The archetype now ships
   the standard `api/` / `plugin/` tree, and a flat `Files.list` would have compiled none of it.
 

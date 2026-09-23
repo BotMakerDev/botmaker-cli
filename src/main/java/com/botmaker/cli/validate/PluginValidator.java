@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.plugin.host.Palettes;
 import com.botmaker.plugin.host.PluginLoader;
 
 import java.lang.invoke.MethodType;
@@ -187,9 +188,12 @@ public final class PluginValidator {
             }
             if (catalog == null) {
                 problems.add(safeId(plugin) + "#catalog() returned null; return PaletteCatalog.empty()"
-                        + " to offer everything the jar contains");
+                        + " to let the host discover the palette from @Palette");
                 continue;
             }
+            // Empty is the default, and means the host discovers the palette from the plugin's own jar —
+            // exactly as Studio does, so the validator judges the palette a user would see.
+            if (Palettes.isDefault(catalog)) catalog = Palettes.discover(plugin.getClass());
             catalog.problems().forEach(problem -> problems.add(safeId(plugin) + ": " + problem));
             for (FacadeEntry facade : catalog.facades()) {
                 facades++;

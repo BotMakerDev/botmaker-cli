@@ -218,6 +218,17 @@ class PluginValidatorTest {
         assertTrue(palette.detail().getFirst().contains("@Palette"), palette.detail()::toString);
     }
 
+    /** A plugin that leaves {@code catalog()} alone is judged on the palette the host discovers from its jar. */
+    @Test
+    void a_plugin_with_no_catalog_is_judged_on_the_discovered_palette(@TempDir Path dir) throws IOException {
+        PluginSubject subject = subject(dir, GOOD_POM, GOOD_PLUGIN.replace(
+                "@Override public PaletteCatalog catalog() { return PaletteCatalog.of(Api.class); }", ""),
+                GOOD_API);
+        CheckResult palette = result(PluginValidator.validate(subject), Check.PALETTE);
+        assertEquals(Status.PASS, palette.status(), palette.detail()::toString);
+        assertTrue(palette.detail().toString().contains("1 facade"), palette.detail()::toString);
+    }
+
     // ------------------------------------------------------------------------------------------------
     // types
     // ------------------------------------------------------------------------------------------------
