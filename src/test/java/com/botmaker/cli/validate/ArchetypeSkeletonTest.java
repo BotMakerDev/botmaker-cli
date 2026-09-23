@@ -74,12 +74,9 @@ class ArchetypeSkeletonTest {
         // ---- the generated project, minus the archetype's own machinery --------------------------------
         Path sources = Files.createDirectories(work.resolve("src/main/java/" + PACKAGE.replace('.', '/')));
         // Every source the archetype ships, rather than a list: a file added to the skeleton and missing
-        // here would be a class the plugin names and this test never compiles.
-        try (Stream<Path> shipped = Files.list(resources.resolve("src/main/java"))) {
-            for (Path source : shipped.toList()) {
-                copySubstituted(source, sources.resolve(source.getFileName().toString()));
-            }
-        }
+        // here would be a class the plugin names and this test never compiles. Walked, not listed — the
+        // skeleton is the standard api/ internal/ plugin/ tree, and archetype:generate keeps subdirectories.
+        List<Path> mainSources = copyTree(resources.resolve("src/main/java"), sources);
         Path pom = work.resolve("pom.xml");
         copySubstituted(resources.resolve("pom.xml"), pom);
 
@@ -93,20 +90,20 @@ class ArchetypeSkeletonTest {
         String classpath = System.getProperty("java.class.path")
                 + java.io.File.pathSeparator + toolkitClasses;
         List<String> arguments = new ArrayList<>(List.of("-cp", classpath, "-d", classes.toString()));
-        try (Stream<Path> files = Files.list(sources)) {
-            files.map(Path::toString).forEach(arguments::add);
-        }
+        mainSources.stream().map(Path::toString).forEach(arguments::add);
         int status = javac.run(null, null, null, arguments.toArray(String[]::new));
         assertEquals(0, status, "the archetype's skeleton no longer compiles against this toolkit");
 
         // ---- and so does its test, the first thing an author runs ------------------------------------
         // Compiled, not run: running it wants a JUnit launcher. Compiling is what caught the 2026-09-23
         // drift — the test still called catalog(null) and valueTypes(), neither of which exists.
-        Path testSource = Files.createDirectories(work.resolve("src/test/java")).resolve("ExamplePluginTest.java");
-        copySubstituted(resources.resolve("src/test/java/ExamplePluginTest.java"), testSource);
+        List<Path> testSources = copyTree(resources.resolve("src/test/java"),
+                work.resolve("src/test/java/" + PACKAGE.replace('.', '/')));
         Path testClasses = Files.createDirectories(work.resolve("target/test-classes"));
-        assertEquals(0, javac.run(null, null, null, "-cp", classpath + java.io.File.pathSeparator + classes,
-                        "-d", testClasses.toString(), testSource.toString()),
+        List<String> testArguments = new ArrayList<>(List.of("-cp",
+                classpath + java.io.File.pathSeparator + classes, "-d", testClasses.toString()));
+        testSources.stream().map(Path::toString).forEach(testArguments::add);
+        assertEquals(0, javac.run(null, null, null, testArguments.toArray(String[]::new)),
                 "the archetype's own test no longer compiles against its skeleton");
 
         // ---- a host loads it --------------------------------------------------------------------------
@@ -136,6 +133,20 @@ class ArchetypeSkeletonTest {
         CheckResult types = results.stream().filter(r -> r.check() == Check.TYPES).findFirst().orElseThrow();
         assertEquals(Status.PASS, types.status(), types::toString);
         assertTrue(types.detail().getFirst().contains("1 round-tripped"), types.detail()::toString);
+    }
+
+    /** Copies every {@code .java} under {@code from} to the same relative path under {@code to}. */
+    private static List<Path> copyTree(Path from, Path to) throws IOException {
+        List<Path> copied = new ArrayList<>();
+        try (Stream<Path> shipped = Files.walk(from)) {
+            for (Path source : shipped.filter(p -> p.toString().endsWith(".java")).toList()) {
+                Path target = to.resolve(from.relativize(source).toString());
+                Files.createDirectories(target.getParent());
+                copySubstituted(source, target);
+                copied.add(target);
+            }
+        }
+        return copied;
     }
 
     private static void copySubstituted(Path from, Path to) throws IOException {

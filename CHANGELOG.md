@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- **`ArchetypeSkeletonTest` walks the skeleton instead of listing one directory.** The archetype now ships
+  the standard `api/` / `plugin/` tree, and a flat `Files.list` would have compiled none of it.
+
 ### Added
 
 - **`--gamebot`: the worked bot is released like every other module.** `botmaker-gamebot` is the template
