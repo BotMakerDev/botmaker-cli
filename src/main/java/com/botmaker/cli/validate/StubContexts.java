@@ -58,10 +58,6 @@ final class StubContexts {
             }
 
             @Override
-            public void setSource(String javaExpression, Class<?>... imports) {
-            }
-
-            @Override
             public StudioServices services() {
                 return SERVICES;
             }
@@ -79,11 +75,6 @@ final class StubContexts {
             @Override
             public int argIndex() {
                 return argIndex;
-            }
-
-            @Override
-            public Optional<String> enclosingCall() {
-                return Optional.empty();
             }
         };
     }
@@ -112,10 +103,6 @@ final class StubContexts {
             @Override
             public String source() {
                 return source == null ? "" : source;
-            }
-
-            @Override
-            public void setSource(String javaExpression, Class<?>... imports) {
             }
 
             @Override
