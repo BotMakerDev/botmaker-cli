@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **A release that moves a template's pin no longer compiles the template at the old pin.** When one run
+  cuts both the SDK and `botmaker-gamebot`, the decide pass says the pin moves and leaves the compile to
+  `TemplateGate.afterBump`, which runs before the template is tagged. A template migrated ahead of its SDK,
+  as the gamebot is to SDK 2.0.0, was otherwise refused by the release that fixes it.
+
 - **`validate` checks each component type's `factory()`**: it is public, its parameters match
   `componentTypes()` (the receiver excluded for an instance method, a varargs tail allowed), and the type is
   assignable to what it returns. A mismatch is a `types` problem naming the executable.

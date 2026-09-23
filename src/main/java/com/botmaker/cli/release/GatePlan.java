@@ -85,6 +85,20 @@ public final class GatePlan {
         return relevant ? TemplateGate.directories() : List.of();
     }
 
+    /**
+     * Whether this release moves {@code directory}'s pin: it cuts that template <b>and</b> a module the
+     * template pins ({@link TemplatePin#PINS}).
+     *
+     * <p>Then the decide pass has nothing honest to compile. The pin it would read is the one the release
+     * replaces, and a template migrated ahead of its SDK — {@code botmaker-gamebot} on SDK 2.0.0, 2026-09-23 —
+     * compiles only at the pin it is about to get. {@link TemplateGate#afterBump} asks the question of the pin
+     * actually written, before the template is tagged.
+     */
+    public static boolean pinMoves(String directory, Set<Module> releasing) {
+        return releasing.stream().anyMatch(module -> module.template() && module.directory().equals(directory))
+                && TemplatePin.PINS.keySet().stream().anyMatch(releasing::contains);
+    }
+
     /** Whether the two SDK-only gates run: only when this release cuts the SDK. */
     public static boolean sdkGates(Set<Module> releasing) {
         return releasing.contains(Module.SDK);

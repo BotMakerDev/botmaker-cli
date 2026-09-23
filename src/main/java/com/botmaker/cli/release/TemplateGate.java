@@ -28,7 +28,9 @@ import java.util.List;
  * <p><b>What the decide pass proves is that the template is coherent today</b>, at the pin it has now. A
  * {@code --gamebot} run then moves that pin, so {@link #afterBump} compiles it again, after
  * {@link TemplatePin#bump} and before {@link CommitTagPush} — the one place a refusal is still free, since
- * {@link Order#TAG} puts the templates last and nothing is tagged for this module yet.
+ * {@link Order#TAG} puts the templates last and nothing is tagged for this module yet. <b>A run that moves
+ * the pin skips the first compile</b> ({@link #deferred}): a template migrated ahead of its SDK compiles only
+ * at the pin it is about to get, and refusing it at the old one would refuse the very release that fixes it.
  *
  * <p>Skips with a line when {@code mvn} is absent, like every other gate that shells out: a gate that cannot
  * run must say so, and {@code --force} overrides a gate that failed, never one that could not run.
@@ -71,6 +73,15 @@ public final class TemplateGate {
             return GateVerdict.skipped("  " + directory + ": mvn not on PATH — template gate skipped");
         }
         return verdict(directory, compile(umbrella, pom), force);
+    }
+
+    /**
+     * The decide pass's line for a template whose pin this release moves ({@link GatePlan#pinMoves}): the
+     * compile waits for {@link #afterBump}, which runs before the template is tagged. A dry run never gets
+     * there, so its preview says the question is still open rather than answered.
+     */
+    public static GateVerdict deferred(String directory) {
+        return GateVerdict.ok("  " + directory + ": its pin moves in this release — compiled after the bump");
     }
 
     /** The reading of one compile, split out so the refusal's wording is tested without forking Maven. */

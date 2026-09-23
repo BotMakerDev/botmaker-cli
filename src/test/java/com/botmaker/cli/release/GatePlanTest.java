@@ -48,6 +48,17 @@ class GatePlanTest {
     }
 
     @Test
+    void aTemplatesPinMovesOnlyWhenTheRunCutsBothItAndWhatItPins() {
+        String gamebot = Module.GAMEBOT.directory();
+        assertTrue(GatePlan.pinMoves(gamebot, Set.of(Module.SDK, Module.GAMEBOT)));
+        // The SDK alone leaves the pin where it is, so the template is compiled at it as before.
+        assertFalse(GatePlan.pinMoves(gamebot, Set.of(Module.SDK)));
+        assertFalse(GatePlan.pinMoves(gamebot, Set.of(Module.GAMEBOT)));
+        // The blank template pins nothing and is no module, so no run moves anything of it.
+        assertFalse(GatePlan.pinMoves(TemplateGate.BASE, Set.of(Module.SDK, Module.GAMEBOT)));
+    }
+
+    @Test
     void theCountsAreTheScriptsOwnLoops() {
         // Fifteen modules: two APKs take no gate, and the template takes none of these four; Studio,
         // remote-server and the dashboard take every gate but JitPack's.

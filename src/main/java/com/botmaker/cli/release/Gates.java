@@ -57,7 +57,9 @@ public final class Gates {
         // After the SDK gates, because the SDK is what a template pins: asking whether the templates still
         // compile is worth more once the thing they compile against has answered for itself.
         for (String directory : GatePlan.templates(modules)) {
-            record(runner, refusals, TemplateGate.check(umbrella, directory, force));
+            record(runner, refusals, GatePlan.pinMoves(directory, modules)
+                    ? TemplateGate.deferred(directory)
+                    : TemplateGate.check(umbrella, directory, force));
         }
         return List.copyOf(refusals);
     }
