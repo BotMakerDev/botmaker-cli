@@ -14,6 +14,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -312,6 +313,63 @@ class PluginValidatorTest {
                 PluginValidator.freshCallProblem(String.class.getMethod("valueOf", int.class), "java.lang.String"));
         assertEquals("returns java.lang.String, not p.Greeting",
                 PluginValidator.freshCallProblem(System.class.getMethod("lineSeparator"), "p.Greeting"));
+    }
+
+    /** Every shape a factory comes in, and the ones that are wrong. */
+    public static final class Made {
+        public Made(String who, int times) {}
+        Made(int hidden) {}
+        public static Made of(String who, int times) { return new Made(who, times); }
+        public static Object loose(String who, int times) { return null; }
+        public static String other(String who, int times) { return who; }
+        public static Made many(String... names) { return null; }
+        public Made again(int times) { return this; }
+    }
+
+    @Test
+    void a_sound_factory_passes() throws NoSuchMethodException {
+        assertNull(PluginValidator.factoryProblem(Made.class.getConstructor(String.class, int.class),
+                Made.class, List.of(String.class, int.class)));
+        assertNull(PluginValidator.factoryProblem(Made.class.getMethod("of", String.class, int.class),
+                Made.class, List.of(String.class, int.class)));
+        assertNull(PluginValidator.factoryProblem(Made.class.getMethod("loose", String.class, int.class),
+                Made.class, List.of(String.class, int.class)), "a supertype return is how Source.current() reads");
+        assertNull(PluginValidator.factoryProblem(Made.class.getMethod("many", String[].class),
+                Made.class, List.of(String.class)), "a varargs tail repeats the last part");
+        assertNull(PluginValidator.factoryProblem(Made.class.getMethod("again", int.class),
+                Made.class, List.of(Made.class, int.class)), "part 0 is the receiver");
+    }
+
+    @Test
+    void a_factory_of_the_wrong_shape_is_named() throws NoSuchMethodException {
+        assertEquals("is not public; a bot calls it",
+                PluginValidator.factoryProblem(Made.class.getDeclaredConstructor(int.class),
+                        Made.class, List.of(int.class)));
+        assertEquals("takes [java.lang.String, int], where componentTypes() declares [int]",
+                PluginValidator.factoryProblem(Made.class.getMethod("of", String.class, int.class),
+                        Made.class, List.of(int.class)));
+        assertEquals("returns java.lang.String, which a " + Made.class.getName() + " is not",
+                PluginValidator.factoryProblem(Made.class.getMethod("other", String.class, int.class),
+                        Made.class, List.of(String.class, int.class)));
+        assertEquals("is an instance method of " + Made.class.getName()
+                        + ", so part 0 is its receiver, and part 0 is a java.lang.String",
+                PluginValidator.factoryProblem(Made.class.getMethod("again", int.class),
+                        Made.class, List.of(String.class, int.class)));
+    }
+
+    /** A plugin's component type whose factory does not fit is refused through TYPES, never thrown. */
+    @Test
+    void a_component_type_with_a_bad_factory_fails(@TempDir Path dir) throws IOException {
+        PluginSubject subject = subject(dir, GOOD_POM, GOOD_PLUGIN.replace(
+                "@Override public List<Class<?>> componentTypes() { return List.of(String.class, int.class); }",
+                "@Override public List<Class<?>> componentTypes() { return List.of(String.class, int.class); }"
+                        + " @Override public java.lang.reflect.Executable factory() {"
+                        + " try { return String.class.getMethod(\"valueOf\", int.class); }"
+                        + " catch (NoSuchMethodException e) { throw new IllegalStateException(e); } }"),
+                GOOD_API);
+        CheckResult types = result(PluginValidator.validate(subject), Check.TYPES);
+        assertEquals(Status.FAIL, types.status());
+        assertTrue(types.detail().getFirst().contains("factory()"), types.detail()::toString);
     }
 
     /**

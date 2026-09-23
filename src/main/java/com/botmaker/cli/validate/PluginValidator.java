@@ -14,6 +14,8 @@ import com.botmaker.plugin.host.PluginLoader;
 import com.botmaker.plugin.host.Recordings;
 
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
@@ -438,6 +440,52 @@ public final class PluginValidator {
     }
 
     /**
+     * Why the host could not write or read a value through {@code factory}, or {@code null} when it can.
+     *
+     * <p>A constructor must be {@code type}'s own. A method must return {@code type} or a supertype of it —
+     * {@code Source.current()} returns the interface its value implements. An instance method is a chain on
+     * part 0, so part 0 must be of the class that declares it, and the parameters are the parts after it. A
+     * varargs parameter stands for the last declared part repeated.
+     */
+    static String factoryProblem(Executable factory, Class<?> type, List<Class<?>> parts) {
+        if (!Modifier.isPublic(factory.getModifiers())) return "is not public; a bot calls it";
+        List<Class<?>> arguments = parts;
+        if (factory instanceof Method method && !Modifier.isStatic(method.getModifiers())) {
+            if (parts.isEmpty() || !method.getDeclaringClass().isAssignableFrom(parts.getFirst())) {
+                return "is an instance method of " + method.getDeclaringClass().getName()
+                        + ", so part 0 is its receiver, and part 0 is "
+                        + (parts.isEmpty() ? "missing" : "a " + parts.getFirst().getName());
+            }
+            arguments = parts.subList(1, parts.size());
+        }
+        List<Class<?>> declared = List.of(factory.getParameterTypes());
+        if (!fits(declared, arguments, factory.isVarArgs())) {
+            return "takes " + names(declared) + ", where componentTypes() declares " + names(arguments);
+        }
+        if (factory instanceof Constructor<?> constructor) {
+            return constructor.getDeclaringClass() == type ? null
+                    : "constructs a " + constructor.getDeclaringClass().getName() + ", not a " + type.getName();
+        }
+        Class<?> returned = ((Method) factory).getReturnType();
+        return returned.isAssignableFrom(type) ? null
+                : "returns " + returned.getName() + ", which a " + type.getName() + " is not";
+    }
+
+    private static boolean fits(List<Class<?>> declared, List<Class<?>> parts, boolean varargs) {
+        if (declared.size() != parts.size()) return false;
+        for (int i = 0; i < declared.size(); i++) {
+            Class<?> want = declared.get(i);
+            if (varargs && i == declared.size() - 1) want = want.getComponentType();
+            if (want != parts.get(i)) return false;
+        }
+        return true;
+    }
+
+    private static String names(List<Class<?>> types) {
+        return types.stream().map(Class::getName).toList().toString();
+    }
+
+    /**
      * What is wrong with one component type, or {@code null} when it took a fresh value apart and put it
      * back. An empty list means it answered and there was no value to try it on.
      */
@@ -458,6 +506,22 @@ public final class PluginValidator {
             return problems;
         }
         String name = cls.getName();
+        Executable factory;
+        try {
+            factory = shape.factory();
+        } catch (RuntimeException | LinkageError e) {
+            problems.add(id + ": " + name + " factory() threw " + e);
+            return problems;
+        }
+        if (factory == null) {
+            problems.add(id + ": " + name + " factory() returned null; the host has nothing to write it with");
+            return problems;
+        }
+        String why = factoryProblem(factory, cls, kinds);
+        if (why != null) {
+            problems.add(id + ": " + name + " factory() " + factory + " " + why);
+            return problems;
+        }
         Object value = fresh.get(name);
         if (value == null) {
             return problems;

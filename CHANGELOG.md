@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **`validate` checks each component type's `factory()`**: it is public, its parameters match
+  `componentTypes()` (the receiver excluded for an instance method, a varargs tail allowed), and the type is
+  assignable to what it returns. A mismatch is a `types` problem naming the executable.
 - **`validate` has a `records` check.** Every `@Records` method of the plugin must be `public static` with
   no parameter a recording cannot fill — asked through `botmaker-plugin-host`'s `Recordings`, the code Studio
   records with. Skipped on a host with no JavaFX when the plugin's types cannot be linked.
