@@ -5,6 +5,85 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.0.21; re-released for updated upstream pins.
+
+### Changed
+
+- **A release that moves a template's pin no longer compiles the template at the old pin.** When one run
+  cuts both the SDK and `botmaker-gamebot`, the decide pass says the pin moves and leaves the compile to
+  `TemplateGate.afterBump`, which runs before the template is tagged. A template migrated ahead of its SDK,
+  as the gamebot is to SDK 2.0.0, was otherwise refused by the release that fixes it.
+
+- **`validate` checks each component type's `factory()`**: it is public, its parameters match
+  `componentTypes()` (the receiver excluded for an instance method, a varargs tail allowed), and the type is
+  assignable to what it returns. A mismatch is a `types` problem naming the executable.
+- **`validate` has a `records` check.** Every `@Records` method of the plugin must be `public static` with
+  no parameter a recording cannot fill — asked through `botmaker-plugin-host`'s `Recordings`, the code Studio
+  records with. Skipped on a host with no JavaFX when the plugin's types cannot be linked.
+- **The validator's stub contexts follow the contract**: no `setSource` or `enclosingCall`, which a plugin
+  can no longer call.
+- **`validate` judges the palette the host discovers.** A plugin whose `catalog()` is the empty default is
+  checked against every `@Palette` class in its jar (`botmaker-plugin-host`'s `Palettes`), exactly the
+  palette Studio will show; a hand-built catalog is checked as before.
+- **`ArchetypeSkeletonTest` walks the skeleton instead of listing one directory.** The archetype now ships
+  the standard `api/` / `plugin/` tree, and a flat `Files.list` would have compiled none of it.
+
+### Added
+
+- **`--gamebot`: the worked bot is released like every other module.** `botmaker-gamebot` is the template
+  *New project from a template* copies, and it was the one published thing the release did not touch — its
+  pom pinned an SDK by hand, so it went stale silently. It is `Module.GAMEBOT` now, last in the flag list and
+  last in both `Order.DECIDE` and `Order.TAG`, because its pom pins tags the same run is cutting.
+  `TemplatePin` moves that pin to the SDK the run just cut, which is `Fallback.bump` for the other bot pom
+  this project owns. Forced by nothing: a small SDK patch must not demand a template version.
+- **`TemplateGate`: the templates are compiled before anything is tagged.** `mvn -B -q compile` on each
+  template whenever the release cuts the SDK **or** a template — which is what a forcing edge would
+  otherwise have been, since an SDK release is exactly the moment an untouched template can stop compiling.
+  A pin comparison would have caught neither of the two failures on 2026-09-21: source migrated past its own
+  pin, and a toolkit declared beside the SDK that brings it. The gate is asked of a *directory*, so
+  `botmaker-base` is covered too — it has no pin to move and no flag, and it can still stop compiling.
+
+### Changed
+
+- **`value-types` checks what a plugin declares, not which strings it claims.** The contract's value
+  vocabulary is gone, so the check asks `types()` and `componentTypes()` instead: every `PluginType` answers
+  a class and a fresh value of it (or, per the contract, a null `fresh()` beside a `freshCall()` that is a
+  public static method with no parameters returning the type — any other shape is a failure naming it), no class
+  is declared by two plugins on the classpath — the host's own composition rule — and every component type
+  gives the same components back from `build(components(fresh()))`. That last one is a real check the id
+  comparison could never make. The check's id is still `value-types`; the constant is `Check.TYPES`. A host
+  with no JavaFX that cannot link a plugin's types reports a skip rather than a failure. Run against the SDK
+  working copy it reports 23 types across the SDK and plugin-basics, 9 of them round-tripped.
+- **`pom-scopes` accepts a `compile` contract.** `@Param` and `@Managed` moved into `botmaker-studio-api`,
+  so the SDK — the plugin a bot compiles against — declares it at `compile` to hand it on. The refusal
+  guarded against a second `Class` object, which `PluginLoader`'s parent-first rule for
+  `com.botmaker.plugin.api.**` already makes impossible. Any scope but `provided` or `compile` still fails.
+- **The archetype's skeleton is compiled whole.** `ArchetypeSkeletonTest` copies every source the archetype
+  ships rather than a list of two, compiles the skeleton's own `ExamplePluginTest` too, and asserts its one
+  type round-trips.
+- **`PluginValidatorTest`'s fixtures fail when they stop compiling.** They were compiled under
+  `assumeTrue`, so a fixture that drifted from the contract skipped every test that used it and reported
+  green.
+- **Value type ids are removed everywhere they were a claim.** `PluginSubject.claimedValueTypeIds`,
+  `Registry.claimedValueTypeIds`, `Bundled.valueTypeIds`, the third argument of
+  `Subjects.fromCoordinate`/`fromCoordinates`, and `RegistryEntry.valueTypeIds`. A type is its class now,
+  named by its own package. An entry file that still carries the field reads as before; the generated index
+  stops carrying it, and nothing rewrites the file.
+- **`PluginSubject.pinnedVersion` is removed**: it was the argument to `catalog(pin)`, and the contract's
+  `catalog()` takes none.
+- **What a module is exempt from is asked of the module, never by naming it**, and a template answers no to
+  four things the repository genuinely lacks: `onJitpack()` (nobody resolves a template), `hasChangelog()`
+  (there is no `CHANGELOG.md`), and both CI gates (there is no `.github/workflows`). New
+  `Module.commitsOnRelease()`: the release commit was derived from `hasChangelog()`, which was true for
+  everything that had something to commit until a module arrived with no changelog and a pom pin to rewrite.
+- **A template's release-log row says `n/a` in all three columns.** `VerifyPass` skips the Actions poll for
+  it: `no run on <tag>` is the failure that column exists to catch, and for a repository with no workflows it
+  would be the only answer it could ever give.
+- `Plan.LABEL` is package-private with a test asserting it is total. A module missing from it printed
+  `null: 0.3.0 -> v0.3.0` in the plan block — a defect only the next new module would have found.
+
 ## [0.0.21] — 2026-09-23
 
 ### Changed
