@@ -25,11 +25,15 @@ class TemplatePinTest {
                 <artifactId>gamebot</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
 
+                <properties>
+                    <botmaker.sdk.version>1.1.9</botmaker.sdk.version>
+                </properties>
+
                 <dependencies>
                     <dependency>
                         <groupId>com.github.LiQiyeDev</groupId>
                         <artifactId>botmaker-sdk</artifactId>
-                        <version>1.1.9</version>
+                        <version>${botmaker.sdk.version}</version>
                     </dependency>
                     <dependency>
                         <groupId>net.java.dev.jna</groupId>
@@ -60,9 +64,9 @@ class TemplatePinTest {
                 Map.of(Module.SDK, new Version(1, 1, 15)));
 
         String after = Files.readString(pom);
-        assertTrue(after.replaceAll("\\s+", " ")
-                        .contains("<artifactId>botmaker-sdk</artifactId> <version>1.1.15</version>"),
-                after);
+        assertTrue(after.contains("<botmaker.sdk.version>1.1.15</botmaker.sdk.version>"), after);
+        // The dependency keeps naming the property: the umbrella's templates profile overrides it with -D.
+        assertTrue(after.contains("<version>${botmaker.sdk.version}</version>"), after);
         assertFalse(after.contains("1.1.9"), "the old pin is still there");
         // Without the `v` the tag carries, which is the spelling the template's own pom already uses.
         assertFalse(after.contains("v1.1.15"));
@@ -126,6 +130,6 @@ class TemplatePinTest {
         // transitively at the version that SDK was built against. A template naming it again would pin it
         // by Maven's nearest-wins to whatever number the file said — which is how a template ended up
         // linked against a contract that had moved, dying on open with a bare class name.
-        assertEquals(Map.of(Module.SDK, "botmaker-sdk"), TemplatePin.PINS);
+        assertEquals(Map.of(Module.SDK, "botmaker.sdk.version"), TemplatePin.PINS);
     }
 }

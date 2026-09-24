@@ -11,6 +11,10 @@ No source changes since v0.0.21; re-released for updated upstream pins.
 
 ### Changed
 
+- **A template's SDK pin is the `botmaker.sdk.version` property.** `TemplatePin` rewrites
+  `<botmaker.sdk.version>` instead of the dependency's `<version>`, so the umbrella's `templates` profile can
+  build the template against the reactor SDK with `-Dbotmaker.sdk.version=0.0.0-SNAPSHOT` on every commit.
+
 - **A release that moves a template's pin no longer compiles the template at the old pin.** When one run
   cuts both the SDK and `botmaker-gamebot`, the decide pass says the pin moves and leaves the compile to
   `TemplateGate.afterBump`, which runs before the template is tagged. A template migrated ahead of its SDK,

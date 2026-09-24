@@ -24,14 +24,20 @@ import java.util.regex.Pattern;
  * <p><b>An anchored regex over the pom text, and it must never become a computed value</b>, which is
  * {@code Fallback}'s rule and it is load-bearing for the same reason: the bump is a text edit, so anything
  * derived would let it silently stop matching while continuing to report success. The anchor is the
- * {@code artifactId}, never the version, so the pattern is indifferent to what the pin says today; and
+ * pin's name, never the version, so the pattern is indifferent to what the pin says today; and
  * {@link Runner#replace} throws when nothing matches, so a template that stops declaring the dependency is
  * a refusal rather than a release that believes it moved a pin it did not move.
+ *
+ * <p><b>The pin is a property since 2026-09-24</b> — {@code <botmaker.sdk.version>} in the template's
+ * {@code <properties>}, which its dependency names as {@code ${botmaker.sdk.version}}. That is what lets the
+ * umbrella's {@code templates} profile build the template against the reactor's SDK with
+ * {@code -Dbotmaker.sdk.version=0.0.0-SNAPSHOT} on every commit, so an {@code api.*} break fails the commit
+ * that made it rather than the next release. The anchor is the property element, which names one thing.
  */
 public final class TemplatePin {
 
     /**
-     * Module to the Maven {@code artifactId} a template pins it as.
+     * Module to the pom property a template pins it with.
      *
      * <p>A map of one, and it stays a map for {@link Fallback#CONSTANTS}'s reason: any released module a
      * template's pom names belongs here, and belongs here <i>once</i>. {@code botmaker-plugin-toolkit} is
@@ -41,22 +47,19 @@ public final class TemplatePin {
      * up linked against a contract that had moved.
      */
     static final Map<Module, String> PINS =
-            new EnumMap<>(Map.of(Module.SDK, "botmaker-sdk"));
+            new EnumMap<>(Map.of(Module.SDK, "botmaker.sdk.version"));
 
     private TemplatePin() {
     }
 
     /**
-     * {@code <artifactId>botmaker-sdk</artifactId> … <version>1.1.14</version>} — the declaration, with the
-     * version as the middle group.
-     *
-     * <p>The whitespace between the two elements is whatever the file has, so the pattern reads a pom
-     * formatted either way and touches one version: the one belonging to the artifact it names. A bare
-     * {@code <version>} pattern would match the project's own version, which is the first one in the file.
+     * {@code <botmaker.sdk.version>1.1.14</botmaker.sdk.version>} — the property, with the version as the
+     * middle group. A bare {@code <version>} pattern would match the project's own version, which is the
+     * first one in the file.
      */
-    static Pattern declaration(String artifactId) {
-        return Pattern.compile("(<artifactId>" + Pattern.quote(artifactId)
-                + "</artifactId>\\s*<version>)[^<]*(</version>)");
+    static Pattern declaration(String property) {
+        String quoted = Pattern.quote(property);
+        return Pattern.compile("(<" + quoted + ">)[^<]*(</" + quoted + ">)");
     }
 
     /**
@@ -73,10 +76,10 @@ public final class TemplatePin {
      */
     public static void bump(Runner runner, Path umbrella, Module module, Map<Module, Version> releasing) {
         Path pom = umbrella.resolve(module.directory()).resolve("pom.xml");
-        PINS.forEach((pinned, artifactId) -> {
+        PINS.forEach((pinned, property) -> {
             Version version = releasing.get(pinned);
             if (version != null) {
-                runner.replace(pom, declaration(artifactId), "$1" + version + "$2");
+                runner.replace(pom, declaration(property), "$1" + version + "$2");
             }
         });
     }
