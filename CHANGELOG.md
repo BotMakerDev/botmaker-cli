@@ -11,6 +11,11 @@ No source changes since v0.0.21; re-released for updated upstream pins.
 
 ### Changed
 
+- **`plugin validate` asks an editor about a slot by class** (contract 0.3.0): the stub slot is a
+  `String` in a call the validator could not resolve, so a call-site editor must decline it without
+  throwing. A `SlotEditor.calls` naming a method its class does not declare throws while the plugin builds
+  its editors, and the validator reports that as the plugin's failure.
+
 - **A template's SDK pin is the `botmaker.sdk.version` property.** `TemplatePin` rewrites
   `<botmaker.sdk.version>` instead of the dependency's `<version>`, so the umbrella's `templates` profile can
   build the template against the reactor SDK with `-Dbotmaker.sdk.version=0.0.0-SNAPSHOT` on every commit.

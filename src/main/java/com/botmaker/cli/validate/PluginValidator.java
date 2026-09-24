@@ -638,15 +638,15 @@ public final class PluginValidator {
     private static List<String> answers(StudioPlugin plugin, int index, SlotEditor editor) {
         List<String> problems = new ArrayList<>();
         try {
-            editor.matches(StubContexts.slot("java.lang.String", "Example", "example", 0, "\"x\""));
+            editor.matches(StubContexts.slot(String.class, 0, "\"x\""));
         } catch (RuntimeException | LinkageError e) {
             problems.add(safeId(plugin) + ": slotEditors()[" + index + "].matches threw on a slot: " + e);
         }
         try {
-            editor.matches(StubContexts.row("java.lang.String", "x"));
+            editor.matches(StubContexts.row(String.class, "x"));
         } catch (RuntimeException | LinkageError e) {
             problems.add(safeId(plugin) + ": slotEditors()[" + index + "].matches threw on a Parameters row"
-                    + " (a row has no call behind it, so enclosingClass()/argIndex() are not a slot's): " + e);
+                    + " (a row has no call behind it, so it has no enclosingExecutable()/argIndex()): " + e);
         }
         return problems;
     }

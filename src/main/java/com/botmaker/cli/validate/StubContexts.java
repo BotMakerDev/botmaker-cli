@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.TypeRef;
 import com.botmaker.plugin.api.slot.ValueContext;
 
+import java.lang.reflect.Executable;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -31,16 +32,15 @@ final class StubContexts {
     }
 
     /**
-     * A slot: a value of {@code typeName} sitting at argument {@code argIndex} of
-     * {@code enclosingClass#enclosingMethod}. This is the shape a call-site-matched editor is looking for,
-     * and the shape the archetype's own example uses.
+     * A slot: a value of {@code type} sitting at argument {@code argIndex} of a call the host could not
+     * resolve. This is the shape a call-site-matched editor is looking for, and it must answer "not mine"
+     * without throwing — a validator has no bot to resolve a call in.
      */
-    static SlotContext slot(String typeName, String enclosingClass, String enclosingMethod, int argIndex,
-                            String currentSource) {
+    static SlotContext slot(Class<?> type, int argIndex, String currentSource) {
         return new SlotContext() {
             @Override
             public TypeRef type() {
-                return typeRef(typeName);
+                return TypeRef.of(type);
             }
 
             @Override
@@ -63,13 +63,8 @@ final class StubContexts {
             }
 
             @Override
-            public Optional<String> enclosingClassName() {
-                return Optional.ofNullable(enclosingClass);
-            }
-
-            @Override
-            public Optional<String> enclosingMethodName() {
-                return Optional.ofNullable(enclosingMethod);
+            public Optional<Executable> enclosingExecutable() {
+                return Optional.empty();
             }
 
             @Override
@@ -80,15 +75,15 @@ final class StubContexts {
     }
 
     /**
-     * A value of {@code typeName} with no call behind it — a Parameters row, or a {@code @Managed} method.
+     * A value of {@code type} with no call behind it — a Parameters row, or a {@code @Managed} method.
      * An editor chosen by the call must decline this one, which is the property the archetype's generated
      * test holds and the reason the validator asks both shapes rather than only the slot.
      */
-    static ValueContext row(String typeName, String source) {
+    static ValueContext row(Class<?> type, String source) {
         return new ValueContext() {
             @Override
             public TypeRef type() {
-                return typeRef(typeName);
+                return TypeRef.of(type);
             }
 
             @Override
@@ -108,24 +103,6 @@ final class StubContexts {
             @Override
             public StudioServices services() {
                 return SERVICES;
-            }
-        };
-    }
-
-    // Not named `type`: a call to it sits inside an anonymous class that already declares `type()`, and
-    // Java resolves a method call against the innermost enclosing declaration holding that NAME — arity
-    // does not widen the search, so `type(name)` there would not compile.
-    private static TypeRef typeRef(String name) {
-        return new TypeRef() {
-            @Override
-            public String simpleName() {
-                int dot = name.lastIndexOf('.');
-                return dot < 0 ? name : name.substring(dot + 1);
-            }
-
-            @Override
-            public String qualifiedName() {
-                return name;
             }
         };
     }
