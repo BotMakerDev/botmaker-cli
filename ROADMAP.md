@@ -2,6 +2,14 @@
 
 ## Done
 
+### 2026-09-27 — `value-types` reads a varargs tail as the host does
+
+The SDK's `Combo` (picker 6b) is a component type over `Combo.of(Key...)`: one declared part, `Key`, repeated.
+`factoryProblem` already said "a varargs tail repeats the last part", but the fresh-value round trip still
+wanted one part per kind, so the release's SDK gate refused `Ctrl+S`. `PluginValidator.partsProblem` now
+matches Studio's `Factory.fits`: at least `kinds - 1` parts, each extra one checked against the last kind.
+`botmaker plugin validate botmaker-sdk` passes, 14 types round-tripped.
+
 ### 2026-09-23 — `value-types` checks a `freshCall()`'s shape
 
 `PluginType.freshSource()` (text) became `freshCall()` (a `Method`). A type answering a null `fresh()` must

@@ -7,6 +7,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- **`value-types` accepts a varargs factory's repeated tail.** A component type written through a varargs
+  factory (the SDK's `Combo.of(Key...)`) takes its fresh value apart into any number of its last part; the check
+  wanted exactly one per declared kind, so `botmaker plugin validate botmaker-sdk` — and the release's SDK gate —
+  refused Ctrl+S's two keys. Each extra part is now checked against the last kind, as the host's grammar reads it.
+
 No source changes since v0.0.22; re-released for updated upstream pins.
 
 No source changes since v0.0.21; re-released for updated upstream pins.

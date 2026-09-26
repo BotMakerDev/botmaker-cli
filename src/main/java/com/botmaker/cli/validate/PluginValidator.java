@@ -532,19 +532,9 @@ public final class PluginValidator {
                 problems.add(id + ": " + name + " components(fresh()) returned null");
                 return problems;
             }
-            if (parts.size() != kinds.size()) {
-                problems.add(id + ": " + name + " components(fresh()) answered " + parts.size()
-                        + " part(s), where componentTypes() declares " + kinds.size());
-                return problems;
-            }
-            for (int i = 0; i < parts.size(); i++) {
-                Object part = parts.get(i);
-                if (part != null && !boxed(kinds.get(i)).isInstance(part)) {
-                    problems.add(id + ": " + name + " part " + i + " is a " + part.getClass().getName()
-                            + ", where componentTypes() declares " + kinds.get(i).getName());
-                }
-            }
-            if (!problems.isEmpty()) {
+            String partsWhy = partsProblem(factory, kinds, parts);
+            if (partsWhy != null) {
+                problems.add(id + ": " + name + " " + partsWhy);
                 return problems;
             }
             Object rebuilt = shape.build(parts);
@@ -562,6 +552,29 @@ public final class PluginValidator {
             problems.add(id + ": " + name + " threw taking its fresh value apart or putting it back: " + e);
         }
         return problems.isEmpty() ? null : problems;
+    }
+
+    /**
+     * Why {@code parts}, a fresh value taken apart, is not what {@code kinds} declares, or {@code null} when it
+     * is: one part per declared kind, each an instance of it — except that a varargs factory's last kind
+     * repeats, any number of times (none included), as the host's grammar reads the call.
+     */
+    static String partsProblem(Executable factory, List<Class<?>> kinds, List<Object> parts) {
+        boolean varargs = factory.isVarArgs() && !kinds.isEmpty();
+        boolean counts = varargs ? parts.size() >= kinds.size() - 1 : parts.size() == kinds.size();
+        if (!counts) {
+            return "components(fresh()) answered " + parts.size() + " part(s), where componentTypes() declares "
+                    + (varargs ? "at least " + (kinds.size() - 1) : kinds.size());
+        }
+        for (int i = 0; i < parts.size(); i++) {
+            Object part = parts.get(i);
+            Class<?> kind = kinds.get(Math.min(i, kinds.size() - 1));
+            if (part != null && !boxed(kind).isInstance(part)) {
+                return "part " + i + " is a " + part.getClass().getName()
+                        + ", where componentTypes() declares " + kind.getName();
+            }
+        }
+        return null;
     }
 
     /** {@code int.class} as {@code Integer.class}: a value handed around as an {@code Object} is boxed. */

@@ -357,6 +357,28 @@ class PluginValidatorTest {
                         Made.class, List.of(String.class, int.class)));
     }
 
+    /**
+     * A varargs tail repeats the last part, so a fresh value may answer any number of them — the SDK's
+     * {@code Combo.of(Key...)} answers two for Ctrl+S, and the release gate refused it for that.
+     */
+    @Test
+    void a_varargs_factory_takes_any_number_of_its_last_part() throws NoSuchMethodException {
+        var many = Made.class.getMethod("many", String[].class);
+        assertNull(PluginValidator.partsProblem(many, List.of(String.class), List.of("a", "b")));
+        assertNull(PluginValidator.partsProblem(many, List.of(String.class), List.of("a")));
+        assertNull(PluginValidator.partsProblem(many, List.of(String.class), List.of()));
+        assertEquals("part 1 is a java.lang.Integer, where componentTypes() declares java.lang.String",
+                PluginValidator.partsProblem(many, List.of(String.class), List.of("a", 1)));
+    }
+
+    @Test
+    void a_fixed_factory_takes_one_part_per_kind() throws NoSuchMethodException {
+        var of = Made.class.getMethod("of", String.class, int.class);
+        assertNull(PluginValidator.partsProblem(of, List.of(String.class, int.class), List.of("a", 1)));
+        assertEquals("components(fresh()) answered 1 part(s), where componentTypes() declares 2",
+                PluginValidator.partsProblem(of, List.of(String.class, int.class), List.of("a")));
+    }
+
     /** A plugin's component type whose factory does not fit is refused through TYPES, never thrown. */
     @Test
     void a_component_type_with_a_bad_factory_fails(@TempDir Path dir) throws IOException {
