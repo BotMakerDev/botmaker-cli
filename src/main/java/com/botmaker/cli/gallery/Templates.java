@@ -19,7 +19,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -43,8 +44,9 @@ import java.util.zip.ZipInputStream;
  *
  * <h2>Only the package is renamed</h2>
  *
- * <p>{@code TemplateProject} in Studio is the original of this rule and states it at length: the declared
- * package prefix is replaced in every text file and the directories move with it, and <b>nothing else is
+ * <p>{@code TemplateProject} in Studio is the original of this rule and states it at length: the package
+ * holding {@code main} is the template's (2026-09-27; a {@code botmaker-template.properties} declared it
+ * before, and a template that still ships one has it deleted from the copy), that prefix is replaced in every text file and the directories move with it, and <b>nothing else is
  * renamed</b>. The entry class keeps the author's name, their helper classes keep theirs, their javadoc
  * keeps its wording — what they shipped is what demonstrably built for them, and a copy that quietly renames
  * their types is a copy whose stack traces and README stop matching. The package is the exception because it
@@ -115,7 +117,7 @@ public final class Templates {
     }
 
     /**
-     * Reads {@value #TEMPLATE_FILE} and rewrites the unpacked copy into {@code newPackage}.
+     * Finds the template's package and rewrites the unpacked copy into {@code newPackage}.
      *
      * <p>Text first, then the moves: rewriting after the move would mean walking a tree whose shape has
      * already changed, and a half-moved tree is the state hardest to recover from.
@@ -145,21 +147,21 @@ public final class Templates {
      */
     public static void repackage(Path projectDir, String newPackage, String newArtifactId)
             throws IOException {
-        String declared = declaredPackage(projectDir);
+        String declared = packageOf(projectDir);
         Path sources = projectDir.resolve("src/main/java").resolve(declared.replace('.', '/'));
         if (!Files.isDirectory(sources)) {
-            throw new IOException("this template declares package " + declared + ", but there are no"
-                    + " sources in it. Ask its author to fix its " + TEMPLATE_FILE + ".");
+            throw new IOException("this template's package is " + declared + ", but there are no sources in"
+                    + " it. Ask its author to fix it.");
         }
         if (declared.equals(newPackage)) {
             renameArtifact(projectDir, newArtifactId);
-            Files.deleteIfExists(projectDir.resolve(TEMPLATE_FILE));
+            Files.deleteIfExists(projectDir.resolve(OLD_DECLARATION));
             return;
         }
         rewriteText(projectDir, declared, newPackage);
         movePackage(projectDir, declared, newPackage);
         renameArtifact(projectDir, newArtifactId);
-        Files.deleteIfExists(projectDir.resolve(TEMPLATE_FILE));
+        Files.deleteIfExists(projectDir.resolve(OLD_DECLARATION));
     }
 
     /**
@@ -194,24 +196,50 @@ public final class Templates {
                 + text.substring(at + element.length()));
     }
 
-    /** The declaration file at a template's root — {@code TemplateProject.FILE_NAME}, and it must match. */
-    public static final String TEMPLATE_FILE = "botmaker-template.properties";
+    /**
+     * The declaration file templates carried until 2026-09-27. Nothing reads it; a copy made from an older
+     * template release has it removed, as Studio's {@code TemplateProject} does.
+     */
+    private static final String OLD_DECLARATION = "botmaker-template.properties";
 
-    private static String declaredPackage(Path projectDir) throws IOException {
-        Path file = projectDir.resolve(TEMPLATE_FILE);
-        if (!Files.exists(file)) {
-            throw new IOException("this template has no " + TEMPLATE_FILE + ", so nothing can tell which"
-                    + " package to rename. Ask its author to add one.");
+    private static final Pattern PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
+    private static final Pattern MAIN = Pattern.compile("public\\s+static\\s+void\\s+main\\s*\\(");
+
+    /**
+     * The template's package: the package of the class holding {@code public static void main}, or, when
+     * several classes do, the one every other lies under. Studio's {@code TemplateProject.derivePackage}, the
+     * same rule.
+     *
+     * @throws IOException when no class has a {@code main}, or they sit in packages that share no root — a
+     *                     template whose package is unknown cannot have it replaced
+     */
+    public static String packageOf(Path projectDir) throws IOException {
+        Path sources = projectDir.resolve("src/main/java");
+        java.util.TreeSet<String> packages = new java.util.TreeSet<>(Comparator.comparingInt(String::length)
+                .thenComparing(Comparator.naturalOrder()));
+        if (Files.isDirectory(sources)) {
+            try (var walk = Files.walk(sources)) {
+                for (Path java : walk.filter(p -> p.toString().endsWith(".java")).toList()) {
+                    String text = Files.readString(java);
+                    if (!MAIN.matcher(text).find()) continue;
+                    Matcher pkg = PACKAGE.matcher(text);
+                    if (pkg.find()) packages.add(pkg.group(1));
+                }
+            }
         }
-        Properties properties = new Properties();
-        try (var in = Files.newInputStream(file)) {
-            properties.load(in);
+        if (packages.isEmpty()) {
+            throw new IOException("nothing can tell this template's package: no class in a package has a main"
+                    + " method. Add one to the class the template starts from.");
         }
-        String declared = properties.getProperty("package", "").trim();
-        if (declared.isBlank()) {
-            throw new IOException(TEMPLATE_FILE + " must set package.");
+        String root = packages.first();
+        for (String other : packages) {
+            if (!other.equals(root) && !other.startsWith(root + ".")) {
+                throw new IOException("classes with a main method sit in " + root + " and " + other
+                        + ", so nothing can tell which package is the template's. Keep every main method in"
+                        + " the template's package or below it.");
+            }
         }
-        return declared;
+        return root;
     }
 
     private static void rewriteText(Path projectDir, String from, String to) throws IOException {

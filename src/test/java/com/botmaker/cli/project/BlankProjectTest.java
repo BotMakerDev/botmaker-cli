@@ -64,16 +64,17 @@ class BlankProjectTest {
         assertTrue(pom.contains("repo.maven.apache.org"), pom);
     }
 
-    /** The three files, at the paths Studio and {@code TemplateProject} both expect to find them at. */
+    /**
+     * The two files, at the paths Studio expects to find them at. No template declaration: the package of
+     * the class holding main says it (2026-09-27).
+     */
     @Test
-    void the_three_files_are_the_pom_one_main_and_the_template_declaration() {
+    void the_two_files_are_the_pom_and_one_main() {
         Map<String, String> files = BlankProject.files("gamebot", "com.example.game");
 
         assertEquals(java.util.Set.of("pom.xml",
-                        "src/main/java/com/example/game/Gamebot.java",
-                        "botmaker-template.properties"),
+                        "src/main/java/com/example/game/Gamebot.java"),
                 files.keySet());
-        assertEquals("package=com.example.game\n", files.get("botmaker-template.properties"));
         assertTrue(files.get("src/main/java/com/example/game/Gamebot.java")
                 .contains("package com.example.game;"));
     }
@@ -110,7 +111,7 @@ class BlankProjectTest {
 
         assertTrue(Files.isRegularFile(project.resolve("pom.xml")));
         assertTrue(Files.isRegularFile(project.resolve("src/main/java/com/gamebot/Gamebot.java")));
-        assertTrue(Files.isRegularFile(project.resolve("botmaker-template.properties")));
+        assertFalse(Files.exists(project.resolve("botmaker-template.properties")));
 
         assertThrows(IOException.class, () -> BlankProject.write(project, "gamebot", "com.gamebot"),
                 "a second write into the same directory must refuse rather than merge");

@@ -169,10 +169,10 @@ final class BotPublishCommand implements Callable<Integer> {
         if (template && entryTags.stream().noneMatch(GalleryEntry.TEMPLATE_TAG::equalsIgnoreCase)) {
             entryTags.add(GalleryEntry.TEMPLATE_TAG);
         }
-        if (template && !Files.exists(dir.resolve(Templates.TEMPLATE_FILE))) {
-            throw new IOException("a template must declare its package in " + Templates.TEMPLATE_FILE
-                    + ", and " + dir + " has none. `botmaker bot new` writes one; a project created in"
-                    + " Studio needs a line saying `package=<your package>`.");
+        if (template) {
+            // Refused here rather than on somebody's New Project: the package holding main is what a copy
+            // renames, so a template with none, or with two unrelated ones, cannot be started from.
+            Templates.packageOf(dir);
         }
         GalleryEntry entry = new GalleryEntry(name, target[0], target[1], description, entryTags);
         // What the bot needs, by registry id. An unreachable registry composes none rather than failing the

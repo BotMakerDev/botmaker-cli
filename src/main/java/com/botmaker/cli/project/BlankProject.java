@@ -35,9 +35,6 @@ import java.util.Map;
  */
 public final class BlankProject {
 
-    /** The template declaration {@code TemplateProject} reads — one file, one key. */
-    public static final String TEMPLATE_FILE = "botmaker-template.properties";
-
     private BlankProject() {
     }
 
@@ -55,9 +52,8 @@ public final class BlankProject {
         files.put("pom.xml", pomXml(name, packageName));
         files.put("src/main/java/" + packageName.replace('.', '/') + "/" + className(name) + ".java",
                 mainClass(packageName, className(name)));
-        // Written for every blank project, not only one heading for the gallery: it is one line, and it is
-        // what lets `botmaker bot publish --template` work later without the author knowing this file exists.
-        files.put(TEMPLATE_FILE, "package=" + packageName + "\n");
+        // No template declaration: `botmaker bot publish --template` reads the package off the class holding
+        // main (2026-09-27).
         return files;
     }
 

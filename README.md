@@ -160,12 +160,13 @@ botmaker bot new gamebot                                     # blank
 botmaker bot new farmer --from BotMakerDev/botmaker-gamebot   # from a published template
 ```
 
-**Blank means blank**: a pom, one `main()` that prints a line, and `botmaker-template.properties`. No SDK,
+**Blank means blank**: a pom and one `main()` that prints a line. No SDK,
 no plugin, no BotMaker API — that is what a project with no plugins installed looks like, and it is one step
 from being a bot (**Project ▸ Manage Plugins** in Studio). The repositories are declared, so that step needs
 no hand-edited XML.
 
-`--from` downloads that template's release archive and renames **its package** into yours (`--package`,
+`--from` downloads that template's release archive and renames **its package** — the one holding its
+`main()` — into yours (`--package`,
 default `com.<name>`) **and its Maven coordinate** into your project's name. Its entry class keeps the
 author's name, its helpers keep theirs, its javadoc keeps its wording: what they shipped is what
 demonstrably built for them. The coordinate is the exception because it is not the author's code — it says

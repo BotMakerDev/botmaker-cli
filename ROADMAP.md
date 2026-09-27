@@ -2,6 +2,13 @@
 
 ## Done
 
+### 2026-09-27 — templates declare nothing
+
+`gallery/Templates.packageOf` is Studio's `TemplateProject.derivePackage` reproduced: the package of the class
+holding `main`, the shallowest when several do, refused when they share no root. `repackage` uses it and
+deletes an older release's `botmaker-template.properties` from the copy; `bot publish --template` calls it as
+its check; `BlankProject` stops writing the file, and `TEMPLATE_FILE` is gone from both classes.
+
 ### 2026-09-27 — `managed`: every managed value is one a host can write
 
 The contract says a `@Managed` value is one `public static T id() { return <expression>; }` and nothing checked

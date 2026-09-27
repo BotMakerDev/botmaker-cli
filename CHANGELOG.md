@@ -18,6 +18,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **A template needs no `botmaker-template.properties`.** `bot new --from` renames the package holding the
+  template's `main`, `bot publish --template` refuses a project with no `main` or with two in unrelated
+  packages, and `bot new` no longer writes the file. A copy of an older template has it removed.
 - Built against contract 0.3.0's `EditableType`; the validator's test plugin declares its type editable.
 
 ## [0.0.23] — 2026-09-27

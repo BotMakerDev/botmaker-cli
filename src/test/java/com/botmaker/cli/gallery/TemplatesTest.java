@@ -47,14 +47,16 @@ class TemplatesTest {
                 "the empty shell directories are pruned");
     }
 
-    /** The declaration is consumed: the unpacked copy is the user's project, not a template any more. */
+    /** An older release's declaration file is read by nothing, and the copy does not keep it. */
     @Test
-    void the_declaration_file_is_removed() throws Exception {
+    void an_old_declaration_file_is_ignored_and_removed() throws Exception {
         Path project = template("com.botmaker.gamebot");
+        Files.writeString(project.resolve("botmaker-template.properties"), "package=com.somewhere.else\n");
 
+        assertEquals("com.botmaker.gamebot", Templates.packageOf(project));
         Templates.repackage(project, "com.myfarmer");
 
-        assertFalse(Files.exists(project.resolve(Templates.TEMPLATE_FILE)));
+        assertFalse(Files.exists(project.resolve("botmaker-template.properties")));
     }
 
     /** The prefix is replaced in every text file, the pom included — that is what keeps the build valid. */
@@ -67,10 +69,13 @@ class TemplatesTest {
         assertTrue(Files.readString(project.resolve("pom.xml")).contains("<groupId>com.myfarmer</groupId>"));
     }
 
+    /** A main whose package line disagrees with its directory names a package with no sources in it. */
     @Test
-    void a_template_that_declares_a_package_it_does_not_have_is_refused() throws Exception {
+    void a_template_whose_main_names_a_package_it_does_not_have_is_refused() throws Exception {
         Path project = template("com.botmaker.gamebot");
-        Files.writeString(project.resolve(Templates.TEMPLATE_FILE), "package=com.somewhere.else\n");
+        Path entry = project.resolve("src/main/java/com/botmaker/gamebot/GameBot.java");
+        Files.writeString(entry, Files.readString(entry).replace("package com.botmaker.gamebot;",
+                "package com.somewhere.else;"));
 
         IOException refused =
                 assertThrows(IOException.class, () -> Templates.repackage(project, "com.myfarmer"));
@@ -78,11 +83,13 @@ class TemplatesTest {
     }
 
     @Test
-    void a_template_with_no_declaration_is_refused() throws Exception {
+    void a_template_with_no_main_is_refused() throws Exception {
         Path project = template("com.botmaker.gamebot");
-        Files.delete(project.resolve(Templates.TEMPLATE_FILE));
+        Files.delete(project.resolve("src/main/java/com/botmaker/gamebot/GameBot.java"));
 
-        assertThrows(IOException.class, () -> Templates.repackage(project, "com.myfarmer"));
+        IOException refused =
+                assertThrows(IOException.class, () -> Templates.repackage(project, "com.myfarmer"));
+        assertTrue(refused.getMessage().contains("main method"), refused.getMessage());
     }
 
     // ---- the archive -----------------------------------------------------------------------------------
@@ -139,7 +146,7 @@ class TemplatesTest {
 
     // ---- fixtures --------------------------------------------------------------------------------------
 
-    /** A template as its author shipped it: two classes in one package, a pom, and the declaration. */
+    /** A template as its author shipped it: two classes in one package, one of them with main, and a pom. */
     private Path template(String packageName) throws IOException {
         Path project = root.resolve("template");
         Path sources = project.resolve("src/main/java").resolve(packageName.replace('.', '/'));
@@ -148,6 +155,10 @@ class TemplatesTest {
                 package %s;
 
                 public class GameBot {
+                    public static void main(String[] args) {
+                        new GameBot().go();
+                    }
+
                     void go() {
                         new Helper();
                     }
@@ -171,7 +182,6 @@ class TemplatesTest {
                     </dependencies>
                 </project>
                 """.formatted(packageName));
-        Files.writeString(project.resolve(Templates.TEMPLATE_FILE), "package=" + packageName + "\n");
         return project;
     }
 
