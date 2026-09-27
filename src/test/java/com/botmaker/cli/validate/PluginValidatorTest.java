@@ -46,6 +46,7 @@ class PluginValidatorTest {
             import com.botmaker.plugin.api.catalog.PaletteCatalog;
             import com.botmaker.plugin.api.slot.ValueContext;
             import com.botmaker.plugin.api.value.ComponentType;
+            import com.botmaker.plugin.api.value.EditableType;
             import com.botmaker.plugin.api.value.PluginType;
             import java.util.List;
             public final class GoodPlugin implements StudioPlugin {
@@ -60,7 +61,7 @@ class PluginValidatorTest {
                     public Greeting(String who, int times) { this.who = who; this.times = times; }
                 }
 
-                public static final class GreetingType implements PluginType<Greeting>, ComponentType<Greeting> {
+                public static final class GreetingType implements EditableType<Greeting>, ComponentType<Greeting> {
                     @Override public Class<Greeting> type() { return Greeting.class; }
                     @Override public Greeting fresh() { return new Greeting("world", 1); }
                     @Override public javafx.scene.Node editor(ValueContext ctx) { return null; }

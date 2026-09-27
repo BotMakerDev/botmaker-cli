@@ -5,6 +5,12 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- Built against contract 0.3.0's `EditableType`; the validator's test plugin declares its type editable.
+
 ## [0.0.23] — 2026-09-27
 
 ### Fixed
