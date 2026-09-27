@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`plugin validate` checks every managed value** (`managed`): a well-formed id, unique within the plugin, a
+  holder that is a simple class name, a value type some loaded plugin declares, and a first value its
+  declaration takes apart and puts back unchanged — so every value is one a host can write as
+  `public static T id() { return …; }`.
 - **`plugin validate` checks every declared type has a picker** (`pickers`): an `EditableType`, or another
   plugin's slot editor that claims it. A type nobody draws fails. Skipped, saying so, where JavaFX is absent.
 

@@ -38,6 +38,14 @@ public enum Check {
      */
     TYPES("value-types", "Every declared type is sound and declared once"),
 
+    /**
+     * Every {@code ManagedValue} a plugin declares is one a host can write as
+     * {@code public static T id() { return <expression>; }} (2026-09-27): a well-formed id, unique within the
+     * plugin, a holder that is a simple class name, a value type some loaded plugin declares, and a first
+     * value of that type that its declaration takes apart and puts back unchanged.
+     */
+    MANAGED("managed", "Every @Managed value is one a host can write"),
+
     /** {@code slotEditors()} builds, and every predicate answers without throwing. */
     EDITORS("editors", "Every slot editor builds and answers"),
 

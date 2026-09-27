@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.catalog.FacadeEntry;
 import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
+import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
@@ -22,6 +23,7 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -84,7 +86,7 @@ public final class PluginValidator {
         results.add(classpath);
         if (classpath.failed()) {
             for (Check check : List.of(Check.LOADS, Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES,
-                    Check.EDITORS, Check.PICKERS)) {
+                    Check.MANAGED, Check.EDITORS, Check.PICKERS)) {
                 results.add(CheckResult.skip(check, "the classpath did not resolve"));
             }
             results.add(checkPomScopes(subject));
@@ -105,8 +107,8 @@ public final class PluginValidator {
                                 + " a class that is not there, and a plugin whose own dependency is missing",
                         "check that src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin"
                                 + " exists and names your plugin's fully qualified class")));
-                for (Check check : List.of(Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES, Check.EDITORS,
-                        Check.PICKERS)) {
+                for (Check check : List.of(Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES, Check.MANAGED,
+                        Check.EDITORS, Check.PICKERS)) {
                     results.add(CheckResult.skip(check, "nothing loaded"));
                 }
             } else {
@@ -115,6 +117,7 @@ public final class PluginValidator {
                 results.add(checkPalette(plugins));
                 results.add(checkRecords(plugins, subject));
                 results.add(checkTypes(plugins, subject));
+                results.add(checkManaged(plugins, subject));
                 results.add(checkEditors(plugins));
                 results.add(checkPickers(plugins, subject));
             }
@@ -593,6 +596,173 @@ public final class PluginValidator {
         } catch (ClassNotFoundException | LinkageError e) {
             return false;
         }
+    }
+
+    // -------------------------------------------------------------------------------------------------
+    // 5b — managed values
+    // -------------------------------------------------------------------------------------------------
+
+    /** A managed value's id: lowercase words joined by dots or dashes — {@code flow}, {@code flow.layout}. */
+    private static final Pattern MANAGED_ID = Pattern.compile("[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*");
+
+    /**
+     * Every value a judged plugin declares in {@code managedValues()} is one a host can write — the only method
+     * it ever writes being {@code public static T id() { return <expression>; }} (2026-09-27).
+     *
+     * <p>No host grammar runs here, so "can write" is asked the way the host would find out: the value type is
+     * a class some loaded plugin declares (a type, or the parts of one) or one the host writes itself (a JDK
+     * literal, an enum), and the first value — {@code initial}, or the declared type's {@code fresh()} — is
+     * taken apart by its declaration and put back unchanged. A type declared only by its parts has no fresh
+     * value, so it owes an {@code initial}. An open set ({@code @Managed} on a class, no value type) is
+     * written as an empty class and asks only for its holder.
+     */
+    private static CheckResult checkManaged(List<StudioPlugin> plugins, PluginSubject subject) {
+        Map<String, ComponentType<?>> shapes = new HashMap<>();
+        Map<String, PluginType<?>> types = new HashMap<>();
+        for (StudioPlugin plugin : plugins) {
+            try {
+                for (PluginType<?> type : nonNull(plugin.types())) types.putIfAbsent(type.type().getName(), type);
+                for (ComponentType<?> shape : nonNull(plugin.componentTypes())) {
+                    shapes.putIfAbsent(shape.type().getName(), shape);
+                }
+            } catch (LinkageError e) {
+                if (!javafx()) {
+                    return CheckResult.skip(Check.MANAGED, "no JavaFX on this classpath, so the declared types"
+                            + " could not be linked to check the values against");
+                }
+            } catch (RuntimeException ignored) {
+                // Reported by the types check; a managed value is judged against whatever did load.
+            }
+        }
+        List<String> problems = new ArrayList<>();
+        int sound = 0;
+        for (StudioPlugin plugin : plugins) {
+            String id = safeId(plugin);
+            if (!subject.judges(id)) continue;
+            List<ManagedValue> values;
+            try {
+                values = plugin.managedValues();
+            } catch (RuntimeException | LinkageError e) {
+                problems.add(id + "#managedValues() threw " + e);
+                continue;
+            }
+            if (values == null) {
+                problems.add(id + "#managedValues() returned null; return List.of()");
+                continue;
+            }
+            Set<String> seen = new HashSet<>();
+            for (ManagedValue value : values) {
+                List<String> found = managedProblems(id, value, seen, types, shapes);
+                if (found.isEmpty()) sound++;
+                problems.addAll(found);
+            }
+        }
+        if (!problems.isEmpty()) return CheckResult.fail(Check.MANAGED, problems);
+        return CheckResult.pass(Check.MANAGED, sound == 0 ? "declares no managed values"
+                : sound + " managed value(s), each writable as `public static T id() { return …; }`");
+    }
+
+    private static List<String> managedProblems(String plugin, ManagedValue value,
+                                                Set<String> seen, Map<String, PluginType<?>> types,
+                                                Map<String, ComponentType<?>> shapes) {
+        if (value == null) return List.of(plugin + ": managedValues() holds a null");
+        String id = value.id();
+        String at = plugin + ": managed value \"" + id + "\"";
+        List<String> problems = new ArrayList<>();
+        if (id == null || !MANAGED_ID.matcher(id).matches()) {
+            problems.add(at + " is not a well-formed id; use lowercase words joined by '.' or '-', as the"
+                    + " bot's @Managed(\"…\") will spell it");
+        } else if (!seen.add(id)) {
+            problems.add(at + " is declared twice; a bot's @Managed(\"" + id + "\") can only mean one of them");
+        }
+        if (value.reason() == null || value.reason().isBlank()) {
+            problems.add(at + " has no reason; it is the sentence the canvas shows when it refuses an edit there");
+        }
+        String holder = value.holder();
+        if (holder != null && !javaIdentifier(holder)) {
+            problems.add(at + " names holder \"" + holder + "\", which is not a simple class name");
+        }
+        if (value.valueType() == null) return problems;
+        if (holder == null) {
+            // Opened, never created: nothing here is written by a host, so there is nothing more to prove.
+            return problems;
+        }
+        Class<?> raw = rawClass(value.valueType());
+        if (raw == null) {
+            problems.add(at + " has a value type " + value.valueType() + " that is not a class");
+            return problems;
+        }
+        boolean hostWrites = raw.isPrimitive() || raw.isEnum() || raw == String.class
+                || Number.class.isAssignableFrom(boxed(raw)) || boxed(raw) == Boolean.class;
+        PluginType<?> declared = types.get(raw.getName());
+        ComponentType<?> shape = shapes.get(raw.getName());
+        if (!hostWrites && declared == null && shape == null) {
+            problems.add(at + " returns " + raw.getName() + ", which no loaded plugin declares, so no host can"
+                    + " write `public static " + raw.getSimpleName() + " " + id + "()`");
+            return problems;
+        }
+        Object first = value.initial();
+        if (first == null && declared != null) {
+            try {
+                first = declared.fresh();
+            } catch (RuntimeException | LinkageError e) {
+                problems.add(at + ": " + raw.getName() + " fresh() threw " + e);
+                return problems;
+            }
+        }
+        if (first == null) {
+            if (!hostWrites) {
+                problems.add(at + " has no initial value, and " + raw.getName() + " has no fresh() to start"
+                        + " from; give the ManagedValue an initial");
+            }
+            return problems;
+        }
+        if (!boxed(raw).isInstance(first)) {
+            problems.add(at + "'s first value is a " + first.getClass().getName() + ", not a " + raw.getName());
+            return problems;
+        }
+        if (shape != null) {
+            Object back;
+            boolean same;
+            try {
+                back = rebuild(shape, first);
+                // By parts as well as by equals, as the types check compares: most classes a plugin writes
+                // have no equals, and such a value is still one the host writes back unchanged.
+                same = first.equals(back) || (back != null && shape.componentsOf(first).equals(shape.componentsOf(back)));
+            } catch (RuntimeException | LinkageError e) {
+                problems.add(at + ": taking its first value apart and back threw " + e);
+                return problems;
+            }
+            if (!same) {
+                problems.add(at + ": " + shape.type().getSimpleName() + " builds " + back + " from the parts of "
+                        + first + ", so the method a host writes would not return the value declared");
+            }
+        }
+        return problems;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> Object rebuild(ComponentType<T> shape, Object value) {
+        return shape.build(shape.components((T) value));
+    }
+
+    private static <T> List<T> nonNull(List<T> list) {
+        return list == null ? List.of() : list;
+    }
+
+    private static Class<?> rawClass(java.lang.reflect.Type type) {
+        if (type instanceof Class<?> cls) return cls;
+        if (type instanceof java.lang.reflect.ParameterizedType parameterized
+                && parameterized.getRawType() instanceof Class<?> cls) return cls;
+        return null;
+    }
+
+    private static boolean javaIdentifier(String name) {
+        if (name.isEmpty() || !Character.isJavaIdentifierStart(name.charAt(0))) return false;
+        for (int i = 1; i < name.length(); i++) {
+            if (!Character.isJavaIdentifierPart(name.charAt(i))) return false;
+        }
+        return true;
     }
 
     // -------------------------------------------------------------------------------------------------

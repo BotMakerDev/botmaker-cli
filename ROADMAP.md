@@ -2,6 +2,18 @@
 
 ## Done
 
+### 2026-09-27 — `managed`: every managed value is one a host can write
+
+The contract says a `@Managed` value is one `public static T id() { return <expression>; }` and nothing checked
+a plugin's side of that until a user opened the value. The check (after `value-types`) asks each
+`ManagedValue` a judged plugin declares: a well-formed id (lowercase words joined by `.` or `-`, as the bot's
+annotation spells it), unique within the plugin, a reason, a holder that is a simple class name; then, for a
+value the host may create, a value type some loaded plugin declares (or a JDK literal, an enum), and a first
+value — `initial`, else the type's `fresh()` — that its `ComponentType` takes apart and puts back, compared by
+`equals` or by parts as the types check compares. A type declared only by its parts owes an `initial`. No host
+grammar runs here, so that round trip is the headless form of "the host could write it". Skipped where the
+declared types cannot link without JavaFX. `PluginValidatorTest` has six cases over a compiled fixture.
+
 ### 2026-09-27 — `pickers`: every declared type has a picker
 
 A type the user cannot edit was a Parameters row with nothing in it. The new check (picker 6f phase B) asks

@@ -274,6 +274,70 @@ class PluginValidatorTest {
                 types.detail()::toString);
     }
 
+    // ------------------------------------------------------------------------------------------------
+    // managed values
+    // ------------------------------------------------------------------------------------------------
+
+    /** The good plugin, declaring {@code values} (Java expressions of {@code ManagedValue}) as its managed values. */
+    private static String managing(String... values) {
+        return GOOD_PLUGIN.replace(
+                "@Override public List<PluginType<?>> types() {",
+                "@Override public List<com.botmaker.plugin.api.source.ManagedValue> managedValues() {"
+                        + " return List.of(" + String.join(", ", values) + "); }"
+                        + " @Override public List<PluginType<?>> types() {");
+    }
+
+    private static CheckResult managed(Path dir, String... values) throws IOException {
+        return result(PluginValidator.validate(subject(dir, GOOD_POM, managing(values), GOOD_API)), Check.MANAGED);
+    }
+
+    @Test
+    void a_plugin_with_no_managed_values_passes(@TempDir Path dir) throws IOException {
+        CheckResult managed = result(PluginValidator.validate(subject(dir, GOOD_POM)), Check.MANAGED);
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+    }
+
+    /** A declared type, starting as its fresh value: the method a host writes returns exactly that. */
+    @Test
+    void a_value_of_a_declared_type_passes(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir, "new com.botmaker.plugin.api.source.ManagedValue(\"greeting\","
+                + " \"Edit it in the Greeting window.\", \"Values\", Greeting.class)");
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+    }
+
+    @Test
+    void an_id_a_bot_could_not_spell_fails(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir, "new com.botmaker.plugin.api.source.ManagedValue(\"My Greeting\","
+                + " \"why\", \"Values\", Greeting.class)");
+        assertEquals(Status.FAIL, managed.status());
+        assertTrue(managed.detail().getFirst().contains("not a well-formed id"), managed.detail()::toString);
+    }
+
+    @Test
+    void a_type_no_plugin_declares_cannot_be_written(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir, "new com.botmaker.plugin.api.source.ManagedValue(\"clock\","
+                + " \"why\", \"Values\", java.time.Clock.class, java.time.Clock.systemUTC())");
+        assertEquals(Status.FAIL, managed.status());
+        assertTrue(managed.detail().getFirst().contains("no loaded plugin declares"), managed.detail()::toString);
+    }
+
+    @Test
+    void a_holder_is_a_simple_class_name(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir, "new com.botmaker.plugin.api.source.ManagedValue(\"greeting\","
+                + " \"why\", \"plugins.Values\", Greeting.class)");
+        assertEquals(Status.FAIL, managed.status());
+        assertTrue(managed.detail().getFirst().contains("not a simple class name"), managed.detail()::toString);
+    }
+
+    @Test
+    void one_id_is_one_value(@TempDir Path dir) throws IOException {
+        String value = "new com.botmaker.plugin.api.source.ManagedValue(\"greeting\", \"why\", \"Values\","
+                + " Greeting.class)";
+        CheckResult managed = managed(dir, value, value);
+        assertEquals(Status.FAIL, managed.status());
+        assertTrue(managed.detail().getFirst().contains("declared twice"), managed.detail()::toString);
+    }
+
     /** {@code GreetingType} answering a null {@code fresh()} and {@code freshCall()} as {@code body}. */
     private static String startingAsCall(String body) {
         return GOOD_PLUGIN.replace(
