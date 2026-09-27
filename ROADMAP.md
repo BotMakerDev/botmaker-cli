@@ -2,6 +2,11 @@
 
 ## Done
 
+### 2026-09-28 — `managed` reads the typed `ManagedValue<T>`
+
+`type()` is a `Class`, so the raw-class unwrapping and its "not a class" refusal went; fixtures use
+`ManagedValue.of`.
+
 ### 2026-09-27 — templates declare nothing
 
 `gallery/Templates.packageOf` is Studio's `TemplateProject.derivePackage` reproduced: the package of the class

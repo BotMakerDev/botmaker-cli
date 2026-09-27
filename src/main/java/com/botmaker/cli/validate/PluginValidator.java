@@ -639,7 +639,7 @@ public final class PluginValidator {
         for (StudioPlugin plugin : plugins) {
             String id = safeId(plugin);
             if (!subject.judges(id)) continue;
-            List<ManagedValue> values;
+            List<ManagedValue<?>> values;
             try {
                 values = plugin.managedValues();
             } catch (RuntimeException | LinkageError e) {
@@ -651,7 +651,7 @@ public final class PluginValidator {
                 continue;
             }
             Set<String> seen = new HashSet<>();
-            for (ManagedValue value : values) {
+            for (ManagedValue<?> value : values) {
                 List<String> found = managedProblems(id, value, seen, types, shapes);
                 if (found.isEmpty()) sound++;
                 problems.addAll(found);
@@ -662,7 +662,7 @@ public final class PluginValidator {
                 : sound + " managed value(s), each writable as `public static T id() { return …; }`");
     }
 
-    private static List<String> managedProblems(String plugin, ManagedValue value,
+    private static List<String> managedProblems(String plugin, ManagedValue<?> value,
                                                 Set<String> seen, Map<String, PluginType<?>> types,
                                                 Map<String, ComponentType<?>> shapes) {
         if (value == null) return List.of(plugin + ": managedValues() holds a null");
@@ -682,16 +682,12 @@ public final class PluginValidator {
         if (holder != null && !javaIdentifier(holder)) {
             problems.add(at + " names holder \"" + holder + "\", which is not a simple class name");
         }
-        if (value.valueType() == null) return problems;
+        if (value.isOpenSet()) return problems;
         if (holder == null) {
             // Opened, never created: nothing here is written by a host, so there is nothing more to prove.
             return problems;
         }
-        Class<?> raw = rawClass(value.valueType());
-        if (raw == null) {
-            problems.add(at + " has a value type " + value.valueType() + " that is not a class");
-            return problems;
-        }
+        Class<?> raw = value.type();
         boolean hostWrites = raw.isPrimitive() || raw.isEnum() || raw == String.class
                 || Number.class.isAssignableFrom(boxed(raw)) || boxed(raw) == Boolean.class;
         PluginType<?> declared = types.get(raw.getName());
@@ -748,13 +744,6 @@ public final class PluginValidator {
 
     private static <T> List<T> nonNull(List<T> list) {
         return list == null ? List.of() : list;
-    }
-
-    private static Class<?> rawClass(java.lang.reflect.Type type) {
-        if (type instanceof Class<?> cls) return cls;
-        if (type instanceof java.lang.reflect.ParameterizedType parameterized
-                && parameterized.getRawType() instanceof Class<?> cls) return cls;
-        return null;
     }
 
     private static boolean javaIdentifier(String name) {
