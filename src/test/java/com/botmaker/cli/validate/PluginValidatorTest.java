@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * The eight checks, against plugins compiled here.
+ * The checks, against plugins compiled here.
  *
  * <p><b>The fixtures are compiled rather than mocked, and that is the point of the file.</b> Every failure
  * these checks exist to catch is a failure of a real classloader over real bytecode — a services file naming
@@ -129,7 +129,7 @@ class PluginValidatorTest {
     }
 
     /**
-     * All eight, always, whatever happened. A report that shrinks when things go wrong leaves the reader
+     * All of them, always, whatever happened. A report that shrinks when things go wrong leaves the reader
      * unable to tell a check that passed from one that never ran — which is why {@link Status#SKIP} exists
      * at all rather than a check simply being absent.
      */
@@ -498,8 +498,98 @@ class PluginValidatorTest {
     }
 
     // ------------------------------------------------------------------------------------------------
+    // pickers
+    // ------------------------------------------------------------------------------------------------
+
+    /** A type its plugin declares but does not draw. */
+    private static final String PLAIN_PLUGIN = """
+            package p;
+            import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.value.PluginType;
+            import java.util.List;
+            public final class PlainPlugin implements StudioPlugin {
+                @Override public String id() { return "com.example.plain"; }
+                @Override public List<PluginType<?>> types() { return List.of(new PlainType()); }
+                public static final class Plain {}
+                public static final class PlainType implements PluginType<Plain> {
+                    @Override public Class<Plain> type() { return Plain.class; }
+                    @Override public Plain fresh() { return new Plain(); }
+                }
+            }
+            """;
+
+    /** Another plugin that draws the plain type through a slot editor of its own. */
+    private static final String DRAWER_PLUGIN = """
+            package p;
+            import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.slot.SlotEditor;
+            import java.util.List;
+            public final class DrawerPlugin implements StudioPlugin {
+                @Override public String id() { return "com.example.drawer"; }
+                @Override public List<SlotEditor> slotEditors() {
+                    return List.of(SlotEditor.forType(PlainPlugin.Plain.class, ctx -> null));
+                }
+            }
+            """;
+
+    /** A plugin whose only editor throws when asked. */
+    private static final String THROWING_DRAWER = """
+            package p;
+            import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.slot.SlotEditor;
+            import java.util.List;
+            public final class ThrowingDrawer implements StudioPlugin {
+                @Override public String id() { return "com.example.throwing"; }
+                @Override public List<SlotEditor> slotEditors() {
+                    return List.of(SlotEditor.of(ctx -> { throw new IllegalStateException("boom"); }, ctx -> null));
+                }
+            }
+            """;
+
+    @Test
+    void a_type_its_owner_draws_has_a_picker(@TempDir Path dir) throws IOException {
+        CheckResult pickers = result(PluginValidator.validate(subject(dir, GOOD_POM)), Check.PICKERS);
+        assertEquals(Status.PASS, pickers.status(), pickers::toString);
+    }
+
+    @Test
+    void a_type_nobody_draws_fails(@TempDir Path dir) throws IOException {
+        CheckResult pickers = result(PluginValidator.validate(loose(dir, "p.PlainPlugin", PLAIN_PLUGIN)),
+                Check.PICKERS);
+        String detail = String.join("\n", pickers.detail());
+        assertEquals(Status.FAIL, pickers.status());
+        assertTrue(detail.contains("p.PlainPlugin$Plain has no picker: implement EditableType, or depend"
+                + " on a plugin that draws it"), detail);
+    }
+
+    @Test
+    void a_type_another_plugin_draws_passes_and_names_it(@TempDir Path dir) throws IOException {
+        CheckResult pickers = result(PluginValidator.validate(loose(dir, "p.PlainPlugin\np.DrawerPlugin",
+                PLAIN_PLUGIN, DRAWER_PLUGIN)), Check.PICKERS);
+        String detail = String.join("\n", pickers.detail());
+        assertEquals(Status.PASS, pickers.status(), detail);
+        assertTrue(detail.contains("com.example.drawer"), detail);
+    }
+
+    @Test
+    void a_throwing_predicate_is_not_a_picker(@TempDir Path dir) throws IOException {
+        CheckResult pickers = result(PluginValidator.validate(loose(dir, "p.PlainPlugin\np.ThrowingDrawer",
+                PLAIN_PLUGIN, THROWING_DRAWER)), Check.PICKERS);
+        assertEquals(Status.FAIL, pickers.status());
+    }
+
+    // ------------------------------------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------------------------------------
+
+    /** Compiles {@code sources}, registers {@code services} (newline-separated) and judges every plugin. */
+    private static PluginSubject loose(Path dir, String services, String... sources) throws IOException {
+        Path classes = compile(dir, sources);
+        services(classes, services);
+        Path pomFile = dir.resolve("pom.xml");
+        Files.writeString(pomFile, GOOD_POM);
+        return PluginSubject.local(List.of(classes), pomFile);
+    }
 
     private static PluginSubject subject(Path dir, String pom, String... sources) throws IOException {
         Path classes = compile(dir, sources.length == 0 ? new String[]{GOOD_PLUGIN, GOOD_API} : sources);

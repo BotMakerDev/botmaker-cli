@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.host.Palettes;
 import com.botmaker.plugin.host.PluginLoader;
@@ -21,6 +22,7 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +71,7 @@ public final class PluginValidator {
     }
 
     /**
-     * Runs every check and reports each one, in {@link Check} order and always all eight.
+     * Runs every check and reports each one, in {@link Check} order and always all of them.
      *
      * <p>A check whose predecessor made it unanswerable is a {@link Status#SKIP} with the reason, never a
      * second failure and never silence: a report that shrinks when things go wrong is a report that hides
@@ -82,7 +84,7 @@ public final class PluginValidator {
         results.add(classpath);
         if (classpath.failed()) {
             for (Check check : List.of(Check.LOADS, Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES,
-                    Check.EDITORS)) {
+                    Check.EDITORS, Check.PICKERS)) {
                 results.add(CheckResult.skip(check, "the classpath did not resolve"));
             }
             results.add(checkPomScopes(subject));
@@ -103,7 +105,8 @@ public final class PluginValidator {
                                 + " a class that is not there, and a plugin whose own dependency is missing",
                         "check that src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin"
                                 + " exists and names your plugin's fully qualified class")));
-                for (Check check : List.of(Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES, Check.EDITORS)) {
+                for (Check check : List.of(Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES, Check.EDITORS,
+                        Check.PICKERS)) {
                     results.add(CheckResult.skip(check, "nothing loaded"));
                 }
             } else {
@@ -113,6 +116,7 @@ public final class PluginValidator {
                 results.add(checkRecords(plugins, subject));
                 results.add(checkTypes(plugins, subject));
                 results.add(checkEditors(plugins));
+                results.add(checkPickers(plugins, subject));
             }
         }
 
@@ -665,7 +669,85 @@ public final class PluginValidator {
     }
 
     // -------------------------------------------------------------------------------------------------
-    // 7 — pom scopes
+    // 7 — pickers
+    // -------------------------------------------------------------------------------------------------
+
+    /**
+     * Every type a judged plugin declares has a picker: its own ({@code EditableType}), or another plugin's
+     * {@code SlotEditor} that claims a row of that type — an alternative the user settles with <i>Edit
+     * with</i>. Asked with {@code matches} alone, so no JavaFX toolkit is started; a predicate that throws is not
+     * a picker, and {@link Check#EDITORS} reports the throw.
+     */
+    private static CheckResult checkPickers(List<StudioPlugin> plugins, PluginSubject subject) {
+        if (!javafx()) {
+            return CheckResult.skip(Check.PICKERS, "no JavaFX on this classpath, so neither a declared type nor a"
+                    + " slot editor can be linked. Put javafx-controls on the classpath to check that every type"
+                    + " has a picker");
+        }
+        Map<SlotEditor, String> drawers = new LinkedHashMap<>();
+        for (StudioPlugin plugin : plugins) {
+            try {
+                List<SlotEditor> offered = plugin.slotEditors();
+                if (offered == null) continue;
+                for (SlotEditor editor : offered) if (editor != null) drawers.put(editor, safeId(plugin));
+            } catch (RuntimeException | LinkageError e) {
+                // EDITORS reports it; an editor list that cannot be built draws nothing here.
+            }
+        }
+        List<String> problems = new ArrayList<>();
+        List<String> borrowed = new ArrayList<>();
+        int own = 0;
+        for (StudioPlugin plugin : plugins) {
+            String id = safeId(plugin);
+            if (!subject.judges(id)) continue;
+            List<PluginType<?>> types;
+            try {
+                types = plugin.types();
+            } catch (RuntimeException | LinkageError e) {
+                continue;   // TYPES reports it
+            }
+            if (types == null) continue;
+            for (PluginType<?> type : types) {
+                if (type == null) continue;
+                if (type instanceof EditableType<?>) {
+                    own++;
+                    continue;
+                }
+                Class<?> cls;
+                try {
+                    cls = type.type();
+                } catch (RuntimeException | LinkageError e) {
+                    continue;   // TYPES reports it
+                }
+                if (cls == null) continue;
+                String drawer = drawerOf(cls, drawers);
+                if (drawer != null) {
+                    borrowed.add(cls.getSimpleName() + " (drawn by " + drawer + ")");
+                } else {
+                    problems.add(id + ": " + cls.getName()
+                            + " has no picker: implement EditableType, or depend on a plugin that draws it");
+                }
+            }
+        }
+        if (!problems.isEmpty()) return CheckResult.fail(Check.PICKERS, problems);
+        return CheckResult.pass(Check.PICKERS, own + " drawn by their owner"
+                + (borrowed.isEmpty() ? "" : "; " + String.join(", ", borrowed)));
+    }
+
+    /** The id of the first plugin whose slot editor claims a row of {@code cls}, or {@code null}. */
+    private static String drawerOf(Class<?> cls, Map<SlotEditor, String> drawers) {
+        for (Map.Entry<SlotEditor, String> each : drawers.entrySet()) {
+            try {
+                if (each.getKey().matches(StubContexts.row(cls, ""))) return each.getValue();
+            } catch (RuntimeException | LinkageError e) {
+                // not a picker; EDITORS reports the throw
+            }
+        }
+        return null;
+    }
+
+    // -------------------------------------------------------------------------------------------------
+    // 8 — pom scopes
     // -------------------------------------------------------------------------------------------------
 
     /**
@@ -723,7 +805,7 @@ public final class PluginValidator {
     }
 
     // -------------------------------------------------------------------------------------------------
-    // 8 — plugin deps
+    // 9 — plugin deps
     // -------------------------------------------------------------------------------------------------
 
     /**

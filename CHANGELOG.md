@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- **`plugin validate` checks every declared type has a picker** (`pickers`): an `EditableType`, or another
+  plugin's slot editor that claims it. A type nobody draws fails. Skipped, saying so, where JavaFX is absent.
+
 ### Changed
 
 - Built against contract 0.3.0's `EditableType`; the validator's test plugin declares its type editable.

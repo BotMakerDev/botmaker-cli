@@ -2,6 +2,15 @@
 
 ## Done
 
+### 2026-09-27 — `pickers`: every declared type has a picker
+
+A type the user cannot edit was a Parameters row with nothing in it. The new check (picker 6f phase B) asks
+each type a judged plugin declares: is it an `EditableType`, or does some plugin's `SlotEditor` claim a row
+of it? Headless, through `matches` only; a throwing predicate is no picker. A type nobody draws fails with
+"`<type>` has no picker: implement EditableType, or depend on a plugin that draws it". Like `editors`, it
+skips where JavaFX is absent — which is the shipped `all` jar; run it with javafx-controls on the classpath
+to answer it. basics passes 11 of 11, the SDK 26 of 26 (its own 15 and basics').
+
 ### 2026-09-27 — `value-types` reads a varargs tail as the host does
 
 The SDK's `Combo` (picker 6b) is a component type over `Combo.of(Key...)`: one declared part, `Key`, repeated.

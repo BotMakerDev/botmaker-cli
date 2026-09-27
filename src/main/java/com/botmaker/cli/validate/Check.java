@@ -42,6 +42,12 @@ public enum Check {
     EDITORS("editors", "Every slot editor builds and answers"),
 
     /**
+     * Every type a judged plugin declares has a picker: it is an {@code EditableType}, or some plugin on the
+     * classpath offers a slot editor that claims it (6f, 2026-09-27). Headless: {@code matches} only.
+     */
+    PICKERS("pickers", "Every declared type has a picker"),
+
+    /**
      * {@code botmaker-studio-api} is {@code provided} or {@code compile}; {@code botmaker-plugin-toolkit} is
      * not {@code provided}.
      */
