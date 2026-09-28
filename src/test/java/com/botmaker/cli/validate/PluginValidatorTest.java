@@ -300,39 +300,39 @@ class PluginValidatorTest {
     /** A declared type, starting as its fresh value: the method a host writes returns exactly that. */
     @Test
     void a_value_of_a_declared_type_passes(@TempDir Path dir) throws IOException {
-        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.of(\"greeting\","
-                + " \"Values\", Greeting.class, null, \"Edit it in the Greeting window.\")");
+        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.method(\"greeting\")"
+                + ".in(\"Values\").holds(Greeting.class, null).because(\"Edit it in the Greeting window.\")");
         assertEquals(Status.PASS, managed.status(), managed::toString);
     }
 
     @Test
     void an_id_a_bot_could_not_spell_fails(@TempDir Path dir) throws IOException {
-        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.of(\"My Greeting\","
-                + " \"Values\", Greeting.class, null, \"why\")");
+        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.method(\"My Greeting\")"
+                + ".in(\"Values\").holds(Greeting.class, null).because(\"why\")");
         assertEquals(Status.FAIL, managed.status());
         assertTrue(managed.detail().getFirst().contains("not a well-formed id"), managed.detail()::toString);
     }
 
     @Test
     void a_type_no_plugin_declares_cannot_be_written(@TempDir Path dir) throws IOException {
-        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.of(\"clock\","
-                + " \"Values\", java.time.Clock.class, java.time.Clock.systemUTC(), \"why\")");
+        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.method(\"clock\")"
+                + ".in(\"Values\").holds(java.time.Clock.class, java.time.Clock.systemUTC()).because(\"why\")");
         assertEquals(Status.FAIL, managed.status());
         assertTrue(managed.detail().getFirst().contains("no loaded plugin declares"), managed.detail()::toString);
     }
 
     @Test
     void a_holder_is_a_simple_class_name(@TempDir Path dir) throws IOException {
-        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.of(\"greeting\","
-                + " \"plugins.Values\", Greeting.class, null, \"why\")");
+        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.method(\"greeting\")"
+                + ".in(\"plugins.Values\").holds(Greeting.class, null).because(\"why\")");
         assertEquals(Status.FAIL, managed.status());
         assertTrue(managed.detail().getFirst().contains("not a simple class name"), managed.detail()::toString);
     }
 
     @Test
     void one_id_is_one_value(@TempDir Path dir) throws IOException {
-        String value = "com.botmaker.plugin.api.source.ManagedValue.of(\"greeting\", \"Values\","
-                + " Greeting.class, null, \"why\")";
+        String value = "com.botmaker.plugin.api.source.ManagedValue.method(\"greeting\").in(\"Values\")"
+                + ".holds(Greeting.class, null).because(\"why\")";
         CheckResult managed = managed(dir, value, value);
         assertEquals(Status.FAIL, managed.status());
         assertTrue(managed.detail().getFirst().contains("declared twice"), managed.detail()::toString);
