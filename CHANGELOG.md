@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`plugin validate` checks what a plugin links in the contract** (`contract-links`, second): every class,
+  field and method a plugin entry references in `com.botmaker.plugin.api`, directly or through its own
+  supertypes, must exist in the contract this build carries. A plugin built for a newer Studio fails with the
+  members named — *built for a newer Studio: needs `StudioPlugin.newer(…)`* — as a host now refuses it at load.
+  The report's id column widens to the longest check id.
 - **`plugin validate` checks every managed value** (`managed`): a well-formed id, unique within the plugin, a
   holder that is a simple class name, a value type some loaded plugin declares, and a first value its
   declaration takes apart and puts back unchanged — so every value is one a host can write as

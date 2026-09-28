@@ -11,6 +11,7 @@ import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.plugin.host.ContractLinks;
 import com.botmaker.plugin.host.Palettes;
 import com.botmaker.plugin.host.PluginLoader;
 import com.botmaker.plugin.host.Recordings;
@@ -85,14 +86,15 @@ public final class PluginValidator {
         CheckResult classpath = checkClasspath(subject);
         results.add(classpath);
         if (classpath.failed()) {
-            for (Check check : List.of(Check.LOADS, Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES,
-                    Check.MANAGED, Check.EDITORS, Check.PICKERS)) {
+            for (Check check : List.of(Check.CONTRACT_LINKS, Check.LOADS, Check.ID, Check.PALETTE, Check.RECORDS,
+                    Check.TYPES, Check.MANAGED, Check.EDITORS, Check.PICKERS)) {
                 results.add(CheckResult.skip(check, "the classpath did not resolve"));
             }
             results.add(checkPomScopes(subject));
             results.add(checkPluginDeps(subject));
             return List.copyOf(results);
         }
+        results.add(checkContractLinks(subject));
 
         // One loader for every check that needs a loaded plugin. Opening it five times would be five
         // URLClassLoaders holding the same jars — and on Windows a held jar cannot be replaced, which is
@@ -149,6 +151,32 @@ public final class PluginValidator {
                 ? CheckResult.pass(Check.CLASSPATH, subject.classpath().size() + " entries")
                 : CheckResult.fail(Check.CLASSPATH,
                         missing.stream().map(path -> "no such classpath entry: " + path).toList());
+    }
+
+    // -------------------------------------------------------------------------------------------------
+    // 2 — contract links
+    // -------------------------------------------------------------------------------------------------
+
+    /**
+     * Each entry declaring a plugin, read against the contract this build carries — the same reading
+     * {@code PluginLoader} makes before it constructs one, so the refusal is seen here first.
+     */
+    private static CheckResult checkContractLinks(PluginSubject subject) {
+        ClassLoader contract = StudioPlugin.class.getClassLoader();
+        List<String> problems = new ArrayList<>();
+        int plugins = 0;
+        for (var entry : subject.classpath()) {
+            if (!ContractLinks.declaresPlugin(entry)) continue;
+            plugins++;
+            List<ContractLinks.Link> missing = ContractLinks.missing(entry, contract);
+            if (!missing.isEmpty()) {
+                problems.add(entry.getFileName() + ": " + new ContractLinks.NewerContract(missing).getMessage());
+            }
+        }
+        return problems.isEmpty()
+                ? CheckResult.pass(Check.CONTRACT_LINKS, plugins == 0
+                        ? "no entry declares a plugin" : plugins + " plugin entr" + (plugins == 1 ? "y" : "ies") + " checked")
+                : CheckResult.fail(Check.CONTRACT_LINKS, problems);
     }
 
     // -------------------------------------------------------------------------------------------------

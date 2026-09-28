@@ -1,8 +1,10 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.validate.Check;
 import com.botmaker.cli.validate.CheckResult;
 import com.botmaker.cli.validate.Status;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -88,8 +90,12 @@ public final class Console {
         };
     }
 
+    /** One past the longest check id, so a check added with a longer id keeps the column. */
+    private static final int ID_COLUMN = Arrays.stream(Check.values())
+            .mapToInt(check -> check.id().length()).max().orElse(13) + 1;
+
     private static String pad(String id) {
-        return id.length() >= 14 ? id + " " : id + " ".repeat(14 - id.length());
+        return id.length() >= ID_COLUMN ? id + " " : id + " ".repeat(ID_COLUMN - id.length());
     }
 
     private String paint(String code, String text) {

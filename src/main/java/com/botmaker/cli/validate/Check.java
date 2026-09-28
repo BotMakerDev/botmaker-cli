@@ -18,6 +18,13 @@ public enum Check {
     /** The classpath the plugin would be loaded from resolves, and every entry on it exists. */
     CLASSPATH("classpath", "The plugin's classpath resolves"),
 
+    /**
+     * Everything a plugin's classes link in the contract exists in the contract this build carries
+     * (2026-09-28): the check {@code PluginLoader} makes before constructing a plugin, so a plugin built
+     * against a newer contract is refused here with the member named, as a host would refuse it.
+     */
+    CONTRACT_LINKS("contract-links", "Every contract member the plugin links exists"),
+
     /** {@code PluginLoader} finds at least one {@code StudioPlugin} on it. */
     LOADS("loads", "ServiceLoader finds a StudioPlugin"),
 

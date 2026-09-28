@@ -149,6 +149,37 @@ class PluginValidatorTest {
     // loading
     // ------------------------------------------------------------------------------------------------
 
+    /**
+     * A plugin compiled against a contract with a member this one lacks — the state of a plugin built for a
+     * newer Studio — fails {@code contract-links} naming the member, and does not load, as in a host.
+     */
+    @Test
+    void a_plugin_built_for_a_newer_contract_fails_contract_links(@TempDir Path dir) throws IOException {
+        JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
+        assumeTrue(javac != null, "no javac in this JRE");
+        Path stubSource = Files.createDirectories(dir.resolve("stub/src/com/botmaker/plugin/api"))
+                .resolve("StudioPlugin.java");
+        Files.writeString(stubSource, "package com.botmaker.plugin.api;"
+                + " public interface StudioPlugin { String id(); default void newer() {} }");
+        Path stub = Files.createDirectories(dir.resolve("stub/classes"));
+        assertEquals(0, javac.run(null, null, null, "-d", stub.toString(), stubSource.toString()));
+
+        Path pluginSource = Files.createDirectories(dir.resolve("src/p")).resolve("Newer.java");
+        Files.writeString(pluginSource, "package p; public final class Newer implements"
+                + " com.botmaker.plugin.api.StudioPlugin { public String id() { newer(); return \"test.newer\"; } }");
+        Path classes = Files.createDirectories(dir.resolve("classes"));
+        assertEquals(0, javac.run(null, null, null, "-cp", stub.toString(), "-d", classes.toString(),
+                pluginSource.toString()));
+        services(classes, "p.Newer");
+
+        List<CheckResult> results = PluginValidator.validate(PluginSubject.local(List.of(classes), null));
+
+        CheckResult links = result(results, Check.CONTRACT_LINKS);
+        assertEquals(Status.FAIL, links.status());
+        assertEquals(List.of("classes: built for a newer Studio: needs StudioPlugin.newer(…)"), links.detail());
+        assertEquals(Status.FAIL, result(results, Check.LOADS).status());
+    }
+
     @Test
     void a_classpath_entry_that_does_not_exist_fails_the_first_check(@TempDir Path dir) {
         List<CheckResult> results = PluginValidator.validate(
