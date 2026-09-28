@@ -591,7 +591,7 @@ class PluginValidatorTest {
             public final class DrawerPlugin implements StudioPlugin {
                 @Override public String id() { return "com.example.drawer"; }
                 @Override public List<SlotEditor> slotEditors() {
-                    return List.of(SlotEditor.forType(PlainPlugin.Plain.class, ctx -> null));
+                    return List.of(SlotEditor.forType(PlainPlugin.Plain.class).draw(() -> ctx -> null));
                 }
             }
             """;
@@ -605,7 +605,8 @@ class PluginValidatorTest {
             public final class ThrowingDrawer implements StudioPlugin {
                 @Override public String id() { return "com.example.throwing"; }
                 @Override public List<SlotEditor> slotEditors() {
-                    return List.of(SlotEditor.of(ctx -> { throw new IllegalStateException("boom"); }, ctx -> null));
+                    return List.of(SlotEditor.when(ctx -> { throw new IllegalStateException("boom"); })
+                            .draw(() -> ctx -> null));
                 }
             }
             """;
