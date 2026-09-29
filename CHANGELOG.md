@@ -29,6 +29,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Built against contract 0.3.0's `EditableType`; the validator's test plugin declares its type editable.
 - **The `managed` check reads the typed `ManagedValue<T>`**: its `type()` is a class, so "not a class" can no
   longer happen and is not checked.
+- **A release library command stops when its thread is interrupted.** The command and the processes it
+  started are killed, the answer is exit 130 (`Proc.INTERRUPTED`), and an interrupted thread starts no further
+  command. The dashboard's Cancel buttons rely on this to stop a preview or a clean-room resolve at once.
 
 ## [0.0.23] — 2026-09-27
 

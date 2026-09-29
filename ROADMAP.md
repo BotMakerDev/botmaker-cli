@@ -2,6 +2,14 @@
 
 ## Done
 
+### 2026-09-29 — `Proc.run` stops on an interrupt
+
+It read the output to the end and then waited, so an interrupt reached nothing until the command exited on its
+own. The dashboard's Cancel is an interrupt of the thread running a preview or a clean-room resolve, so the
+output is now drained on a virtual thread beside an interruptible `waitFor`; an interrupt kills the process and
+its descendants and answers `INTERRUPTED` (130), and a thread already interrupted starts nothing, which is
+what lets a cancelled pass unwind in a second. `ProcTest` covers both.
+
 ### 2026-09-28 — `managed` reads the typed `ManagedValue<T>`
 
 `type()` is a `Class`, so the raw-class unwrapping and its "not a class" refusal went; fixtures use
