@@ -5,6 +5,13 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- **`contract-links` says which side is behind**: *built for an older Studio (contract vX)*, *built for a newer
+  Studio*, or *built for a different Studio* when the plugin's jar names no contract tag.
+
 ## [0.1.0] — 2026-09-29
 
 ### Added

@@ -170,7 +170,7 @@ public final class PluginValidator {
             plugins++;
             List<ContractLinks.Link> missing = ContractLinks.missing(entry, contract);
             if (!missing.isEmpty()) {
-                problems.add(entry.getFileName() + ": " + new ContractLinks.NewerContract(missing).getMessage());
+                problems.add(entry.getFileName() + ": " + ContractLinks.mismatch(entry, missing).getMessage());
             }
         }
         return problems.isEmpty()

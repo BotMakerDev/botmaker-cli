@@ -176,7 +176,8 @@ class PluginValidatorTest {
 
         CheckResult links = result(results, Check.CONTRACT_LINKS);
         assertEquals(Status.FAIL, links.status());
-        assertEquals(List.of("classes: built for a newer Studio: needs StudioPlugin.newer(…)"), links.detail());
+        assertEquals(List.of("classes: built for a different Studio: it uses StudioPlugin.newer(…),"
+                + " which this Studio has not got"), links.detail());
         assertEquals(Status.FAIL, result(results, Check.LOADS).status());
     }
 
