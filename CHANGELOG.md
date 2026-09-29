@@ -11,6 +11,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - **`contract-links` says which side is behind**: *built for an older Studio (contract vX)*, *built for a newer
   Studio*, or *built for a different Studio* when the plugin's jar names no contract tag.
+- **An archetype release moves the versions a generated plugin pins** (`ArchetypePin`): the descriptor's
+  `studioApiVersion` and `toolkitVersion` defaults become the contract and toolkit tags this run cuts, or
+  the newest existing ones. A descriptor that lost either key refuses the release.
 
 ## [0.1.0] — 2026-09-29
 

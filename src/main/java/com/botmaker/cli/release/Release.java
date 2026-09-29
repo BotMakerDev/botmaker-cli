@@ -212,6 +212,11 @@ public final class Release {
             at.accept("fallback versions");
             Fallback.bump(runner, umbrella, releasing);
         }
+        if (module == Module.PLUGIN_ARCHETYPE) {
+            // The third door: what a generated PLUGIN pins, which is the archetype's descriptor defaults.
+            at.accept("archetype defaults");
+            ArchetypePin.bump(runner, umbrella, releasing);
+        }
         if (module.template()) {
             // The other path into a project: what a bot copied FROM A TEMPLATE pins, which is the template's
             // own pom. Same sentence as the line above, about the other door.
