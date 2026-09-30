@@ -90,7 +90,7 @@ class PluginValidatorTest {
             package p;
             import com.botmaker.plugin.api.palette.Hidden;
             import com.botmaker.plugin.api.palette.Palette;
-            @Palette(category = "util", categoryLabel = "Good", icon = "*", order = 100)
+            @Palette(category = "util", categoryLabel = "Good", icon = "*")
             public final class Api {
                 public static String greet(String who) { return "Hello, " + who; }
                 @Hidden public static String helper(String who) { return who; }
@@ -245,8 +245,7 @@ class PluginValidatorTest {
     @Test
     void a_catalogued_class_with_no_palette_annotation_fails(@TempDir Path dir) throws IOException {
         PluginSubject subject = subject(dir, GOOD_POM, GOOD_PLUGIN,
-                GOOD_API.replace("@Palette(category = \"util\", categoryLabel = \"Good\", icon = \"*\","
-                        + " order = 100)", ""));
+                GOOD_API.replace("@Palette(category = \"util\", categoryLabel = \"Good\", icon = \"*\")", ""));
         CheckResult palette = result(PluginValidator.validate(subject), Check.PALETTE);
         assertEquals(Status.FAIL, palette.status());
         assertTrue(palette.detail().getFirst().contains("@Palette"), palette.detail()::toString);
