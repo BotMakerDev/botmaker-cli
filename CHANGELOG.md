@@ -5,6 +5,13 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- Built against `botmaker-studio-api` 0.4.0 and `botmaker-plugin-host` 0.2.2: `plugin validate` reads a palette
+  with no `@Palette.order`, which that contract release deleted.
+
 ## [0.1.1] — 2026-09-29
 
 ### Changed
