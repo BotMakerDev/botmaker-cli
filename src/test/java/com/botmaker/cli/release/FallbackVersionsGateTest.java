@@ -62,7 +62,9 @@ class FallbackVersionsGateTest {
         String text = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
                 () -> java.nio.file.Files.readString(source));
 
-        assertTrue(FallbackVersionsGate.read(text, "SDK_FALLBACK_VERSION").isPresent(),
-                "MavenService no longer declares SDK_FALLBACK_VERSION the way the gate reads it");
+        for (String constant : Fallback.CONSTANTS.values()) {
+            assertTrue(FallbackVersionsGate.read(text, constant).isPresent(),
+                    "MavenService no longer declares " + constant + " the way the gate reads it");
+        }
     }
 }

@@ -47,6 +47,7 @@ class SourceEditsTest {
     private static final String MAVEN_SERVICE = """
             public final class MavenService {
                 public static final String SDK_FALLBACK_VERSION = "1.1.6";
+                public static final String CONTRACT_FALLBACK_VERSION = "0.3.1";
                 private static final String SOMETHING_ELSE = "1.1.6";
             }
             """;
@@ -102,7 +103,8 @@ class SourceEditsTest {
         // Two lists is how TOOLKIT_FALLBACK_VERSION spent months being moved by a release and checked by
         // nothing. The writer owns the list and the gate reads it; the gate keeping no copy is what the
         // compiler holds, and this is the value both see.
-        assertEquals(Map.of(Module.SDK, "SDK_FALLBACK_VERSION"), Fallback.CONSTANTS);
+        assertEquals(Map.of(Module.SDK, "SDK_FALLBACK_VERSION", Module.STUDIO_API, "CONTRACT_FALLBACK_VERSION"),
+                Fallback.CONSTANTS);
         assertSame(Fallback.SOURCE, FallbackVersionsGate.SOURCE);
     }
 
@@ -129,6 +131,21 @@ class SourceEditsTest {
                 Map.of(Module.STUDIO, new Version(1, 0, 38), Module.SDK, new Version(1, 2, 0)));
 
         assertTrue(Files.readString(file).contains("SDK_FALLBACK_VERSION = \"1.2.0\""));
+    }
+
+    @Test
+    void theContractBeingCutMovesItsConstantAndLeavesTheSdkOne(@TempDir Path umbrella) throws IOException {
+        // A dev Studio writes this tag into a project's pom (HostContract), so it must follow the contract.
+        Path studio = umbrella.resolve(Module.STUDIO.directory());
+        Files.createDirectories(studio.resolve(Fallback.SOURCE).getParent());
+        Path file = Files.writeString(studio.resolve(Fallback.SOURCE), MAVEN_SERVICE);
+
+        Fallback.bump(executing(new ArrayList<>()), umbrella,
+                Map.of(Module.STUDIO, new Version(1, 0, 38), Module.STUDIO_API, new Version(0, 4, 0)));
+
+        String text = Files.readString(file);
+        assertTrue(text.contains("CONTRACT_FALLBACK_VERSION = \"0.4.0\""), text);
+        assertTrue(text.contains("SDK_FALLBACK_VERSION = \"1.1.6\""), text);
     }
 
     @Test

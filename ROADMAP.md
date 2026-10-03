@@ -2,6 +2,12 @@
 
 ## Done
 
+### 2026-10-03 — `CONTRACT_FALLBACK_VERSION` is a fallback constant
+
+A dev Studio wrote `0.0.0-SNAPSHOT` as a new project's contract pin until Studio went released-only; it writes
+`MavenService.CONTRACT_FALLBACK_VERSION` now. `Fallback.CONSTANTS` maps `STUDIO_API` to it, so a `--studio-api`
+run (which forces `--studio`) moves it and `FallbackVersionsGate` checks it like the SDK's.
+
 ### 2026-09-29 — `Proc.run` stops on an interrupt
 
 It read the output to the end and then waited, so an interrupt reached nothing until the command exited on its

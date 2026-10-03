@@ -7,9 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.1.2; re-released for updated upstream pins.
-
 ### Changed
+
+- A `--studio-api` release moves Studio's `CONTRACT_FALLBACK_VERSION` to the contract tag it cuts, as
+  `--sdk` moves `SDK_FALLBACK_VERSION`, and the fallback gate refuses a Studio release whose constant names
+  no published contract tag.
 
 - Built against `botmaker-studio-api` 0.4.0 and `botmaker-plugin-host` 0.2.2: `plugin validate` reads a palette
   with no `@Palette.order`, which that contract release deleted.

@@ -23,7 +23,8 @@ import java.util.regex.Pattern;
  *
  * <p>There were two until 2026-09-06. {@code TOOLKIT_FALLBACK_VERSION} went with the toolkit entry a
  * generated pom used to declare: the SDK brings the toolkit transitively at {@code compile} scope, and a
- * direct entry in the bot's pom outranked it by nearest-wins.
+ * direct entry in the bot's pom outranked it by nearest-wins. There are two again since 2026-10-03:
+ * {@code CONTRACT_FALLBACK_VERSION}, the contract tag a dev Studio writes into a project.
  *
  * <p><b>This is the failure mode of three consecutive Studio releases.</b> 1.0.34, 1.0.35 and 1.0.36 each
  * exist only because the previous one pointed the constant at an SDK tag whose JitPack build had published
@@ -98,8 +99,8 @@ public final class FallbackVersionsGate {
         }
 
         if (problems.isEmpty()) {
-            // The verb agrees with the count: the map held two constants until 2026-09-06 and holds one now,
-            // and a line reading "SDK_FALLBACK_VERSION resolve" is a line that was written for a list.
+            // The verb agrees with the count: a run cutting one of the two modules checks only the other, and
+            // a line reading "SDK_FALLBACK_VERSION resolve" is a line that was written for a list.
             return GateVerdict.ok(checked.isEmpty()
                     ? "  studio: no fallback constant to check this run — ok"
                     : "  studio: " + String.join(", ", checked)

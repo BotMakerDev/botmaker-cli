@@ -30,12 +30,16 @@ public final class Fallback {
     /**
      * Constant name to the module whose tags it must name.
      *
-     * <p>A map of one since 2026-09-06, and it stays a map: the shape that outlived
+     * <p>A map of one from 2026-09-06 to 2026-10-03, and it stayed a map: the shape that outlived
      * {@code TOOLKIT_FALLBACK_VERSION} is the general one — any constant in Studio's source naming another
-     * module's released version belongs here, and belongs here <i>once</i>.
+     * module's released version belongs here, and belongs here <i>once</i>. {@code CONTRACT_FALLBACK_VERSION}
+     * joined when a dev Studio stopped writing {@code 0.0.0-SNAPSHOT} as a project's contract pin
+     * ({@code HostContract}); {@code --studio-api} forces {@code --studio}, so the run that cuts the contract
+     * moves it.
      */
-    static final Map<Module, String> CONSTANTS =
-            new EnumMap<>(Map.of(Module.SDK, "SDK_FALLBACK_VERSION"));
+    static final Map<Module, String> CONSTANTS = new EnumMap<>(Map.of(
+            Module.SDK, "SDK_FALLBACK_VERSION",
+            Module.STUDIO_API, "CONTRACT_FALLBACK_VERSION"));
 
     /** Studio's file holding them, relative to that module's directory. */
     static final String SOURCE = "src/main/java/com/botmaker/studio/services/MavenService.java";
