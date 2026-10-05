@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- A release of `--sdk` or `--plugin-basics` opens a pull request on `botmaker-plugin-registry` moving that
+  plugin's `verifiedVersion` to the new tag, and the registry's gate runs over it there. Studio installs a
+  ticked plugin at that version, and nothing moved it after `plugin publish`, so New Project offered SDK
+  v1.1.7 and basics v0.0.1. A pull request that cannot be opened warns; the release is not failed.
+
 - `plugin validate`'s `value-types` check walks every part a component type's factory declares, through the
   host's containers to each leaf, and fails a part no host could write — `part 0 (java.util.List<p.Step>)
   holds p.Step, which no loaded plugin declares`. The fresh-value round trip alone passed a type whose fresh

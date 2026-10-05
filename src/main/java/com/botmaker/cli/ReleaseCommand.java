@@ -207,7 +207,8 @@ public final class ReleaseCommand implements Callable<Integer> {
         if (!outcome.pushesOk()) {
             // Reported, not fatal: by the time a branch push fails every tag is out and every CI job is
             // running, so a non-zero exit would call a finished release failed.
-            parent.console().warn("a branch was not pushed — see the lines above.");
+            parent.console().warn("a branch was not pushed or a registry pull request not opened — see the"
+                    + " lines above.");
         }
         return 0;
     }
