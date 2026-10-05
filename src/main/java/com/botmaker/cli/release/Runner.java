@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,8 +26,20 @@ import java.util.stream.Stream;
  *
  * @param dryRun when true, commands are echoed and not run
  * @param out    where the echo goes — the caller's, because a library has no opinion about stdout
+ * @param stop   whether the operator asked the release to stop. Read between modules and in each JitPack
+ *               wait, never during a command: a git push cut in half is worse than one more tag.
  */
-public record Runner(boolean dryRun, Consumer<String> out) {
+public record Runner(boolean dryRun, Consumer<String> out, BooleanSupplier stop) {
+
+    /** A runner nobody can stop — the terminal's, where Ctrl-C is the stop. */
+    public Runner(boolean dryRun, Consumer<String> out) {
+        this(dryRun, out, () -> false);
+    }
+
+    /** Whether the operator has asked the release to stop. */
+    public boolean stopping() {
+        return stop.getAsBoolean();
+    }
 
     /** A runner that prints to stdout and executes. */
     public static Runner real() {

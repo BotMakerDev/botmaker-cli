@@ -15,6 +15,14 @@ No source changes since v0.1.3; re-released for updated upstream pins.
 
 ### Changed
 
+- A release stops at a module whose JitPack build failed or never appeared, when a later module of the
+  release resolves it. The JitPack wait reads JitPack's build status on every try, so a failed build ends the
+  wait at once with JitPack's message (`jitpack failed` in the log, `BROKEN` with the message under
+  `## Errors`), where it waited the full ten minutes for the pom and then tagged the next module on top of it.
+  The stopped release writes its log and commits the tagged modules' pointers locally, as a failed module
+  does. A `Runner` can carry a stop request, read between modules and in each wait, never during a git
+  command.
+
 - A release of `--sdk` or `--plugin-basics` opens a pull request on `botmaker-plugin-registry` moving that
   plugin's `verifiedVersion` to the new tag, and the registry's gate runs over it there. Studio installs a
   ticked plugin at that version, and nothing moved it after `plugin publish`, so New Project offered SDK

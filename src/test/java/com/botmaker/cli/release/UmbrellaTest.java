@@ -85,10 +85,10 @@ class UmbrellaTest {
 
         // The wait reaches the network, so a dry run must not: this is the one gate-like step that would
         // otherwise make a preview take ten minutes.
-        assertTrue(Jitpack.waitFor(recording(log), Module.SDK, new Version(1, 1, 7),
+        assertEquals(Jitpack.Build.BUILT, Jitpack.waitFor(recording(log), Module.SDK, new Version(1, 1, 7),
                 duration -> {
                     throw new AssertionError("a dry run slept");
-                }));
+                }).build());
         assertTrue(log.get(0).contains("(dry-run) would poll"));
     }
 }

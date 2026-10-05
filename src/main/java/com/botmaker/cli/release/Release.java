@@ -89,6 +89,10 @@ public final class Release {
             return new Outcome(plan, refusals, Optional.empty(), true);
         }
 
+        if (runner.stopping()) {
+            // Pressed during the gates: nothing is tagged, so there is nothing to log or record either.
+            throw new ReleaseRefusal(STOPPED_BY_YOU + " before the first tag — nothing was tagged.");
+        }
         LocalDateTime when = LocalDateTime.now();
         Chain chain = tagChain(runner, umbrella, releasing, when,
                 (module, version, at) -> release(runner, umbrella, module, version, releasing, wait, at));
@@ -155,6 +159,11 @@ public final class Release {
      *
      * <p>That is the 2026-09-16 release, recorded: four tags pushed, the window gone, and no log and no
      * pointer commit, so the only evidence of what had been cut was each repository's tag list.
+     *
+     * <p><b>An {@link AfterTag} stops it the same way, with the row tagged</b>: an owed JitPack wait that
+     * failed, timed out or was stopped. And <b>a stop the operator asked for</b> ({@link Runner#stopping})
+     * is honoured before each module. Both since 2026-10-05, when the chain tagged plugin-toolkit and
+     * plugin-host on top of a studio-api JitPack had failed to build, and could only be stopped by killing it.
      */
     static Chain tagChain(Runner runner, Path umbrella, Map<Module, Version> releasing, LocalDateTime when,
                           Step step) {
@@ -165,6 +174,17 @@ public final class Release {
 
         for (int i = 0; i < rows.size(); i++) {
             ReleaseLog.Row row = rows.get(i);
+            if (runner.stopping()) {
+                // Between two modules, which is the one moment a stop costs nothing: the last tag is out and
+                // waited for, the next not started.
+                rows.set(i, row.withStage(ReleaseLog.Stage.NOT_REACHED).stoppedAt("start", STOPPED_BY_YOU));
+                notReachedAfter(rows, i);
+                runner.say("error: " + STOPPED_BY_YOU + " before " + row.module().directory() + " — "
+                        + tagged.size() + " of " + rows.size() + " modules were tagged.");
+                recordStop(runner, umbrella, when, log, rows, tagged);
+                throw new ReleaseRefusal(STOPPED_BY_YOU + " before " + row.module().directory() + ". "
+                        + tagged.size() + " of " + rows.size() + " modules were tagged.");
+            }
             at[0] = "start";
             java.time.Instant moduleStarted = java.time.Instant.now();
             try {
@@ -177,19 +197,20 @@ public final class Release {
             } catch (RuntimeException e) {
                 // Timed too: how long a module ran before it threw is the first thing asked about a release
                 // that stopped, and it is gone the moment the terminal is closed.
-                rows.set(i, row.failed(at[0], e.getMessage() == null ? e.getClass().getSimpleName()
-                                : e.getMessage())
-                        .withElapsed(java.time.Duration.between(moduleStarted, java.time.Instant.now())));
-                for (int rest = i + 1; rest < rows.size(); rest++) {
-                    rows.set(rest, rows.get(rest).withStage(ReleaseLog.Stage.NOT_REACHED));
+                java.time.Duration took = java.time.Duration.between(moduleStarted, java.time.Instant.now());
+                if (e instanceof AfterTag after) {
+                    // Its tag is out, so its row says how far it got and its pointer is recorded.
+                    rows.set(i, after.record(row, at[0]).withElapsed(took));
+                    tagged.put(row.module(), row.version());
+                } else {
+                    rows.set(i, row.failed(at[0], e.getMessage() == null ? e.getClass().getSimpleName()
+                            : e.getMessage()).withElapsed(took));
                 }
+                notReachedAfter(rows, i);
                 runner.say("error: " + row.module().directory() + " failed at " + at[0]
                         + " — the release stopped here. " + tagged.size() + " of " + rows.size()
                         + " modules were tagged.");
-                if (log != null) {
-                    runner.write(log, ReleaseLog.render(when, rows));
-                }
-                Umbrella.recordStopped(runner, umbrella, tagged, log != null);
+                recordStop(runner, umbrella, when, log, rows, tagged);
                 throw e;
             }
             if (log != null) {
@@ -197,6 +218,21 @@ public final class Release {
             }
         }
         return new Chain(log, List.copyOf(rows));
+    }
+
+    private static void notReachedAfter(List<ReleaseLog.Row> rows, int i) {
+        for (int rest = i + 1; rest < rows.size(); rest++) {
+            rows.set(rest, rows.get(rest).withStage(ReleaseLog.Stage.NOT_REACHED));
+        }
+    }
+
+    /** The log as it stands and the pointers of what was tagged, committed locally; nothing is pushed. */
+    private static void recordStop(Runner runner, Path umbrella, LocalDateTime when, Path log,
+                                   List<ReleaseLog.Row> rows, Map<Module, Version> tagged) {
+        if (log != null) {
+            runner.write(log, ReleaseLog.render(when, rows));
+        }
+        Umbrella.recordStopped(runner, umbrella, tagged, log != null);
     }
 
     /**
@@ -266,9 +302,53 @@ public final class Release {
             runner.say(Waits.notWaiting(module, version));
         } else if (wait && ReleaseLog.onJitpack(module)) {
             at.accept("jitpack wait");
-            return Jitpack.waitFor(runner, module, version, Jitpack.Sleeper.real())
-                    ? ReleaseLog.Stage.BUILT : ReleaseLog.Stage.TIMEOUT;
+            Jitpack.Waited waited = Jitpack.waitFor(runner, module, version, Jitpack.Sleeper.real(runner::stopping));
+            // The wait is owed, so a later module resolves this one from JitPack: tagging it now would start a
+            // build that cannot find its upstream, and JitPack caches that result per tag.
+            String tag = module.directory() + " " + version.tag();
+            switch (waited.build()) {
+                case BUILT -> {
+                    return ReleaseLog.Stage.BUILT;
+                }
+                case FAILED -> throw new AfterTag(ReleaseLog.Stage.JITPACK_FAILED, waited.detail(),
+                        "JitPack failed to build " + tag + ", and a later module resolves it, so the release"
+                                + " stopped here. A new tag of " + module.directory() + " repairs it.");
+                case TIMEOUT -> throw new AfterTag(ReleaseLog.Stage.TIMEOUT, "",
+                        "JitPack had not built " + tag + " after 10 minutes, and a later module resolves it,"
+                                + " so the release stopped here.");
+                case STOPPED -> throw new AfterTag(ReleaseLog.Stage.TAGGED, "",
+                        STOPPED_BY_YOU + " while waiting for JitPack to build " + tag + ".");
+            }
         }
         return ReleaseLog.Stage.TAGGED;
+    }
+
+    static final String STOPPED_BY_YOU = "stopped by you";
+
+    /**
+     * A module that was tagged and pushed, and still stops the chain — its JitPack build failed, timed out, or
+     * the operator stopped the wait.
+     *
+     * <p>Its own type because the tag is out: {@link #tagChain} records this row with its {@code stage} and its
+     * pointer, where any other exception means the module never reached its tag.
+     *
+     * @param stage   what the row says
+     * @param jitpack JitPack's own message, for the row's JitPack error; empty when there is none
+     */
+    static final class AfterTag extends ReleaseRefusal {
+
+        private final ReleaseLog.Stage stage;
+        private final String jitpack;
+
+        AfterTag(ReleaseLog.Stage stage, String jitpack, String message) {
+            super(message);
+            this.stage = stage;
+            this.jitpack = jitpack;
+        }
+
+        ReleaseLog.Row record(ReleaseLog.Row row, String step) {
+            ReleaseLog.Row stopped = row.withStage(stage).stoppedAt(step, getMessage());
+            return jitpack.isBlank() ? stopped : stopped.withJitpack("BROKEN", jitpack);
+        }
     }
 }

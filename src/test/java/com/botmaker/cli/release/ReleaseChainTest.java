@@ -108,6 +108,58 @@ class ReleaseChainTest {
     }
 
     @Test
+    void aFailedJitpackBuildStopsTheChainWithItsRowTaggedAndItsPointerRecorded(@TempDir Path umbrella)
+            throws Exception {
+        List<String> said = new ArrayList<>();
+        List<Module> started = new ArrayList<>();
+
+        // The 2026-10-05 release: studio-api's build failed, and the chain went on to tag two more.
+        assertThrows(ReleaseRefusal.class, () ->
+                Release.tagChain(new Runner(false, said::add), umbrella, fiveModules(), WHEN,
+                        (module, version, at) -> {
+                            started.add(module);
+                            at.accept("jitpack wait");
+                            throw new Release.AfterTag(ReleaseLog.Stage.JITPACK_FAILED, "429 Too Many Requests",
+                                    "JitPack failed to build botmaker-studio-api v0.1.0");
+                        }));
+
+        assertEquals(List.of(Module.STUDIO_API), started);
+        List<ReleaseLog.Row> rows = ReleaseLog.read(ReleaseLog.path(umbrella, WHEN));
+        assertEquals(ReleaseLog.Stage.JITPACK_FAILED, rows.get(0).stage());
+        assertEquals("BROKEN", rows.get(0).jitpack());
+        assertEquals("429 Too Many Requests", rows.get(0).jitpackError());
+        assertEquals("jitpack wait: JitPack failed to build botmaker-studio-api v0.1.0", rows.get(0).failure());
+        assertEquals(ReleaseLog.Stage.NOT_REACHED, rows.get(1).stage());
+        assertTrue(said.stream().anyMatch(line ->
+                line.contains("commit -m 'release (stopped): studio-api v0.1.0'")), said.toString());
+    }
+
+    @Test
+    void aStopIsHonouredBetweenModules(@TempDir Path umbrella) throws Exception {
+        List<String> said = new ArrayList<>();
+        java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
+
+        ReleaseRefusal thrown = assertThrows(ReleaseRefusal.class, () ->
+                Release.tagChain(new Runner(false, said::add, stop::get), umbrella, fiveModules(), WHEN,
+                        (module, version, at) -> {
+                            stop.set(true);                // pressed while the first module ran
+                            return ReleaseLog.Stage.BUILT;
+                        }));
+
+        assertTrue(thrown.getMessage().startsWith("stopped by you before botmaker-plugin-toolkit"),
+                thrown.getMessage());
+        List<ReleaseLog.Row> rows = ReleaseLog.read(ReleaseLog.path(umbrella, WHEN));
+        assertEquals(List.of(ReleaseLog.Stage.BUILT, ReleaseLog.Stage.NOT_REACHED, ReleaseLog.Stage.NOT_REACHED,
+                        ReleaseLog.Stage.NOT_REACHED, ReleaseLog.Stage.NOT_REACHED),
+                rows.stream().map(ReleaseLog.Row::stage).toList());
+        assertEquals("start: stopped by you", rows.get(1).failure());
+        assertTrue(said.stream().anyMatch(line ->
+                line.contains("commit -m 'release (stopped): studio-api v0.1.0'")), said.toString());
+        assertTrue(said.stream().noneMatch(line -> line.contains("$ git") && line.contains(" push ")),
+                said.toString());
+    }
+
+    @Test
     void aDryRunWritesNoLogAndStillWalksTheChain(@TempDir Path umbrella) {
         List<String> said = new ArrayList<>();
         List<Module> walked = new ArrayList<>();

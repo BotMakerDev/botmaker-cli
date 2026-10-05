@@ -57,8 +57,13 @@ public final class ReleaseLog {
         TAGGED("tagged"),
         /** Tagged, and its pom was downloadable before the next module was tagged. */
         BUILT("built on jitpack"),
-        /** Tagged, and the JitPack wait gave up. The chain went on, as it always has. */
+        /**
+         * Tagged, and the JitPack wait gave up. Since 2026-10-05 the chain stops here when a later module
+         * resolves this one; before, it went on and tagged on top of an unbuilt tag.
+         */
         TIMEOUT("jitpack timeout"),
+        /** Tagged, and JitPack's build of it failed. The chain stopped here; the message is JitPack's. */
+        JITPACK_FAILED("jitpack failed"),
         /** Something threw while releasing this module; the whole message is under {@code ## Errors}. */
         FAILED("FAILED"),
         /** The run stopped at an earlier module, so this one was never started. */
@@ -76,7 +81,7 @@ public final class ReleaseLog {
 
         /** Whether a tag was pushed, and so whether JitPack and Actions have anything to answer about. */
         public boolean tagged() {
-            return this == TAGGED || this == BUILT || this == TIMEOUT;
+            return this == TAGGED || this == BUILT || this == TIMEOUT || this == JITPACK_FAILED;
         }
 
         static Stage fromCell(String cell) {
@@ -126,6 +131,12 @@ public final class ReleaseLog {
         public Row failed(String step, String message) {
             return new Row(module, version, Stage.FAILED, step + ": " + message, jitpack, actions,
                     jitpackError, actionsError, elapsed, actionsUrl);
+        }
+
+        /** Why the chain stopped at this row, keeping its stage: a row can be tagged and still be the stop. */
+        public Row stoppedAt(String step, String message) {
+            return new Row(module, version, stage, step + ": " + message, jitpack, actions, jitpackError,
+                    actionsError, elapsed, actionsUrl);
         }
 
         public Row withJitpack(String verdict, String error) {
