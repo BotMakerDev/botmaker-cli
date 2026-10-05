@@ -31,7 +31,7 @@ class GalleryGateTest {
         Optional<String> tag = Optional.of("v1");
         boolean archive = true;
         Optional<List<RegistryEntry>> registry = Optional.of(List.of(new RegistryEntry("com.botmaker.sdk", "SDK",
-                "com.github.LiQiyeDev:botmaker-sdk", "LiQiyeDev/botmaker-sdk", "", List.of(), "", List.of(),
+                "com.github.BotMakerDev:botmaker-sdk", "LiQiyeDev/botmaker-sdk", "", List.of(), "", List.of(),
                 "v1.1.7", "")));
         boolean offline;
 

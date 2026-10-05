@@ -231,7 +231,7 @@ exactly what the gate exists to prevent.
 
 ```xml
 <dependency>
-    <groupId>com.github.LiQiyeDev</groupId>
+    <groupId>com.github.BotMakerDev</groupId>
     <artifactId>botmaker-cli</artifactId>
     <version>v0.1.0</version>
 </dependency>
@@ -249,7 +249,7 @@ them is `com.botmaker.cli.Subjects`, and that is where Maven lives.
 
 ```bash
 mvn test        # CommandLineTest, PomsTest, PluginValidatorTest, RegistryTest, BundledTest
-mvn install     # com.github.LiQiyeDev:botmaker-cli:0.0.0-SNAPSHOT, plus the -all jar
+mvn install     # com.github.BotMakerDev:botmaker-cli:0.0.0-SNAPSHOT, plus the -all jar
 java -jar target/botmaker-cli-0.0.0-SNAPSHOT-all.jar --help
 ```
 
@@ -257,5 +257,5 @@ The `-all` jar carries the version in its name because nothing renames it — a 
 renamed only the *main* artifact and left the pair spelled two different ways. The release renames the asset
 once, on the way out (`jreleaser.yml`), so the download URL above stays stable.
 
-Published through JitPack, which serves each git tag under `com.github.LiQiyeDev` regardless of this pom's
+Published through JitPack, which serves each git tag under `com.github.BotMakerDev` regardless of this pom's
 `groupId`/`version`. Releases are cut from the umbrella with `../release.sh --cli <version>`.

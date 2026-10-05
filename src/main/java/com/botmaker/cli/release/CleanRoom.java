@@ -28,16 +28,16 @@ public final class CleanRoom {
     public static final String OWNER = "BotMakerDev";
 
     /**
-     * The owner in a <b>Maven coordinate</b>, which is deliberately still the old one.
+     * The owner in a <b>Maven coordinate</b> — {@code com.github.BotMakerDev:botmaker-sdk} — and in every JitPack
+     * URL.
      *
-     * <p>JitPack names an artifact after the address it is asked for, so moving the repositories would have
-     * renamed every coordinate — {@code com.github.LiQiyeDev:botmaker-sdk} — in every bot's pom, in every
-     * published pom already baked by flatten, and in the registry's entries. Maven treats the two spellings
-     * as unrelated artifacts, so a project that ended up with both would carry two copies of shared. The
-     * coordinate therefore stays put and resolves through GitHub's redirect; the day that stops working, it
-     * moves in one release with the Studio change that rewrites a bot pom's groupId.
+     * <p>It stayed {@code LiQiyeDev} from the 2026-09-18 move until 2026-10-05, resolving through GitHub's
+     * redirect, so that existing bots' poms kept naming one artifact. The maintainer moved it with existing
+     * bots left as they are: Maven treats the two spellings as unrelated artifacts, and a bot still pinning
+     * the old one keeps resolving its old tags. Kept apart from {@link #OWNER} because the two answer
+     * different questions, even now they agree.
      */
-    public static final String COORDINATE_OWNER = "LiQiyeDev";
+    public static final String COORDINATE_OWNER = "BotMakerDev";
 
     private CleanRoom() {
     }

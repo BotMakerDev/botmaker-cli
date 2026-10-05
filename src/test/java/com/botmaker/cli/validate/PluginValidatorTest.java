@@ -103,13 +103,13 @@ class PluginValidatorTest {
                 <groupId>com.example</groupId><artifactId>good</artifactId><version>0.1.0</version>
                 <dependencies>
                     <dependency>
-                        <groupId>com.github.LiQiyeDev</groupId>
+                        <groupId>com.github.BotMakerDev</groupId>
                         <artifactId>botmaker-studio-api</artifactId>
                         <version>main-SNAPSHOT</version>
                         <scope>provided</scope>
                     </dependency>
                     <dependency>
-                        <groupId>com.github.LiQiyeDev</groupId>
+                        <groupId>com.github.BotMakerDev</groupId>
                         <artifactId>botmaker-plugin-toolkit</artifactId>
                         <version>main-SNAPSHOT</version>
                     </dependency>
@@ -686,7 +686,7 @@ class PluginValidatorTest {
     @Test
     void a_pom_with_no_toolkit_passes_plugin_deps(@TempDir Path dir) throws IOException {
         PluginSubject subject = subject(dir, GOOD_POM.replaceAll(
-                "(?s)<dependency>\\s*<groupId>com.github.LiQiyeDev</groupId>\\s*"
+                "(?s)<dependency>\\s*<groupId>com.github.BotMakerDev</groupId>\\s*"
                         + "<artifactId>botmaker-plugin-toolkit</artifactId>.*?</dependency>", ""));
         assertEquals(Status.PASS, result(PluginValidator.validate(subject), Check.PLUGIN_DEPS).status());
     }

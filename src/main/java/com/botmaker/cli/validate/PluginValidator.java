@@ -73,9 +73,21 @@ public final class PluginValidator {
      * {@code botmaker-plugin-toolkit} in one module is how a rule comes to be enforced in two places and one
      * of them means something slightly different.
      */
-    public static final String CONTRACT_GROUP = "com.github.LiQiyeDev";
+    public static final String CONTRACT_GROUP = "com.github.BotMakerDev";
     public static final String CONTRACT_ARTIFACT = "botmaker-studio-api";
     public static final String TOOLKIT_ARTIFACT = "botmaker-plugin-toolkit";
+
+    /**
+     * The groupId the contract and the toolkit were published under until 2026-10-05. Never required, never
+     * written; recognised wherever a coordinate must <i>not</i> appear, because Maven cannot tell the two
+     * spellings are one artifact and a second copy of the contract is exactly what those refusals prevent.
+     */
+    public static final String RETIRED_CONTRACT_GROUP = "com.github.LiQiyeDev";
+
+    /** Whether {@code groupId} is the contract's and the toolkit's, today's spelling or the retired one. */
+    public static boolean contractGroup(String groupId) {
+        return CONTRACT_GROUP.equals(groupId) || RETIRED_CONTRACT_GROUP.equals(groupId);
+    }
 
     private PluginValidator() {
     }
@@ -1143,7 +1155,12 @@ public final class PluginValidator {
         }
         List<String> problems = new ArrayList<>();
         Poms.Dependency contract = Poms.find(declared, CONTRACT_GROUP, CONTRACT_ARTIFACT).orElse(null);
-        if (contract == null) {
+        if (contract == null && Poms.find(declared, RETIRED_CONTRACT_GROUP, CONTRACT_ARTIFACT).isPresent()) {
+            problems.add("the contract is declared as " + RETIRED_CONTRACT_GROUP + ":" + CONTRACT_ARTIFACT
+                    + ", its groupId before 2026-10-05; declare " + CONTRACT_GROUP + ":" + CONTRACT_ARTIFACT
+                    + " instead (and the toolkit likewise). Maven treats the two as different artifacts, so a"
+                    + " host would load two contracts");
+        } else if (contract == null) {
             problems.add("no dependency on " + CONTRACT_GROUP + ":" + CONTRACT_ARTIFACT
                     + "; a plugin implements the contract, so it must declare it");
         } else if (!"provided".equals(scope(contract)) && !"compile".equals(scope(contract))) {

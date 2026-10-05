@@ -31,7 +31,7 @@ class TemplatePinTest {
 
                 <dependencies>
                     <dependency>
-                        <groupId>com.github.LiQiyeDev</groupId>
+                        <groupId>com.github.BotMakerDev</groupId>
                         <artifactId>botmaker-sdk</artifactId>
                         <version>${botmaker.sdk.version}</version>
                     </dependency>

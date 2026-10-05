@@ -38,6 +38,15 @@ class EditorDependenciesGateTest {
     }
 
     @Test
+    void the_contract_under_its_retired_group_is_refused_too() {
+        String refusal = RegistryGate.editorDependenciesRefusal(
+                List.of("com.github.LiQiyeDev:botmaker-studio-api:v0.4.0"));
+
+        assertNotNull(refusal);
+        assertTrue(refusal.contains("must never declare"), refusal);
+    }
+
+    @Test
     void two_versions_of_one_artifact_are_refused() {
         String refusal = RegistryGate.editorDependenciesRefusal(
                 List.of("io.javalin:javalin:6.7.0", "io.javalin:javalin:6.6.0"));
@@ -52,8 +61,8 @@ class EditorDependenciesGateTest {
      */
     @Test
     void the_contract_and_the_toolkit_are_refused() {
-        for (String coordinate : List.of("com.github.LiQiyeDev:botmaker-studio-api:0.0.4",
-                "com.github.LiQiyeDev:botmaker-plugin-toolkit:0.0.6")) {
+        for (String coordinate : List.of("com.github.BotMakerDev:botmaker-studio-api:0.0.4",
+                "com.github.BotMakerDev:botmaker-plugin-toolkit:0.0.6")) {
             String refusal = RegistryGate.editorDependenciesRefusal(List.of(coordinate));
             assertNotNull(refusal, coordinate + " must be refused");
             assertTrue(refusal.contains("must never declare"), refusal);

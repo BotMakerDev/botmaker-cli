@@ -41,7 +41,7 @@ project:
     homepage: https://github.com/BotMakerDev/botmaker-cli
   languages:
     java:
-      groupId: com.github.LiQiyeDev
+      groupId: com.github.BotMakerDev
       artifactId: botmaker-cli
       version: '21'
 

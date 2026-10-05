@@ -26,7 +26,7 @@ class PublishEditorDependenciesTest {
     @Test
     void only_the_optional_ones_are_listed() {
         List<String> companions = PluginPublishCommand.editorDependencies(CONSOLE, List.of(
-                dep("com.github.LiQiyeDev", "botmaker-plugin-toolkit", "0.0.6", false),
+                dep("com.github.BotMakerDev", "botmaker-plugin-toolkit", "0.0.6", false),
                 dep("io.javalin", "javalin", "6.7.0", true),
                 dep("org.junit.jupiter", "junit-jupiter", "5.9.3", false)));
 
@@ -50,8 +50,8 @@ class PublishEditorDependenciesTest {
     @Test
     void the_contract_and_the_toolkit_are_never_listed() {
         List<String> companions = PluginPublishCommand.editorDependencies(CONSOLE, List.of(
-                dep("com.github.LiQiyeDev", "botmaker-studio-api", "0.0.4", true),
-                dep("com.github.LiQiyeDev", "botmaker-plugin-toolkit", "0.0.6", true)));
+                dep("com.github.BotMakerDev", "botmaker-studio-api", "0.0.4", true),
+                dep("com.github.BotMakerDev", "botmaker-plugin-toolkit", "0.0.6", true)));
 
         assertEquals(List.of(), companions);
     }
@@ -70,8 +70,8 @@ class PublishEditorDependenciesTest {
     @Test
     void the_sdks_pom_composes_the_entry_it_has() {
         List<String> companions = PluginPublishCommand.editorDependencies(CONSOLE, List.of(
-                dep("com.github.LiQiyeDev", "botmaker-studio-api", "0.0.4", false),
-                dep("com.github.LiQiyeDev", "botmaker-plugin-toolkit", "0.0.6", false),
+                dep("com.github.BotMakerDev", "botmaker-studio-api", "0.0.4", false),
+                dep("com.github.BotMakerDev", "botmaker-plugin-toolkit", "0.0.6", false),
                 dep("org.openjfx", "javafx-controls", "21", true),
                 dep("org.openjfx", "javafx-graphics", "21", true),
                 dep("io.javalin", "javalin", "6.7.0", true),

@@ -238,7 +238,7 @@ public final class RegistryGate {
                         + " classpath is the least diagnosable failure this platform has.";
             }
             seen.add(coordinate);
-            if (PluginValidator.CONTRACT_GROUP.equals(parts[0])
+            if (PluginValidator.contractGroup(parts[0])
                     && (PluginValidator.CONTRACT_ARTIFACT.equals(parts[1])
                     || PluginValidator.TOOLKIT_ARTIFACT.equals(parts[1]))) {
                 return "editorDependencies names " + coordinate + ", which a bot's pom must never declare."

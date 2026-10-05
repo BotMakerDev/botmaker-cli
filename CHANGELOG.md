@@ -15,6 +15,11 @@ No source changes since v0.1.3; re-released for updated upstream pins.
 
 ### Changed
 
+- Every coordinate is `com.github.BotMakerDev` (was `com.github.LiQiyeDev`): this artifact, the contract
+  `plugin validate` requires and `plugin publish` reads, the archetype `plugin new` generates from, and the
+  release's JitPack URLs (`CleanRoom.COORDINATE_OWNER`). Tags already built under the old groupId still
+  resolve under it.
+
 - A release stops at a module whose JitPack build failed or never appeared, when a later module of the
   release resolves it. The JitPack wait reads JitPack's build status on every try, so a failed build ends the
   wait at once with JitPack's message (`jitpack failed` in the log, `BROKEN` with the message under

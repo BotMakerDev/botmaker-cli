@@ -73,9 +73,9 @@ class UmbrellaTest {
     void theJitpackUrlsAreTheOnesAConsumerWouldUse() {
         Version version = new Version(0, 0, 5);
 
-        assertEquals("https://jitpack.io/com/github/LiQiyeDev/botmaker-plugin-host/v0.0.5/"
+        assertEquals("https://jitpack.io/com/github/BotMakerDev/botmaker-plugin-host/v0.0.5/"
                 + "botmaker-plugin-host-v0.0.5.pom", Jitpack.pomUrl(Module.PLUGIN_HOST, version));
-        assertEquals("https://jitpack.io/api/builds/com.github.LiQiyeDev/botmaker-plugin-host/v0.0.5",
+        assertEquals("https://jitpack.io/api/builds/com.github.BotMakerDev/botmaker-plugin-host/v0.0.5",
                 Jitpack.buildUrl(Module.PLUGIN_HOST, version));
     }
 

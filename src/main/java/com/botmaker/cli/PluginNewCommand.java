@@ -31,7 +31,7 @@ import java.util.concurrent.Callable;
         mixinStandardHelpOptions = true)
 final class PluginNewCommand implements Callable<Integer> {
 
-    private static final String ARCHETYPE_GROUP = "com.github.LiQiyeDev";
+    private static final String ARCHETYPE_GROUP = "com.github.BotMakerDev";
     private static final String ARCHETYPE_ARTIFACT = "botmaker-plugin-archetype";
 
     /**

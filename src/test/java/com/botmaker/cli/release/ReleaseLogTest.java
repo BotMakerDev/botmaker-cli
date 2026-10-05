@@ -90,7 +90,7 @@ class ReleaseLogTest {
     void errorsGoUnderTheTableInFullRatherThanIntoACell() {
         ReleaseLog.Row row = new ReleaseLog.Row(Module.SESSION, new Version(0, 0, 13))
                 .withStage(ReleaseLog.Stage.BUILT)
-                .withJitpack("BROKEN", "Could not find artifact com.github.LiQiyeDev:botmaker-shared")
+                .withJitpack("BROKEN", "Could not find artifact com.github.BotMakerDev:botmaker-shared")
                 .withActions("FAILED — ci", "ci: failure — https://example.invalid/run/1");
 
         String rendered = ReleaseLog.render(WHEN, List.of(row));
@@ -98,7 +98,7 @@ class ReleaseLogTest {
         assertTrue(rendered.contains("| BROKEN | FAILED — ci |"));
         assertTrue(rendered.contains("## Errors"));
         assertTrue(rendered.contains("**botmaker-session — jitpack**"));
-        assertTrue(rendered.contains("Could not find artifact com.github.LiQiyeDev:botmaker-shared"));
+        assertTrue(rendered.contains("Could not find artifact com.github.BotMakerDev:botmaker-shared"));
         assertTrue(rendered.contains("**botmaker-session — actions**"));
     }
 

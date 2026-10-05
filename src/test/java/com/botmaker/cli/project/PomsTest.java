@@ -23,13 +23,13 @@ class PomsTest {
                 <version>0.1.0-SNAPSHOT</version>
                 <dependencies>
                     <dependency>
-                        <groupId>com.github.LiQiyeDev</groupId>
+                        <groupId>com.github.BotMakerDev</groupId>
                         <artifactId>botmaker-studio-api</artifactId>
                         <version>main-SNAPSHOT</version>
                         <scope>provided</scope>
                     </dependency>
                     <dependency>
-                        <groupId>com.github.LiQiyeDev</groupId>
+                        <groupId>com.github.BotMakerDev</groupId>
                         <artifactId>botmaker-plugin-toolkit</artifactId>
                         <version>main-SNAPSHOT</version>
                     </dependency>
@@ -48,11 +48,11 @@ class PomsTest {
             throws IOException {
         List<Poms.Dependency> declared = Poms.dependencies(write(dir, PLUGIN_POM));
         assertEquals("provided",
-                Poms.find(declared, "com.github.LiQiyeDev", "botmaker-studio-api").orElseThrow().scope());
+                Poms.find(declared, "com.github.BotMakerDev", "botmaker-studio-api").orElseThrow().scope());
         // Empty, not "compile": the POM_SCOPES check asks what the file SAYS, and an omitted scope and a
         // declared `compile` are the same to Maven but not to a reader trying to fix one of them.
         assertEquals("",
-                Poms.find(declared, "com.github.LiQiyeDev", "botmaker-plugin-toolkit").orElseThrow().scope());
+                Poms.find(declared, "com.github.BotMakerDev", "botmaker-plugin-toolkit").orElseThrow().scope());
     }
 
     @Test
@@ -110,7 +110,7 @@ class PomsTest {
                 </properties>
                 <dependencies>
                     <dependency>
-                        <groupId>com.github.LiQiyeDev</groupId>
+                        <groupId>com.github.BotMakerDev</groupId>
                         <artifactId>botmaker-studio-api</artifactId>
                         <version>${botmaker.studioapi.version}</version>
                         <scope>provided</scope>
@@ -128,7 +128,7 @@ class PomsTest {
         Path pom = write(dir, PROPERTY_POM);
 
         assertEquals("${botmaker.studioapi.version}",
-                Poms.find(Poms.dependencies(pom), "com.github.LiQiyeDev", "botmaker-studio-api")
+                Poms.find(Poms.dependencies(pom), "com.github.BotMakerDev", "botmaker-studio-api")
                         .orElseThrow().version());
     }
 

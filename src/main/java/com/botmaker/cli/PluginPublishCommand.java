@@ -272,7 +272,7 @@ final class PluginPublishCommand implements Callable<Integer> {
      */
     static String contractVersionRefusal(String contractVersion) {
         if (contractVersion == null || contractVersion.isBlank()) {
-            return "this pom declares no com.github.LiQiyeDev:botmaker-studio-api dependency, so there is"
+            return "this pom declares no com.github.BotMakerDev:botmaker-studio-api dependency, so there is"
                     + " no contract version to publish. Declare it at `provided` scope, or pass"
                     + " --min-contract-version <version>.";
         }
@@ -319,7 +319,7 @@ final class PluginPublishCommand implements Callable<Integer> {
         for (Poms.Dependency dependency : declared) {
             if (!dependency.optional()) continue;
             if ("org.openjfx".equals(dependency.groupId())) continue;
-            if (PluginValidator.CONTRACT_GROUP.equals(dependency.groupId())
+            if (PluginValidator.contractGroup(dependency.groupId())
                     && (PluginValidator.CONTRACT_ARTIFACT.equals(dependency.artifactId())
                     || PluginValidator.TOOLKIT_ARTIFACT.equals(dependency.artifactId()))) {
                 continue;
