@@ -305,6 +305,80 @@ class PluginValidatorTest {
                 types.detail()::toString);
     }
 
+    /**
+     * A plugin declaring {@code Bag}, written {@code new Bag(<PART> items)} — {@code PART} stands for the part's
+     * declared type. Its fresh value is empty, so it round-trips whatever the part is: only the walk over the
+     * declared parts can tell a bag the host could write once filled from one it never could.
+     */
+    private static final String BAG_PLUGIN = """
+            package p;
+            import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.slot.ValueContext;
+            import com.botmaker.plugin.api.value.ComponentType;
+            import com.botmaker.plugin.api.value.EditableType;
+            import com.botmaker.plugin.api.value.PluginType;
+            import java.util.List;
+            public final class BagPlugin implements StudioPlugin {
+                @Override public String id() { return "com.example.bag"; }
+                @Override public List<PluginType<?>> types() { return List.of(new BagType()); }
+
+                public static final class Loose { }
+                public enum Kind { SMALL, LARGE }
+
+                public static final class Bag {
+                    final PART items;
+                    public Bag(PART items) { this.items = items; }
+                }
+
+                public static final class BagType implements EditableType<Bag>, ComponentType<Bag> {
+                    @Override public Class<Bag> type() { return Bag.class; }
+                    @Override public Bag fresh() { return new Bag(null); }
+                    @Override public javafx.scene.Node editor(ValueContext ctx) { return null; }
+                    @Override public List<Class<?>> componentTypes() { return List.of(PART_RAW.class); }
+                    @Override public List<Object> components(Bag b) { return java.util.Arrays.asList(b.items); }
+                    @Override public Bag build(List<Object> parts) { return new Bag((PART) parts.get(0)); }
+                }
+            }
+            """;
+
+    private static CheckResult bagTypes(Path dir, String part, String raw) throws IOException {
+        Path classes = compile(dir, BAG_PLUGIN.replace("PART_RAW", raw).replace("PART", part));
+        services(classes, "p.BagPlugin");
+        return result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)), Check.TYPES);
+    }
+
+    /** A part nobody declares: the empty bag round-trips, and the first one holding a part could not be written. */
+    @Test
+    void a_part_no_plugin_declares_fails(@TempDir Path dir) throws IOException {
+        CheckResult types = bagTypes(dir, "Loose", "Loose");
+        assertEquals(Status.FAIL, types.status(), types::toString);
+        assertTrue(types.detail().getFirst().contains("holds p.BagPlugin$Loose, which no loaded plugin declares"),
+                types.detail()::toString);
+    }
+
+    /** The same part inside a list: the host writes the {@code List.of(…)} and still has nothing for the element. */
+    @Test
+    void a_list_of_parts_no_plugin_declares_fails(@TempDir Path dir) throws IOException {
+        CheckResult types = bagTypes(dir, "List<Loose>", "List");
+        assertEquals(Status.FAIL, types.status(), types::toString);
+        assertTrue(types.detail().getFirst().contains("part 0 (java.util.List<p.BagPlugin$Loose>)"),
+                types.detail()::toString);
+    }
+
+    /** A functional interface is written whole as {@code Owner::method}: its type argument is never a value. */
+    @Test
+    void a_functional_part_over_an_undeclared_type_passes(@TempDir Path dir) throws IOException {
+        CheckResult types = bagTypes(dir, "java.util.function.Consumer<Loose>", "java.util.function.Consumer");
+        assertEquals(Status.PASS, types.status(), types::toString);
+    }
+
+    /** Containers over what the host writes itself — literals and enums, nested — are writable all the way down. */
+    @Test
+    void containers_of_literals_and_enums_pass(@TempDir Path dir) throws IOException {
+        CheckResult types = bagTypes(dir, "java.util.Map<String, List<Kind>>", "java.util.Map");
+        assertEquals(Status.PASS, types.status(), types::toString);
+    }
+
     // ------------------------------------------------------------------------------------------------
     // managed values
     // ------------------------------------------------------------------------------------------------

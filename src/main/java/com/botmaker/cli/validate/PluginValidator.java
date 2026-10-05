@@ -19,16 +19,23 @@ import com.botmaker.plugin.host.Recordings;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -334,6 +341,7 @@ public final class PluginValidator {
         List<String> declared = new ArrayList<>();
         List<String> unlinked = new ArrayList<>();
         Map<String, String> owners = new HashMap<>();
+        List<Class<?>> known = declaredClasses(plugins);
         int roundTrips = 0;
         for (StudioPlugin plugin : plugins) {
             String id = safeId(plugin);
@@ -436,7 +444,7 @@ public final class PluginValidator {
                 continue;
             }
             for (ComponentType<?> shape : shapes) {
-                List<String> found = shapeProblems(id, shape, fresh);
+                List<String> found = shapeProblems(id, shape, fresh, known);
                 if (found == null) {
                     roundTrips++;
                 } else {
@@ -524,7 +532,8 @@ public final class PluginValidator {
      * What is wrong with one component type, or {@code null} when it took a fresh value apart and put it
      * back. An empty list means it answered and there was no value to try it on.
      */
-    private static List<String> shapeProblems(String id, ComponentType<?> shape, Map<String, Object> fresh) {
+    private static List<String> shapeProblems(String id, ComponentType<?> shape, Map<String, Object> fresh,
+                                              List<Class<?>> known) {
         List<String> problems = new ArrayList<>();
         Class<?> cls;
         List<Class<?>> kinds;
@@ -555,6 +564,13 @@ public final class PluginValidator {
         String why = factoryProblem(factory, cls, kinds);
         if (why != null) {
             problems.add(id + ": " + name + " factory() " + factory + " " + why);
+            return problems;
+        }
+        for (String unwritable : known == null ? List.<String>of() : unwritableParts(factory, known)) {
+            problems.add(id + ": " + name + " " + unwritable + ", so a host cannot write a " + cls.getSimpleName()
+                    + " holding one: declare it, or write the part as a type a host writes");
+        }
+        if (!problems.isEmpty()) {
             return problems;
         }
         Object value = fresh.get(name);
@@ -610,6 +626,155 @@ public final class PluginValidator {
             }
         }
         return null;
+    }
+
+    /**
+     * The containers a host writes by itself — {@code List.of(…)}, {@code Map.ofEntries(…)} and the rest — as
+     * Studio's grammar does (its {@code ValueContainer.ALL}); their type arguments are what must be writable.
+     */
+    private static final List<Class<?>> HOST_CONTAINERS = List.of(List.class, Map.class, Set.class,
+            Deque.class, Map.Entry.class);
+
+    /**
+     * Every class some loaded plugin declares, as a type or as the parts of one — what a host writes a part
+     * through. Every plugin, judged or not: a part may be a type a dependency declares.
+     *
+     * <p>{@code null} when some plugin's declarations could not be linked here (no JavaFX): what it declares is
+     * then unknown, and a part it would have answered for must not fail as declared by nobody, so the walk is
+     * not run. A declaration that throws otherwise adds nothing, and {@link #checkTypes} reports it.
+     */
+    private static List<Class<?>> declaredClasses(List<StudioPlugin> plugins) {
+        List<Class<?>> known = new ArrayList<>();
+        for (StudioPlugin plugin : plugins) {
+            try {
+                for (PluginType<?> type : nonNull(plugin.types())) if (type != null) known.add(type.type());
+            } catch (LinkageError e) {
+                return null;
+            } catch (RuntimeException e) {
+                // the types check reports it
+            }
+            try {
+                for (ComponentType<?> shape : nonNull(plugin.componentTypes())) if (shape != null) known.add(shape.type());
+            } catch (LinkageError e) {
+                return null;
+            } catch (RuntimeException e) {
+                // the types check reports it
+            }
+        }
+        known.removeIf(Objects::isNull);
+        return List.copyOf(known);
+    }
+
+    /**
+     * One sentence per part of {@code factory} a host could not write, naming the path to it — {@code part 1
+     * (java.util.List<p.Step>) holds p.Step, which no loaded plugin declares}. Empty when every part is
+     * writable (2026-10-05).
+     *
+     * <p>The fresh-value round trip above proves only the value a type starts as, and a fresh value's lists
+     * are usually empty: a {@code Flow} with no activities round-trips while its {@code Activity} is declared by
+     * nobody, and the first one the user draws is a value the host cannot write. So this walks the factory's
+     * <em>declared</em> parameter types instead — a receiver, each parameter, a varargs element — through the
+     * host's containers to every leaf, and asks of each leaf what the host's grammar asks: a JDK literal, an
+     * enum, {@code Object}, or a class some loaded plugin declares (or one such class's supertype, written
+     * through the declaration of the value's own class).
+     */
+    static List<String> unwritableParts(Executable factory, List<Class<?>> known) {
+        List<Type> parts = new ArrayList<>();
+        if (factory instanceof Method method && !Modifier.isStatic(method.getModifiers())) {
+            parts.add(method.getDeclaringClass());
+        }
+        Type[] parameters = factory.getGenericParameterTypes();
+        if (parameters.length != factory.getParameterCount()) {
+            // An inner class's constructor answers its generic types without the outer instance; read the raw ones.
+            parameters = factory.getParameterTypes();
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            Type part = parameters[i];
+            if (factory.isVarArgs() && i == parameters.length - 1) part = elementOf(part);
+            parts.add(part);
+        }
+        List<String> problems = new ArrayList<>();
+        for (int i = 0; i < parts.size(); i++) {
+            String leaf = unwritable(parts.get(i), known, new HashSet<>());
+            if (leaf != null) {
+                problems.add("part " + i + " (" + parts.get(i).getTypeName() + ") " + leaf);
+            }
+        }
+        return problems;
+    }
+
+    /** Why a host could not write a value of {@code type}, or {@code null} when it can. */
+    private static String unwritable(Type type, List<Class<?>> known,
+                                     Set<Type> seen) {
+        if (!seen.add(type)) return null;
+        return switch (type) {
+            case Class<?> cls when cls.isArray() -> "is an array, which no host writes outside a varargs tail";
+            case Class<?> cls -> writableClass(cls, known) ? null
+                    : "holds " + cls.getName() + ", which no loaded plugin declares";
+            case ParameterizedType generic -> {
+                Class<?> raw = (Class<?>) generic.getRawType();
+                boolean container = HOST_CONTAINERS.contains(raw);
+                if (!container && !writableClass(raw, known)) {
+                    yield "holds " + raw.getName() + ", which no loaded plugin declares";
+                }
+                // A method reference writes a functional interface whole: its type arguments are never values.
+                if (!container && functional(raw) && known.stream().noneMatch(raw::isAssignableFrom)) yield null;
+                for (Type argument : generic.getActualTypeArguments()) {
+                    String why = unwritable(argument, known, seen);
+                    if (why != null) yield why;
+                }
+                yield null;
+            }
+            case WildcardType wildcard -> unwritable(wildcard.getUpperBounds()[0], known, seen);
+            case TypeVariable<?> variable -> unwritable(variable.getBounds()[0], known, seen);
+            case GenericArrayType ignored ->
+                    "is an array, which no host writes outside a varargs tail";
+            default -> "is a " + type.getTypeName() + ", which no host writes";
+        };
+    }
+
+    private static boolean writableClass(Class<?> cls, List<Class<?>> known) {
+        Class<?> boxed = boxed(cls);
+        if (cls == Object.class || cls.isEnum() || cls == String.class || boxed == Boolean.class
+                || boxed == Character.class || Number.class.isAssignableFrom(boxed) && boxed.getName().startsWith("java.lang.")
+                || HOST_CONTAINERS.contains(cls)) {
+            return true;
+        }
+        for (Class<?> declared : known) if (cls.isAssignableFrom(declared)) return true;
+        return functional(cls);
+    }
+
+    /**
+     * Whether {@code cls} is a functional interface, whose only Java is a method reference — the SDK's
+     * {@code ActivityBody}, written {@code Collect::body}. The host writes such a part through its source-leaf
+     * path, from the text the declaration's {@code components} hands over (`two-strings.md`), so no plugin
+     * declares it and none need to.
+     */
+    private static boolean functional(Class<?> cls) {
+        if (!cls.isInterface() || cls.isAnnotation()) return false;
+        int abstracts = 0;
+        for (Method method : cls.getMethods()) {
+            if (!Modifier.isAbstract(method.getModifiers()) || objectMethod(method)) continue;
+            abstracts++;
+        }
+        return abstracts == 1;
+    }
+
+    /** Whether {@code method} restates one of {@code Object}'s public methods, which no lambda implements. */
+    private static boolean objectMethod(Method method) {
+        try {
+            Object.class.getMethod(method.getName(), method.getParameterTypes());
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    /** A varargs parameter's element type. */
+    private static Type elementOf(Type array) {
+        if (array instanceof Class<?> cls && cls.isArray()) return cls.getComponentType();
+        if (array instanceof GenericArrayType generic) return generic.getGenericComponentType();
+        return array;
     }
 
     /** {@code int.class} as {@code Integer.class}: a value handed around as an {@code Object} is boxed. */

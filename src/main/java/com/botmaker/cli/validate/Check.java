@@ -38,7 +38,9 @@ public enum Check {
 
     /**
      * Every declared type answers a class and a fresh value, no two plugins in the build declare one class,
-     * and a component type takes its fresh value apart and puts it back.
+     * and a component type takes its fresh value apart and puts it back — and every part its factory declares,
+     * through {@code List}/{@code Map}/{@code Set}/{@code Deque}/{@code Map.Entry} to each leaf, is one a host
+     * writes: a JDK literal, an enum, a functional interface, or a class some loaded plugin declares.
      *
      * <p>The id is still {@code value-types}: it is what a report prints and a CI job greps for, and the
      * question — is what this plugin says about its values sound — is the one it always asked.

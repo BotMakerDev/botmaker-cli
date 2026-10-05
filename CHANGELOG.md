@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- `plugin validate`'s `value-types` check walks every part a component type's factory declares, through the
+  host's containers to each leaf, and fails a part no host could write — `part 0 (java.util.List<p.Step>)
+  holds p.Step, which no loaded plugin declares`. The fresh-value round trip alone passed a type whose fresh
+  value held empty lists, and the first filled one was a value Studio silently could not write.
+
 - A `--studio-api` release moves Studio's `CONTRACT_FALLBACK_VERSION` to the contract tag it cuts, as
   `--sdk` moves `SDK_FALLBACK_VERSION`, and the fallback gate refuses a Studio release whose constant names
   no published contract tag.
