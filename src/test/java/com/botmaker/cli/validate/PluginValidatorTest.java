@@ -426,6 +426,31 @@ class PluginValidatorTest {
         assertTrue(managed.detail().getFirst().contains("no loaded plugin declares"), managed.detail()::toString);
     }
 
+    /** An open set's constants are written as values of its element type: a declared one passes. */
+    @Test
+    void an_open_set_of_a_declared_type_passes(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.openSet(\"greetings\")"
+                + ".of(Greeting.class).in(\"Greetings\").because(\"why\")");
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+    }
+
+    @Test
+    void an_open_set_of_a_type_no_plugin_declares_fails(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.openSet(\"clocks\")"
+                + ".of(java.time.Clock.class).in(\"Clocks\").because(\"why\")");
+        assertEquals(Status.FAIL, managed.status());
+        assertTrue(managed.detail().getFirst().contains("holds constants of java.time.Clock"),
+                managed.detail()::toString);
+    }
+
+    /** Opened and never created is still one method's value, not an open set (it was until 2026-10-05). */
+    @Test
+    void a_value_the_host_never_creates_passes(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.method(\"greeting\")"
+                + ".openedOnly().holds(Greeting.class).because(\"why\")");
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+    }
+
     @Test
     void a_holder_is_a_simple_class_name(@TempDir Path dir) throws IOException {
         CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.method(\"greeting\")"

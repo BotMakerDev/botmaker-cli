@@ -852,7 +852,7 @@ public final class PluginValidator {
         }
         if (!problems.isEmpty()) return CheckResult.fail(Check.MANAGED, problems);
         return CheckResult.pass(Check.MANAGED, sound == 0 ? "declares no managed values"
-                : sound + " managed value(s), each writable as `public static T id() { return …; }`");
+                : sound + " managed value(s), each a method or a set of constants a host can write");
     }
 
     private static List<String> managedProblems(String plugin, ManagedValue<?> value,
@@ -875,7 +875,20 @@ public final class PluginValidator {
         if (holder != null && !javaIdentifier(holder)) {
             problems.add(at + " names holder \"" + holder + "\", which is not a simple class name");
         }
-        if (value.isOpenSet()) return problems;
+        if (value.isOpenSet()) {
+            // Each constant's initialiser is written as a value of the element type, so a host must write one.
+            Class<?> element = value.type();
+            List<Class<?>> known = new ArrayList<>();
+            types.values().forEach(type -> known.add(type.type()));
+            shapes.values().forEach(shape -> known.add(shape.type()));
+            // No element type: the deprecated untyped step a plugin built against contract 0.3 calls, still
+            // loaded by every host; javac's deprecation warning is what tells its author.
+            if (element != null && (element.isArray() || !writableClass(element, known))) {
+                problems.add(at + " holds constants of " + element.getName() + ", which no loaded plugin"
+                        + " declares, so no host can write one");
+            }
+            return problems;
+        }
         if (holder == null) {
             // Opened, never created: nothing here is written by a host, so there is nothing more to prove.
             return problems;

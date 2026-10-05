@@ -14,6 +14,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   holds p.Step, which no loaded plugin declares`. The fresh-value round trip alone passed a type whose fresh
   value held empty lists, and the first filled one was a value Studio silently could not write.
 
+- `plugin validate`'s `managed` check judges an open set's element type (`openSet(id).of(E.class)`): a class
+  no loaded plugin declares fails, since no host could write a constant of it.
+
 - A `--studio-api` release moves Studio's `CONTRACT_FALLBACK_VERSION` to the contract tag it cuts, as
   `--sdk` moves `SDK_FALLBACK_VERSION`, and the fallback gate refuses a Studio release whose constant names
   no published contract tag.
