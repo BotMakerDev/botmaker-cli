@@ -121,9 +121,7 @@ public final class Release {
         String pointers = Umbrella.recordPointers(runner, umbrella, releasing, log != null);
         boolean pushed = Umbrella.pushBranches(runner, umbrella);
         // After the verify pass, so the registry's gate resolves a tag JitPack has already built.
-        Path work = Path.of(System.getProperty("java.io.tmpdir"),
-                "botmaker-release-" + when.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")));
-        pushed &= RegistryPin.bump(runner, work, tagged(chain.rows()), when.toLocalDate());
+        pushed &= RegistryPin.bump(runner, tagged(chain.rows()), when.toLocalDate());
 
         runner.say("Done. " + (runner.dryRun() ? "(dry run) " : "") + "Released: " + pointers);
         return new Outcome(plan, List.of(), Optional.ofNullable(log), pushed);

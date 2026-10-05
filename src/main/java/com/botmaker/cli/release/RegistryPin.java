@@ -2,6 +2,8 @@ package com.botmaker.cli.release;
 
 import com.botmaker.cli.registry.Registry;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.EnumMap;
@@ -38,12 +40,31 @@ public final class RegistryPin {
     }
 
     /**
-     * Opens one pull request per registered plugin in {@code tagged}.
+     * Opens one pull request per registered plugin in {@code tagged}, each cloned into a fresh directory.
      *
-     * @param work an empty directory's parent; each entry is cloned under it
+     * <p>{@link Files#createTempDirectory} rather than a name under {@code java.io.tmpdir}: a predictable
+     * path there is one another local user can create first and have the clone land in. A dry run clones
+     * nothing, so it creates nothing and names a placeholder.
+     *
      * @return whether every pull request was opened
      */
-    public static boolean bump(Runner runner, Path work, Map<Module, Version> tagged, LocalDate today) {
+    public static boolean bump(Runner runner, Map<Module, Version> tagged, LocalDate today) {
+        if (ENTRIES.keySet().stream().noneMatch(tagged::containsKey)) {
+            return true;
+        }
+        Path work;
+        try {
+            work = runner.dryRun() ? Path.of("<temp>") : Files.createTempDirectory("botmaker-registry-");
+        } catch (IOException e) {
+            runner.say("  warning: no temporary directory for the registry's clone (" + e.getMessage()
+                    + "). Move each released plugin's verifiedVersion in " + REPO + " by hand.");
+            return false;
+        }
+        return bump(runner, work, tagged, today);
+    }
+
+    /** {@link #bump(Runner, Map, LocalDate)} into {@code work}, which must be this release's own. */
+    static boolean bump(Runner runner, Path work, Map<Module, Version> tagged, LocalDate today) {
         boolean ok = true;
         for (Map.Entry<Module, String> entry : ENTRIES.entrySet()) {
             Version version = tagged.get(entry.getKey());
