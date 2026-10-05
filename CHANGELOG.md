@@ -5,6 +5,34 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+No source changes since v0.1.4; re-released for updated upstream pins.
+
+No source changes since v0.1.3; re-released for updated upstream pins.
+
+### Changed
+
+- A release of `--sdk` or `--plugin-basics` opens a pull request on `botmaker-plugin-registry` moving that
+  plugin's `verifiedVersion` to the new tag, and the registry's gate runs over it there. Studio installs a
+  ticked plugin at that version, and nothing moved it after `plugin publish`, so New Project offered SDK
+  v1.1.7 and basics v0.0.1. A pull request that cannot be opened warns; the release is not failed.
+
+- `plugin validate`'s `value-types` check walks every part a component type's factory declares, through the
+  host's containers to each leaf, and fails a part no host could write — `part 0 (java.util.List<p.Step>)
+  holds p.Step, which no loaded plugin declares`. The fresh-value round trip alone passed a type whose fresh
+  value held empty lists, and the first filled one was a value Studio silently could not write.
+
+- `plugin validate`'s `managed` check judges an open set's element type (`openSet(id).of(E.class)`): a class
+  no loaded plugin declares fails, since no host could write a constant of it.
+
+- A `--studio-api` release moves Studio's `CONTRACT_FALLBACK_VERSION` to the contract tag it cuts, as
+  `--sdk` moves `SDK_FALLBACK_VERSION`, and the fallback gate refuses a Studio release whose constant names
+  no published contract tag.
+
+- Built against `botmaker-studio-api` 0.4.0 and `botmaker-plugin-host` 0.2.2: `plugin validate` reads a palette
+  with no `@Palette.order`, which that contract release deleted.
+
 ## [0.1.4] — 2026-10-05
 
 No source changes since v0.1.3; re-released for updated upstream pins.
