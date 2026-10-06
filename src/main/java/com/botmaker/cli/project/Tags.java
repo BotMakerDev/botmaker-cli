@@ -9,9 +9,9 @@ import java.util.Optional;
  * The newest git tag on a working copy.
  *
  * <p>Here rather than in {@code Poms} because it answers a different question about the same directory, and
- * the difference is the whole point of asking it: <b>JitPack serves an artifact under the git tag, and a
- * module's pom {@code <version>} is cosmetic</b> (the umbrella {@code CLAUDE.md}, <i>JitPack coordinate
- * model</i>). A pom saying {@code 1.0.0} under a tag {@code v1.0.0} resolves by the accident of the two
+ * the difference is the whole point of asking it: <b>JitPack serves an artifact under the git tag, whatever
+ * the pom's {@code <version>} says</b> (this project's own poms agree with their tags only since 2026-10-06,
+ * umbrella doc 43; a plugin author's need not). A pom saying {@code 1.0.0} under a tag {@code v1.0.0} resolves by the accident of the two
  * matching; a pom saying {@code 0.1.0-SNAPSHOT} — which is what {@code botmaker new} generates — resolves
  * for nobody.
  *

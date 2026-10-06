@@ -12,8 +12,8 @@
 # hand-maintained descriptions of one package, which is the arrangement this repository refuses everywhere
 # else.
 #
-# THE VERSION comes from the environment because the pom's <version> is the cosmetic 0.0.0-SNAPSHOT that
-# JitPack overrides with the tag; the workflow sets BOTMAKER_VERSION from the tag that triggered it. The
+# THE VERSION comes from the environment, set by the workflow from the tag that triggered it: the tag is
+# what the release named (the pom said a cosmetic 0.0.0-SNAPSHOT until 2026-10-06). The
 # same rule as jreleaser.yml's: never take a release version from anything in target/.
 #
 # THE RPM IS SIGNED AND THE DEB IS NOT, and the asymmetry is dnf's rather than a preference.

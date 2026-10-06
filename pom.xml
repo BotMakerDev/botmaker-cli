@@ -52,10 +52,9 @@
         <!--
           What the version option prints, stamped into the executable jar's manifest.
 
-          NOT ${project.version}: this pom's <version> is the cosmetic 0.0.0-SNAPSHOT that JitPack
-          overrides with the tag (umbrella CLAUDE.md, *JitPack coordinate model*), so the manifest read
-          "0.0.0-SNAPSHOT" and the version option answered "botmaker (dev)" on an rpm that called itself
-          botmaker-0.0.5-1. The release job passes the tag as -Dbotmaker.cli.version; every other build
+          NOT ${project.version}: this pom's <version> was the cosmetic 0.0.0-SNAPSHOT until 2026-10-06
+          (umbrella doc 43), so the manifest read "0.0.0-SNAPSHOT" and the version option answered
+          "botmaker (dev)" on an rpm that called itself botmaker-0.0.5-1. On main it is a -SNAPSHOT still. The release job passes the tag as -Dbotmaker.cli.version; every other build
           keeps "dev", which is the truth about a build nobody released.
         -->
         <botmaker.cli.version>dev</botmaker.cli.version>
@@ -146,7 +145,7 @@
     <build>
         <!--
           No <finalName>. It renames only the MAIN artifact, so the pair came out as botmaker-cli.jar beside
-          botmaker-cli-0.0.0-SNAPSHOT-all.jar — two naming schemes for two halves of one build, and a
+          botmaker-cli-<version>-all.jar — two naming schemes for two halves of one build, and a
           jreleaser.yml path that looked right and matched nothing. The default names both after the
           artifact and version; the release renames the asset once, on the way out.
         -->

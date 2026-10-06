@@ -94,7 +94,7 @@ this file ends here rather than asking for a matrix nobody can run.
 
 ```bash
 ./release.sh <flags> --dry-run
-java -jar botmaker-cli/target/botmaker-cli-0.0.0-SNAPSHOT-all.jar release <flags>
+java -jar "$(ls -1t botmaker-cli/target/botmaker-cli-*-all.jar | head -1)" release <flags>
 ```
 
 The matrix: `--all`, `--all minor`, each of the ten module flags alone, `--sdk 1.1.7 --studio 1.0.38` (the

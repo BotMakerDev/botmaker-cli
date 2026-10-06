@@ -7,8 +7,8 @@ exactly such a reason.
 
 `verifiedVersion` is the **newest git tag** (`project/Tags.newest`), not `Poms.coordinate(pom).version()`,
 which is what stood there until 2026-09-04. JitPack builds a tag on demand and serves the artifact under
-that tag whatever the pom says — this project's own poms carry the cosmetic `0.0.0-SNAPSHOT` for precisely
-that reason — so a pom version resolves only where it happens to equal the tag. Worse in the ordinary case:
+that tag whatever the pom says — this project's own poms carried a cosmetic `0.0.0-SNAPSHOT` for precisely
+that reason until 2026-10-06 — so a pom version resolves only where it happens to equal the tag. Worse in the ordinary case:
 `botmaker plugin new` generates `0.1.0-SNAPSHOT`, JitPack resolves no snapshot, and so *the first thing a new author
 does* produced an entry the gate could not download. A snapshot is now refused here, by name, with the
 sentence that says what to do; `--tag` overrides the lookup (`--version` is the help mixin's).

@@ -249,8 +249,8 @@ them is `com.botmaker.cli.Subjects`, and that is where Maven lives.
 
 ```bash
 mvn test        # CommandLineTest, PomsTest, PluginValidatorTest, RegistryTest, BundledTest
-mvn install     # com.github.BotMakerDev:botmaker-cli:0.0.0-SNAPSHOT, plus the -all jar
-java -jar target/botmaker-cli-0.0.0-SNAPSHOT-all.jar --help
+mvn install     # com.github.BotMakerDev:botmaker-cli at the pom's main -SNAPSHOT, plus the -all jar
+java -jar "$(ls -1t target/botmaker-cli-*-all.jar | head -1)" --help
 ```
 
 The `-all` jar carries the version in its name because nothing renames it — a `<finalName>` would have

@@ -68,8 +68,8 @@ files:
     # This path used to be `target/botmaker-cli-{{projectVersion}}-all.jar` with a `transform:` back to the
     # unversioned name, on the reasoning that "the path is versioned because that is what shade attaches".
     # That reasoning is false and it cost the v0.0.1 release its asset: shade names the jar from the POM's
-    # <version>, and this pom's version is the cosmetic 0.0.0-SNAPSHOT that JitPack overrides with the tag
-    # (umbrella CLAUDE.md, *JitPack coordinate model*). `projectVersion` is the RELEASE version, which no
+    # <version>, and this pom's version was then the cosmetic 0.0.0-SNAPSHOT (real since 2026-10-06, umbrella
+    # doc 43). `projectVersion` is the RELEASE version, which no
     # artifact in target/ is ever named after — so JReleaser looked for botmaker-cli-0.0.1-all.jar, found
     # botmaker-cli-0.0.0-SNAPSHOT-all.jar beside it, and failed with `Path does not exist`.
     #

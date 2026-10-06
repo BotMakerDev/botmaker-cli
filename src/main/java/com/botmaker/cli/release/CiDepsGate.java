@@ -14,12 +14,12 @@ import java.util.regex.Pattern;
  * {@code check_ci_deps}.
  *
  * <p><b>The bug it exists for is invisible from the umbrella.</b> A module's pom declares its upstreams as
- * {@code ${botmaker.<key>.version}} defaulting to {@code 0.0.0-SNAPSHOT}, which resolves for free in the
+ * {@code ${botmaker.<key>.version}} at the upstream's {@code main} {@code -SNAPSHOT}, which resolves for free in the
  * reactor — the upstream is a sibling module there — so {@code mvn install} at the root is green while that
  * module's own CI is red, having nothing to resolve. A module whose own CI cannot build it is a module whose
  * release job cannot publish it, and a pushed tag cannot be edited.
  *
- * <p>So the rule is: for every property this pom declares at {@code 0.0.0-SNAPSHOT}, that upstream's
+ * <p>So the rule is: for every property this pom declares at a {@code -SNAPSHOT}, that upstream's
  * repository name must appear somewhere in {@code .github/workflows/ci.yml}. A grep, deliberately — what is
  * being asked is <i>does this workflow know about that repository at all</i>, and a YAML parse would answer
  * a narrower question about where it appears.
@@ -63,8 +63,8 @@ public final class CiDepsGate {
             String repo = repositoryFor(key)
                     .orElseThrow(() -> new ReleaseRefusal(module.directory()
                             + ": pom.xml declares ${botmaker." + key + ".version} and this check does not"
-                            + " know which\n     repository that is. Add it to check_ci_deps' table in"
-                            + " release.sh — an upstream nothing maps is\n     exactly the case this gate"
+                            + " know which\n     repository that is. Add it to Module.propertyKey() in"
+                            + " botmaker-cli — an upstream nothing maps is\n     exactly the case this gate"
                             + " exists for."));
             if (!ci.get().contains(repo)) {
                 missing.add(repo);
@@ -90,7 +90,7 @@ public final class CiDepsGate {
     }
 
     /**
-     * The property keys a pom pins at {@code 0.0.0-SNAPSHOT}, deduplicated and sorted.
+     * The property keys a pom pins at a {@code -SNAPSHOT}, deduplicated and sorted.
      *
      * <p>Sorted because the script's is: {@code sed … | sort -u}. It only shows in the order a refusal names
      * the missing repositories, which is exactly the kind of difference a stdout diff catches and a reader

@@ -138,8 +138,8 @@ public final class Main implements Callable<Integer> {
      * <p>{@code (dev)} when there is no manifest, which is what an IDE launch and a test run both look like —
      * and equally when the manifest says {@code dev}, which is what an unreleased build of the executable
      * jar carries. Not read from a generated constant, and <em>not</em> from {@code ${project.version}}:
-     * this project's poms carry the cosmetic {@code 0.0.0-SNAPSHOT} that JitPack overrides with the tag, so
-     * either would be that string forever. The release job passes the tag as
+     * this project's poms carried the cosmetic {@code 0.0.0-SNAPSHOT} until 2026-10-06, and on {@code main}
+     * still carry a {@code -SNAPSHOT}, so either would name no release. The release job passes the tag as
      * {@code -Dbotmaker.cli.version}, which the shade plugin writes into {@code Implementation-Version};
      * see the property in the pom.
      */

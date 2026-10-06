@@ -26,6 +26,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - A pom whose only change since the tag is versions no longer makes a module read as changed.
 - A release now waits for the JitPack build of an upstream that Studio or the dashboard pins, the cli
   included: their package jobs resolve those releases from JitPack instead of building them from source.
+- `CiDepsGate`'s refusal for an unknown pin points at `Module.propertyKey()`, not `release.sh`'s old table.
 
 No source changes since v0.1.3; re-released for updated upstream pins.
 

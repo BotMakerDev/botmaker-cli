@@ -170,7 +170,7 @@ final class PluginPublishCommand implements Callable<Integer> {
      *
      * <p><b>The newest git tag, not the pom's {@code <version>}, and that is a correction rather than a
      * preference.</b> JitPack builds a tag on demand and serves the result under that tag whatever the pom
-     * says — this project's own poms carry a cosmetic {@code 0.0.0-SNAPSHOT} for exactly that reason — so a
+     * says — this project's own poms carried a cosmetic {@code 0.0.0-SNAPSHOT} until 2026-10-06 — so a
      * pom version resolves only where it happens to equal the tag. {@code --tag} overrides both, for the
      * author whose newest tag is not what they publish under.
      */
