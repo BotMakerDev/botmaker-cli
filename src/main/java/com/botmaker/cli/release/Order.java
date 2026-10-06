@@ -30,12 +30,14 @@ import java.util.List;
  * pilot so its build overlaps the chain. {@code botmaker-remote-server} is a jar JitPack never builds and
  * nothing pins, so its place in the chain is its reactor position, after the cli, and nothing waits on it.
  * {@code botmaker-dashboard} (2026-09-17) is Studio's case once more: its {@code package} job builds
- * against shared and the cli at the versions its pom pins, so every one of them must be on origin first. Nothing depends on it, so it goes after Studio rather than before.
+ * against shared and the cli at the versions its pom pins, so every one of them must be built on JitPack
+ * first ({@link Waits}). Nothing depends on it, so it goes after Studio rather than before.
  *
  * <p><b>Studio was tagged second until 2026-09-16, and that was a race every release lost.</b> The argument
  * was that its {@code package} matrix builds its upstreams from source, so it needs no JitPack build to
- * exist. True, and beside the point: it checks those upstreams out <i>at the tags it pins</i> (its
- * {@code .deps.env} then, its pom since 2026-10-06), and those tags are pushed minutes later, further down this list. On 2026-09-16
+ * exist. True, and beside the point: it checked those upstreams out <i>at the tags it pins</i> (its
+ * {@code .deps.env} then; since 2026-10-06 it resolves its pom's released pins from JitPack), and those tags
+ * are pushed minutes later, further down this list. On 2026-09-16
  * Studio v1.1.0's two package jobs failed fetching {@code botmaker-shared v0.1.0}, which did not exist yet.
  * So Studio goes last: every tag it pins is on origin before its CI starts. The cost is that its matrix no
  * longer overlaps the JitPack waits, which is minutes; the other way cost a Studio tag.

@@ -24,7 +24,8 @@ chain (since 2026-09-16: Studio's package jobs build against the upstream releas
 must already be pushed) and the dashboard last of all (since 2026-09-17, the same shape over the cli). What a
 module is exempt from is asked of `Module` itself (`mavenBuild`, `onJitpack`, `hasChangelog`), never by
 naming it: the pilot and `botmaker-remote` are APKs; Studio, the dashboard and `botmaker-remote-server` are
-programs JitPack never builds. **`--cli` forces `--dashboard`**: the dashboard's Release tab calls this
+programs JitPack never builds. Since 2026-10-06 Studio's and the dashboard's package jobs resolve their
+pinned releases from JitPack (`Module.resolvesFromJitpack`), so `Waits` owes their upstreams the wait. **`--cli` forces `--dashboard`**: the dashboard's Release tab calls this
 package in-process, so an installed dashboard decides by the cli it was built with, and a cli release
 without a dashboard release leaves its previews on the previous rules. Its pom pins shared and the cli
 (`Module.byPropertyKey` maps the `cli` key).

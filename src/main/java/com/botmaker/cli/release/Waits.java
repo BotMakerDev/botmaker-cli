@@ -17,17 +17,17 @@ import java.util.List;
  * second statement of the dependency graph and would go stale the first time an edge was added — the failure
  * {@link Module#upstreams()} and {@link Forcing} are both written to avoid. So it is read off what the release
  * already knows: {@link Order#TAG} for who comes after, {@link Module#upstreams()} for who pins whom, and
- * {@link Module#onJitpack()} for whether the consumer's build is a JitPack build at all.
+ * {@link Module#resolvesFromJitpack()} for whether the consumer's build reads JitPack at all.
  *
- * <p><b>{@code onJitpack()} on the <i>consumer</i> is the load-bearing half.</b> Studio's and the dashboard's
- * {@code package} jobs check their upstreams out and {@code mvn install} them from source, so what they need
- * is the <b>tag on origin</b> — which {@link CommitTagPush} has already guaranteed by the time the wait would
- * start — and not a JitPack build of it. A wait for them would block on a build nothing in the release reads.
+ * <p><b>{@code resolvesFromJitpack()} on the <i>consumer</i> is the load-bearing half.</b> Studio's and the
+ * dashboard's {@code package} jobs checked their upstreams out from source until 2026-10-06 and so needed
+ * only the tag on origin; since doc 43 they resolve the released pins their tag's pom names from JitPack,
+ * and are owed the wait like any JitPack build.
  *
- * <p>For a full fourteen-module release that answers: owed — studio-api, plugin-toolkit, plugin-host, shared,
- * session, plugin-basics. Not owed — plugin-archetype (nothing of ours pins it), cli (only the dashboard
- * pins it, and its CI installs it from source) and sdk (nothing tagged after it resolves it; Studio's
- * {@code SDK_FALLBACK_VERSION} is text naming a tag, checked by {@link FallbackVersionsGate} as a tag).
+ * <p>For a full fourteen-module release that answers: owed — studio-api, plugin-toolkit, plugin-host, cli,
+ * shared, session, plugin-basics. Not owed — plugin-archetype (nothing of ours pins it) and sdk (nothing
+ * tagged after it resolves it; Studio's {@code SDK_FALLBACK_VERSION} is text naming a tag, checked by
+ * {@link FallbackVersionsGate} as a tag).
  *
  * <p><b>A skipped wait is not a skipped check.</b> The clean-room verify pass still resolves all nine
  * artifacts after the chain, so a module whose build is broken is still reported — later, and without the
@@ -50,7 +50,7 @@ public final class Waits {
             return false;
         }
         return tagOrder.subList(at + 1, tagOrder.size()).stream()
-                .filter(Module::onJitpack)
+                .filter(Module::resolvesFromJitpack)
                 .anyMatch(consumer -> consumer.upstreams().contains(module));
     }
 

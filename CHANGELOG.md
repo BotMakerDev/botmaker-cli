@@ -24,6 +24,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   upstream pin differs from that upstream's pom version; `--force` overrides. A pin on a module the release
   does not list is refused even under `--force`.
 - A pom whose only change since the tag is versions no longer makes a module read as changed.
+- A release now waits for the JitPack build of an upstream that Studio or the dashboard pins, the cli
+  included: their package jobs resolve those releases from JitPack instead of building them from source.
 
 No source changes since v0.1.3; re-released for updated upstream pins.
 

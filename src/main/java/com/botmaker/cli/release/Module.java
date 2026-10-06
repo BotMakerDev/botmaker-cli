@@ -117,6 +117,15 @@ public enum Module {
     }
 
     /**
+     * Whether this module's tagged build resolves its {@link #upstreams()} from JitPack: every JitPack build,
+     * and Studio's and the dashboard's {@code package} jobs, which resolve the released pins their tag's pom
+     * names (umbrella {@code docs/refactor/43-real-versions.md}). {@link Waits} reads it on the consumer.
+     */
+    public boolean resolvesFromJitpack() {
+        return onJitpack() || this == STUDIO || this == DASHBOARD;
+    }
+
+    /**
      * Whether this module keeps a {@code CHANGELOG.md} the gate reads and the release stamps. The two
      * apps do not: an APK's release notes are JReleaser's commit log, and nothing reads notes out of one.
      * Nor does a template: what changes in one is the bot's own code, which a reader sees by opening it.

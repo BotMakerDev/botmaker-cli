@@ -33,6 +33,13 @@ public final class PomVersions {
     private static final Pattern COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);
     private static final Pattern VERSION = Pattern.compile("<version>\\s*([^<\\s]+)\\s*</version>");
 
+    /**
+     * The subjects of the commits a release lands after a tag — back to snapshot, and a dependent's pin — as
+     * {@code git log --grep} patterns (basic regular expressions). A reader asking what changed since a tag
+     * leaves these out: they change versions and nothing else ({@link #versionsOnly}).
+     */
+    public static final List<String> BOOKKEEPING_SUBJECTS = List.of("^back to snapshot: ", "^pin [a-z-]* [0-9]");
+
     private PomVersions() {
     }
 

@@ -94,6 +94,31 @@ class WritesTest {
     }
 
     @Test
+    void theCommitsAfterATagAreTheOnesTheBookkeepingPatternsName(@TempDir Path umbrella) throws IOException {
+        pom(umbrella, Module.STUDIO_API, "0.4.3-SNAPSHOT", "");
+        pom(umbrella, Module.PLUGIN_TOOLKIT, "0.3.3-SNAPSHOT",
+                "<botmaker.studioapi.version>0.4.3-SNAPSHOT</botmaker.studioapi.version>");
+        List<String> log = new ArrayList<>();
+        Map<Module, Version> releasing = Map.of(Module.STUDIO_API, new Version(0, 5, 0));
+
+        PomVersions.backToSnapshot(recording(log), umbrella, Module.STUDIO_API, new Version(0, 5, 0), releasing);
+        PomVersions.follow(recording(log), umbrella, Module.STUDIO_API, new Version(0, 5, 0),
+                java.util.Set.of(Module.STUDIO_API));
+
+        // The dashboard leaves these out of "commits since the tag"; a reworded subject must move both.
+        List<String> subjects = log.stream().filter(l -> l.contains(" commit -m '"))
+                .map(l -> l.substring(l.indexOf("commit -m '") + 11, l.lastIndexOf('\'')))
+                .toList();
+        assertEquals(2, subjects.size(), log.toString());
+        for (String subject : subjects) {
+            assertTrue(PomVersions.BOOKKEEPING_SUBJECTS.stream()
+                    .anyMatch(p -> java.util.regex.Pattern.compile(p).matcher(subject).find()), subject);
+        }
+        assertFalse(PomVersions.BOOKKEEPING_SUBJECTS.stream()
+                .anyMatch(p -> java.util.regex.Pattern.compile(p).matcher("release: studio-api v0.5.0").find()));
+    }
+
+    @Test
     void aDependentInTheReleaseIsLeftToItsOwnBackToSnapshot(@TempDir Path umbrella) throws IOException {
         pom(umbrella, Module.PLUGIN_TOOLKIT, "0.3.3-SNAPSHOT", "");
 

@@ -21,15 +21,13 @@ class WaitsTest {
     }
 
     @Test
-    void aFullReleaseWaitsOnSixOfItsNineArtifacts() {
+    void aFullReleaseWaitsOnSevenOfItsNineArtifacts() {
         Set<Module> all = EnumSet.allOf(Module.class);
 
-        assertEquals(EnumSet.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_HOST, Module.SHARED,
-                Module.SESSION, Module.PLUGIN_BASICS), owed(all));
-        // The three that go, each for its own reason: nothing pins the archetype; only the dashboard pins the
-        // cli and it builds the cli from source; nothing tagged after the sdk resolves it from JitPack.
+        assertEquals(EnumSet.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_HOST, Module.CLI,
+                Module.SHARED, Module.SESSION, Module.PLUGIN_BASICS), owed(all));
+        // The two that go: nothing pins the archetype; nothing tagged after the sdk resolves it from JitPack.
         assertFalse(Waits.owed(Module.PLUGIN_ARCHETYPE, all));
-        assertFalse(Waits.owed(Module.CLI, all));
         assertFalse(Waits.owed(Module.SDK, all));
     }
 
@@ -45,12 +43,11 @@ class WaitsTest {
     }
 
     @Test
-    void aConsumerThatBuildsFromSourceIsOwedNoWait() {
-        // The dashboard pins the cli, and its package job checks the cli out at that tag and installs it:
-        // it needs the tag on origin, which the push already guarantees, not a JitPack build.
-        assertTrue(owed(EnumSet.of(Module.CLI, Module.DASHBOARD)).isEmpty());
-        // Studio the same over shared.
-        assertTrue(owed(EnumSet.of(Module.SHARED, Module.STUDIO)).isEmpty());
+    void aPackagedAppResolvesItsPinsFromJitpackSoItsUpstreamIsOwed() {
+        // The dashboard's package job resolves the cli its tag's pom pins from JitPack (doc 43), as Studio's
+        // resolves shared: tagged a minute after the upstream, it would read a build still running.
+        assertEquals(EnumSet.of(Module.CLI), owed(EnumSet.of(Module.CLI, Module.DASHBOARD)));
+        assertEquals(EnumSet.of(Module.SHARED), owed(EnumSet.of(Module.SHARED, Module.STUDIO)));
     }
 
     @Test
