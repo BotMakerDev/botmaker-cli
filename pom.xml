@@ -60,7 +60,7 @@
         <botmaker.cli.version>dev</botmaker.cli.version>
         <!-- Each upstream's main version; a release commit sets the released ones (doc 43). -->
         <botmaker.studioapi.version>0.5.1-SNAPSHOT</botmaker.studioapi.version>
-        <botmaker.pluginhost.version>0.3.3-SNAPSHOT</botmaker.pluginhost.version>
+        <botmaker.pluginhost.version>0.4.1-SNAPSHOT</botmaker.pluginhost.version>
     </properties>
 
     <repositories>
