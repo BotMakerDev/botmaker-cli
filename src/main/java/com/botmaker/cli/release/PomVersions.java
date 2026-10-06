@@ -67,8 +67,11 @@ public final class PomVersions {
         List<String> pins = new ArrayList<>();
         set(runner, pom, version.toString());
         for (Module upstream : module.upstreams()) {
-            String pinned = DepTag.version(umbrella, upstream, Optional.ofNullable(releasing.get(upstream)))
-                    .toString();
+            // The TAG NAME (v0.5.0), not the bare number. JitPack does serve 0.5.0 off tag v0.5.0, but as a
+            // separate build with its own cache: the release waits for the v0.5.0 build, and on 2026-10-06
+            // every bare-number build of the contract (0.4.1, 0.4.2, 0.5.0) failed where the v build was ok,
+            // which broke plugin-toolkit v0.4.0 for good. .deps.env carried the tag name for the same reason.
+            String pinned = DepTag.of(umbrella, upstream, Optional.ofNullable(releasing.get(upstream)));
             setProperty(runner, pom, upstream, pinned);
             pins.add(upstream.shortName() + " " + pinned);
         }

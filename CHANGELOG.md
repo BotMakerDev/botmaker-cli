@@ -26,6 +26,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - A pom whose only change since the tag is versions no longer makes a module read as changed.
 - A release now waits for the JitPack build of an upstream that Studio or the dashboard pins, the cli
   included: their package jobs resolve those releases from JitPack instead of building them from source.
+- **A release commit pins each upstream by its tag name (`v0.5.0`), not the bare number.** JitPack builds a
+  bare `0.5.0` separately from tag `v0.5.0`; the release waited for the `v` build while the toolkit's
+  resolved the bare one, which failed, and plugin-toolkit v0.4.0 was published broken.
+- A stopped release moves each dependent it never reached for **every** upstream it tagged; it used to move
+  a dependent once and leave the next upstream's pin behind.
 - `CiDepsGate`'s refusal for an unknown pin points at `Module.propertyKey()`, not `release.sh`'s old table.
 
 No source changes since v0.1.3; re-released for updated upstream pins.

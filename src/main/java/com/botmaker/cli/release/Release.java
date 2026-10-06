@@ -246,13 +246,13 @@ public final class Release {
         }
         // A dependent the chain never reached still pins the snapshot its tagged upstream left: move it now,
         // or its main names a version nobody builds until somebody edits the pin by hand.
+        // Skip only what was tagged (its own back-to-snapshot set its pins): a dependent one upstream already
+        // moved still pins the next one's old snapshot, so each tagged upstream gets its own pin commit. Skipping
+        // the moved set too left plugin-basics and the SDK at toolkit 0.3.3-SNAPSHOT on 2026-10-06.
         java.util.Set<Module> moved = java.util.EnumSet.noneOf(Module.class);
         moved.addAll(followed);
         for (Map.Entry<Module, Version> done : tagged.entrySet()) {
-            java.util.Set<Module> skip = java.util.EnumSet.noneOf(Module.class);
-            skip.addAll(tagged.keySet());
-            skip.addAll(moved);
-            moved.addAll(PomVersions.follow(runner, umbrella, done.getKey(), done.getValue(), skip));
+            moved.addAll(PomVersions.follow(runner, umbrella, done.getKey(), done.getValue(), tagged.keySet()));
         }
         Umbrella.recordStopped(runner, umbrella, tagged, moved, log != null);
     }

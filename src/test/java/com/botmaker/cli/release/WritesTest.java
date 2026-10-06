@@ -51,10 +51,13 @@ class WritesTest {
         assertEquals(before, Files.readString(umbrella.resolve("botmaker-sdk/pom.xml")), "a dry run wrote");
         assertTrue(log.stream().anyMatch(l -> l.contains(PomVersions.PLUGIN + ":set -DnewVersion=1.4.0 ")),
                 log.toString());
+        // The tag name, never the bare number: JitPack builds 0.5.0 apart from v0.5.0, and only the v build
+        // is the one the release waited for (plugin-toolkit v0.4.0, 2026-10-06).
         assertTrue(log.stream().anyMatch(l -> l.contains("-Dproperty=botmaker.studioapi.version"
-                + " -DnewVersion=0.5.0 ")), log.toString());
-        assertTrue(log.stream().anyMatch(l -> l.equals("  botmaker-sdk 1.4.0 pinning shared 0.1.3, session"
-                + " 0.1.3, studio-api 0.5.0, plugin-toolkit 0.3.3, plugin-basics 0.2.1")), log.toString());
+                + " -DnewVersion=v0.5.0 ")), log.toString());
+        assertFalse(log.stream().anyMatch(l -> l.contains("-DnewVersion=0.5.0 ")), log.toString());
+        assertTrue(log.stream().anyMatch(l -> l.equals("  botmaker-sdk 1.4.0 pinning shared v0.1.3, session"
+                + " v0.1.3, studio-api v0.5.0, plugin-toolkit v0.3.3, plugin-basics v0.2.1")), log.toString());
         // Back on main: the next patch snapshot, and each pin at the snapshot its upstream moved to.
         assertTrue(log.stream().anyMatch(l -> l.contains(":set -DnewVersion=1.4.1-SNAPSHOT ")), log.toString());
         assertTrue(log.stream().anyMatch(l -> l.contains("-Dproperty=botmaker.studioapi.version"

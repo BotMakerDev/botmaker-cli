@@ -43,8 +43,9 @@ public final class DepTag {
     }
 
     /**
-     * The released version a downstream pom pins {@code module} at — the same choice as {@link #of}, as the
-     * bare number a pom names ({@code 0.4.2}). JitPack resolves it against the tag {@code v0.4.2}.
+     * The released version {@link #of} names, as a number. A release commit pins the tag name {@link #of}
+     * returns, never this: JitPack builds a bare {@code 0.4.2} separately from tag {@code v0.4.2}
+     * ({@link PomVersions#release}).
      *
      * @throws ReleaseRefusal as {@link #of} does
      */
