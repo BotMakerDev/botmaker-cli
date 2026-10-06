@@ -16,7 +16,8 @@ import java.util.function.BooleanSupplier;
  * Nudging JitPack and waiting for a tag to build — {@code release.sh}'s {@code wait_for_jitpack}.
  *
  * <p><b>The waits were removed in 2026-08 and put back on 2026-09-05, and the reversal is the part to
- * carry.</b> Pinning each upstream ref exactly (see {@link DepsEnv}) removed the <i>requirement</i> that an
+ * carry.</b> Pinning each upstream exactly (once in a {@code .deps.env}, now in the tag's pom —
+ * {@link PomVersions}) removed the <i>requirement</i> that an
  * upstream be published and newest before a downstream is tagged — JitPack resolves and builds a pinned
  * dependency tag on demand. Every clause of that is true and it still loses a race: <b>builds on demand is
  * not queues and retries</b>. {@code botmaker-cli} v0.0.9 was tagged seconds after

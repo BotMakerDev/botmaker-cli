@@ -44,7 +44,27 @@ public enum ChangeKind {
         if (!diff.ok()) {
             return REAL;                                    // same rule: unreadable is not unchanged
         }
-        return classify(diff.lines());
+        return classify(withoutVersionOnlyPom(umbrella.resolve(module.directory()), ref.get(), diff.lines()));
+    }
+
+    /**
+     * The changed files, minus {@code pom.xml} when all that moved in it is versions.
+     *
+     * <p>Every release leaves a back-to-snapshot commit on top of its tag, and a release of an upstream moves
+     * the pins of its dependents ({@link PomVersions}). Neither changes what the module publishes — the next
+     * release commit writes its own versions anyway — so without this every module ever released would read
+     * as changed and be cut again by {@code --all}.
+     */
+    static List<String> withoutVersionOnlyPom(Path dir, String ref, List<String> changed) {
+        if (!changed.contains("pom.xml")) {
+            return changed;
+        }
+        Optional<String> before = Git.capture(dir, "show", ref + ":pom.xml");
+        Optional<String> after = Git.capture(dir, "show", "HEAD:pom.xml");
+        if (before.isEmpty() || after.isEmpty() || !PomVersions.versionsOnly(before.get(), after.get())) {
+            return changed;
+        }
+        return changed.stream().filter(path -> !path.equals("pom.xml")).toList();
     }
 
     /**

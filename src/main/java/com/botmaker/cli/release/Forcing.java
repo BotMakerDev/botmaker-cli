@@ -94,18 +94,18 @@ public record Forcing(Module upstream, Module downstream, String reason) {
                     "the SDK compiles against plugin #2 as an ordinary Maven dependency, and flatten bakes "
                             + "that pin into the SDK's published pom"),
 
-            new Forcing(Module.SHARED, Module.STUDIO, "Studio builds shared from source at the ref in its "
-                    + ".deps.env, which this release moves"),
-            new Forcing(Module.SESSION, Module.STUDIO, "Studio builds session from source at the ref in its "
-                    + ".deps.env, which this release moves"),
-            new Forcing(Module.STUDIO_API, Module.STUDIO, "Studio builds the contract from source at the "
-                    + "ref in its .deps.env, which this release moves"),
-            new Forcing(Module.PLUGIN_HOST, Module.STUDIO, "Studio builds plugin-host from source at the "
-                    + "ref in its .deps.env, which this release moves"),
+            new Forcing(Module.SHARED, Module.STUDIO, "Studio's pom pins shared at a released version, "
+                    + "which this release moves"),
+            new Forcing(Module.SESSION, Module.STUDIO, "Studio's pom pins session at a released version, "
+                    + "which this release moves"),
+            new Forcing(Module.STUDIO_API, Module.STUDIO, "Studio's pom pins the contract at a released "
+                    + "version, which this release moves"),
+            new Forcing(Module.PLUGIN_HOST, Module.STUDIO, "Studio's pom pins plugin-host at a released "
+                    + "version, which this release moves"),
 
             // This last one is the interesting case, and the reason is NOT the old one. The SDK is not a
-            // Studio dependency any more — it left botmaker-studio/pom.xml on 2026-09-02 and is not in
-            // studio's .deps.env. What it is is a STRING CONSTANT IN STUDIO'S SOURCE, sed-bumped by the
+            // Studio dependency any more — it left botmaker-studio/pom.xml on 2026-09-02 and is not
+            // among Studio's pins. What it is is a STRING CONSTANT IN STUDIO'S SOURCE, sed-bumped by the
             // release: a pin Studio WRITES, not a pin Studio HAS.
             //
             // It had a twin, PLUGIN_TOOLKIT -> STUDIO over MavenService.TOOLKIT_FALLBACK_VERSION, deleted

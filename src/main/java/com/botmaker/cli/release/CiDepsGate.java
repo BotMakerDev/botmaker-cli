@@ -105,28 +105,9 @@ public final class CiDepsGate {
         return keys;
     }
 
-    /**
-     * The repository a property key names.
-     *
-     * <p>A table rather than a derivation, because the keys are not the directory names with the dashes
-     * removed by rule — {@code studioapi} is {@code botmaker-studio-api} and {@code plugintoolkit} is
-     * {@code botmaker-plugin-toolkit}, but nothing makes {@code sdk} mean {@code botmaker-sdk} except that
-     * somebody wrote both. Deriving it would silently map a typo to a plausible repository.
-     */
+    /** The repository a property key names — {@link Module#byPropertyKey}, which owns the table. */
     public static Optional<Module> repositoryModule(String key) {
-        return switch (key) {
-            case "shared" -> Optional.of(Module.SHARED);
-            case "session" -> Optional.of(Module.SESSION);
-            case "sdk" -> Optional.of(Module.SDK);
-            case "studioapi" -> Optional.of(Module.STUDIO_API);
-            case "plugintoolkit" -> Optional.of(Module.PLUGIN_TOOLKIT);
-            case "pluginbasics" -> Optional.of(Module.PLUGIN_BASICS);
-            case "pluginhost" -> Optional.of(Module.PLUGIN_HOST);
-            // The dashboard's pin on the release library (2026-09-16); the first key naming a non-plugin
-            // module, since the cli's main jar is a library the registry's CI and the dashboard both call.
-            case "cli" -> Optional.of(Module.CLI);
-            default -> Optional.empty();
-        };
+        return Module.byPropertyKey(key);
     }
 
     private static Optional<String> repositoryFor(String key) {

@@ -1,5 +1,6 @@
 package com.botmaker.cli.release;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -130,7 +131,7 @@ public enum Module {
      *
      * <p>The one new fact about {@link #GAMEBOT}; every exemption above and below is derived from it rather
      * than from naming the module, which is this enum's own rule. A template has no {@code CHANGELOG.md},
-     * no {@code .github/workflows}, no {@code .deps.env} and no japicmp baseline — so the CI gate, the
+     * no {@code .github/workflows}, no {@code main} pin and no japicmp baseline — so the CI gate, the
      * CI-builds-standalone gate, the JitPack gates and the JitPack wait all have nothing to ask it. What it
      * does have is a pom pinning a released SDK, which is the whole reason it is in this list.
      */
@@ -148,6 +149,72 @@ public enum Module {
      */
     public boolean commitsOnRelease() {
         return this != PILOT && this != REMOTE;
+    }
+
+    /**
+     * The key a downstream pom pins this module under — {@code botmaker.<key>.version} — or empty for a
+     * module nothing pins as a property.
+     *
+     * <p>A table rather than a derivation, because the keys are not the directory names with the dashes
+     * removed by rule — {@code studioapi} is {@code botmaker-studio-api} and {@code plugintoolkit} is
+     * {@code botmaker-plugin-toolkit}, but nothing makes {@code sdk} mean {@code botmaker-sdk} except that
+     * somebody wrote both. Deriving it would silently map a typo to a plausible module.
+     */
+    public Optional<String> propertyKey() {
+        return Optional.ofNullable(switch (this) {
+            case STUDIO_API -> "studioapi";
+            case PLUGIN_TOOLKIT -> "plugintoolkit";
+            case PLUGIN_HOST -> "pluginhost";
+            case PLUGIN_BASICS -> "pluginbasics";
+            case CLI -> "cli";
+            case SHARED -> "shared";
+            case SESSION -> "session";
+            case SDK -> "sdk";
+            default -> null;
+        });
+    }
+
+    /** The module a property key names, or empty. */
+    public static Optional<Module> byPropertyKey(String key) {
+        for (Module module : values()) {
+            if (module.propertyKey().filter(key::equals).isPresent()) {
+                return Optional.of(module);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The modules this one's pom pins as a {@code botmaker.<key>.version} property, in the order a release
+     * names them; empty for one that pins nothing of ours.
+     *
+     * <p>Each pin is that upstream's own {@code -SNAPSHOT} on {@code main} and its released version on a tag
+     * ({@link PomVersions}, umbrella {@code docs/refactor/43-real-versions.md}); {@link VersionsGate} holds the
+     * pom to this list. <b>The empties are as deliberate as the entries.</b> Studio pins four and not six: it
+     * has had no {@code botmaker-sdk} dependency since 2026-09-02, and the toolkit is a <i>plugin's</i>
+     * dependency, never the host's. The dashboard pins shared and the cli's main jar, whose own pins it
+     * excludes. {@code botmaker-studio-api} and {@code botmaker-plugin-archetype} pin nothing: the first has
+     * no upstream of ours, the second ships text whose versions are generation-time properties. A template's
+     * SDK pin is a released version {@link TemplatePin} moves, not a {@code main} pin.
+     */
+    public List<Module> upstreams() {
+        return switch (this) {
+            case PLUGIN_TOOLKIT, PLUGIN_HOST -> List.of(STUDIO_API);
+            // Plugin #2 pins two: the contract at `provided` and the toolkit at `compile`. Both reach the
+            // published pom, and that pom is what another plugin — the SDK — resolves.
+            case PLUGIN_BASICS -> List.of(STUDIO_API, PLUGIN_TOOLKIT);
+            case CLI -> List.of(STUDIO_API, PLUGIN_HOST);
+            case SESSION -> List.of(SHARED);
+            case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS);
+            case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_HOST);
+            case DASHBOARD -> List.of(SHARED, CLI);
+            default -> List.of();
+        };
+    }
+
+    /** The modules whose pom pins this one — {@link #upstreams()} read backwards. */
+    public List<Module> dependents() {
+        return java.util.Arrays.stream(values()).filter(module -> module.upstreams().contains(this)).toList();
     }
 
     /** The module a flag names, or empty — which the caller reports as the script's {@code unknown arg}. */

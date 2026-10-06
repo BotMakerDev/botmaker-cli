@@ -12,7 +12,7 @@ class DepTagTest {
 
     @Test
     void aModuleBeingReleasedIsPinnedToTheVersionThisRunIsCutting() {
-        // The load-bearing case: that tag does not exist yet when the downstream's .deps.env is written, so
+        // The load-bearing case: that tag does not exist yet when the downstream's release commit is written, so
         // reading the repository here would pin the PREVIOUS release and publish a downstream resolving an
         // upstream it was not built against. No checkout is touched, which is why the path is a dummy.
         assertEquals("v1.2.0", DepTag.of(Path.of("/nowhere"), Module.SHARED,

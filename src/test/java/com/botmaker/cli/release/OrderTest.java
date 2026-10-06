@@ -46,11 +46,10 @@ class OrderTest {
 
     @Test
     void theDashboardIsStudiosCaseOverTheCli() {
-        // An installable app whose package job builds its upstreams from source at the refs in .deps.env:
-        // every pin must be tagged before it, and the cli's own two pins are among them because the job
-        // installs the cli from source too.
-        List<Module> pins = DepsEnv.upstreams(Module.DASHBOARD);
-        assertEquals(List.of(Module.SHARED, Module.STUDIO_API, Module.PLUGIN_HOST, Module.CLI), pins);
+        // An installable app whose package job builds against its pinned upstream releases: every pin must
+        // be tagged before it. It pins shared and the cli's main jar, whose own two pins it excludes.
+        List<Module> pins = Module.DASHBOARD.upstreams();
+        assertEquals(List.of(Module.SHARED, Module.CLI), pins);
         for (Module pinned : pins) {
             assertTrue(Order.TAG.indexOf(pinned) < Order.TAG.indexOf(Module.DASHBOARD),
                     "dashboard must be tagged after " + pinned);
@@ -74,7 +73,7 @@ class OrderTest {
         assertTrue(Module.REMOTE_SERVER.hasChangelog());
         assertTrue(Module.REMOTE_SERVER.mavenBuild());
         assertFalse(Module.REMOTE_SERVER.onJitpack());
-        assertTrue(DepsEnv.upstreams(Module.REMOTE_SERVER).isEmpty());
+        assertTrue(Module.REMOTE_SERVER.upstreams().isEmpty());
         assertTrue(Forcing.EDGES.stream().noneMatch(edge ->
                 edge.upstream() == Module.REMOTE_SERVER || edge.downstream() == Module.REMOTE_SERVER
                         || edge.upstream() == Module.REMOTE || edge.downstream() == Module.REMOTE));
@@ -82,10 +81,10 @@ class OrderTest {
 
     @Test
     void studioIsTaggedAfterEveryTagItsPackageJobChecksOut() {
-        // Derived from what Studio's .deps.env pins, not restated: Studio v1.1.0's package jobs failed on
-        // 2026-09-16 fetching botmaker-shared v0.1.0, which was tagged after it. A pin added to that file
-        // later is covered without touching this test.
-        List<Module> pins = DepsEnv.upstreams(Module.STUDIO);
+        // Derived from what Studio's pom pins, not restated: Studio v1.1.0's package jobs failed on
+        // 2026-09-16 fetching botmaker-shared v0.1.0, which was tagged after it. A pin added later is
+        // covered without touching this test.
+        List<Module> pins = Module.STUDIO.upstreams();
         assertFalse(pins.isEmpty());
         for (Module pinned : pins) {
             assertTrue(Order.TAG.indexOf(pinned) < Order.TAG.indexOf(Module.STUDIO),

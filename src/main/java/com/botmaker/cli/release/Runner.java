@@ -85,14 +85,10 @@ public record Runner(boolean dryRun, Consumer<String> out, BooleanSupplier stop)
      * Writes a whole file, echoed as the heredoc the script uses.
      *
      * <p>The echo names the file rather than reproducing its content, which is what {@code run_sh}'s own
-     * output does for a heredoc: the interesting part of a {@code .deps.env} is the pins, and those are
-     * printed by the line above it.
+     * output does for a heredoc: what is interesting about a written file is said by the line above it.
      */
     public void write(Path file, String content) {
-        // The marker is the script's own for a .deps.env and a plain EOF for anything else: printing
-        // `cat > CHANGELOG.md <<'DEPS_EOF'` names a heredoc that has nothing to do with a changelog.
-        String marker = file.getFileName().toString().equals(".deps.env") ? "DEPS_EOF" : "EOF";
-        out.accept("    $ cat > " + quoted(file.toString()) + " <<'" + marker + "' … " + marker);
+        out.accept("    $ cat > " + quoted(file.toString()) + " <<'EOF' … EOF");
         if (dryRun) {
             return;
         }

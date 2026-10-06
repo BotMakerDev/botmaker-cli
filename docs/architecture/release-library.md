@@ -20,14 +20,28 @@ same reason.
 dashboard is a reader, so a copy there goes stale against the script; this is the owner being ported, so the
 list has to land somewhere. `Module`'s declaration order is the script's **flag** order and is deliberately
 not the **tag** order — see `Order.TAG`, where the two APKs (pilot, remote) go first, Studio after the whole
-chain (since 2026-09-16: Studio's package jobs check out the tags its `.deps.env` pins, so those must
-already be pushed) and the dashboard last of all (since 2026-09-17, the same shape over the cli). What a
+chain (since 2026-09-16: Studio's package jobs build against the upstream releases its pom pins, so those
+must already be pushed) and the dashboard last of all (since 2026-09-17, the same shape over the cli). What a
 module is exempt from is asked of `Module` itself (`mavenBuild`, `onJitpack`, `hasChangelog`), never by
 naming it: the pilot and `botmaker-remote` are APKs; Studio, the dashboard and `botmaker-remote-server` are
 programs JitPack never builds. **`--cli` forces `--dashboard`**: the dashboard's Release tab calls this
 package in-process, so an installed dashboard decides by the cli it was built with, and a cli release
-without a dashboard release leaves its previews on the previous rules. Its `.deps.env` pins shared, the
-cli and the cli's own two pins (`CiDepsGate.repositoryModule` maps the `cli` key).
+without a dashboard release leaves its previews on the previous rules. Its pom pins shared and the cli
+(`Module.byPropertyKey` maps the `cli` key).
+
+**Versions are real and the release writes them** (2026-10-06, umbrella `docs/refactor/43-real-versions.md`).
+Every pom says `X.Y.Z-SNAPSHOT` on `main`, and each `botmaker.<key>.version` names that upstream's `main`
+version; `Module.upstreams()` is the table, `VersionsGate` holds each pom to it before the first tag. For each
+module `Release` makes **two commits**: the release commit (`PomVersions.release`: its own version and each
+pin at the released version `DepTag.version` picks), tagged, then the back-to-snapshot commit
+(`PomVersions.backToSnapshot`: the next patch `-SNAPSHOT`, each pin at its upstream's `main`), and pushes
+both. A dependent outside the release then has its pin moved and committed (`PomVersions.follow`, never
+fatal), and the umbrella records its pointer with the release's. Every edit is `versions-maven-plugin`
+(`set`, `set-property`), pinned in `PomVersions.PLUGIN`, run locally and never on JitPack. A failure before
+the release commit puts `pom.xml` back; one between the two commits puts the snapshot back in the working
+tree, and nothing is pushed. `ChangeKind` does not count a pom whose only change is versions, or every
+released module would read as changed by its own back-to-snapshot commit. This replaced `.deps.env`
+(`DepsEnv`, deleted) and the `-D` injection in each `jitpack.yml`.
 
 **A tag exists to publish an artifact, so "changed" is not "some byte moved" — and that is `ChangeKind`.**
 It answers three things, not two: `REAL`, `DOCS` (commits exist, all of them markdown, so the tag would
@@ -92,7 +106,7 @@ at once. The wait lives behind a `Supplier`/`Waiter` seam so the window is teste
 Landed: slice 1 (`Module`, `Version`, `Level`, `Tags` = `latest_version`, `VersionSpec` = `resolve_version`,
 `Git`), slice 2 (`Relevance` = `is_release_irrelevant`, `ChangeKind`, `ReleaseDecision` = `should_release`),
 slice 3 (`Forcing`, `Order`, `DepTag`), slice 4 (`GateVerdict`, `GatePlan`, `CiDepsGate`, `ChangelogGate`,
-`SdkGates`, `JitpackPluginsGate`, `MavenPrerequisite`, `Proc`), slice 5 (`Runner`, `DepsEnv`, `Stamp`,
+`SdkGates`, `JitpackPluginsGate`, `MavenPrerequisite`, `Proc`), slice 5 (`Runner`, `DepsEnv` — replaced by `PomVersions` on 2026-10-06, `Stamp`,
 `CommitTagPush`) and slice 6 (`CleanRoom`, `Actions`, `ReleaseLog`, `ReleaseStatus`).
 
 `Plan` is the decide pass and `ReleaseCommand` is `botmaker release`, the third noun. **The command cannot

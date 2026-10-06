@@ -10,7 +10,7 @@ import java.util.List;
  * <p><b>{@link #DECIDE} is dependency order and has to be.</b> Each module's forced flag is computed from
  * the versions decided <i>so far</i> ({@link Forcing}), so an upstream must be answered before anything it
  * drags in. A skipped module has its version cleared here, which is what makes the downstream flags, the
- * {@code .deps.env} pins and the pointer commit all see the final answer.
+ * pom pins and the pointer commit all see the final answer.
  *
  * <p><b>{@link #TAG} is neither, and that freedom is the whole reason the decisions are taken up front.</b>
  * {@code should_release} used to be evaluated inline, immediately before each module was tagged, which
@@ -29,14 +29,13 @@ import java.util.List;
  * <p>{@code botmaker-remote} is the pilot's case again: an APK depending on nothing of ours, tagged with the
  * pilot so its build overlaps the chain. {@code botmaker-remote-server} is a jar JitPack never builds and
  * nothing pins, so its place in the chain is its reactor position, after the cli, and nothing waits on it.
- * {@code botmaker-dashboard} (2026-09-17) is Studio's case once more: its {@code package} job checks out
- * shared and the cli — and the cli's own two pins — at the refs in its {@code .deps.env}, so every one of
- * them must be on origin first. Nothing depends on it, so it goes after Studio rather than before.
+ * {@code botmaker-dashboard} (2026-09-17) is Studio's case once more: its {@code package} job builds
+ * against shared and the cli at the versions its pom pins, so every one of them must be on origin first. Nothing depends on it, so it goes after Studio rather than before.
  *
  * <p><b>Studio was tagged second until 2026-09-16, and that was a race every release lost.</b> The argument
  * was that its {@code package} matrix builds its upstreams from source, so it needs no JitPack build to
- * exist. True, and beside the point: it checks those upstreams out <i>at the tags in its own
- * {@code .deps.env}</i>, and those tags are pushed minutes later, further down this list. On 2026-09-16
+ * exist. True, and beside the point: it checks those upstreams out <i>at the tags it pins</i> (its
+ * {@code .deps.env} then, its pom since 2026-10-06), and those tags are pushed minutes later, further down this list. On 2026-09-16
  * Studio v1.1.0's two package jobs failed fetching {@code botmaker-shared v0.1.0}, which did not exist yet.
  * So Studio goes last: every tag it pins is on origin before its CI starts. The cost is that its matrix no
  * longer overlaps the JitPack waits, which is minutes; the other way cost a Studio tag.
@@ -85,7 +84,7 @@ public final class Order {
             // JitPack builds on demand and does not queue, so the SDK must not start building first.
             Module.PLUGIN_BASICS,
             Module.SDK,
-            // Its package job checks out every upstream at the tag its .deps.env names.
+            // Its package job builds against every upstream at the release its pom pins.
             Module.STUDIO,
             // The same shape over the cli, whose tag is far above; nothing pins the dashboard.
             Module.DASHBOARD,

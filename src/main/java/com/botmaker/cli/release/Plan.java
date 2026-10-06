@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * while nothing has been pushed, which is the only time a refusal is worth anything: a pushed tag cannot be
  * edited.
  *
- * <p><b>A skipped module's version is cleared</b>, so the forcing rules, the {@code .deps.env} pins and the
+ * <p><b>A skipped module's version is cleared</b>, so the forcing rules, the pom pins and the
  * pointer commit all see the final answer rather than the requested one.
  *
  * <p>This class computes and prints; it writes nothing. Handing its {@link #releasing()} to the writers is

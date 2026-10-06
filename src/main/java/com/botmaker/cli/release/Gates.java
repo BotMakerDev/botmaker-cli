@@ -46,6 +46,7 @@ public final class Gates {
         }
         for (Module module : GatePlan.ciDeps(modules)) {
             record(runner, refusals, CiDepsGate.check(umbrella, module, force));
+            record(runner, refusals, VersionsGate.check(umbrella, module, force));
         }
         for (Module module : GatePlan.jitpackPlugins(modules)) {
             record(runner, refusals, JitpackPluginsGate.check(umbrella, module, force));

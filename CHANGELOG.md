@@ -15,6 +15,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   `botmaker-cli-*-all.jar` instead of a fixed `0.0.0-SNAPSHOT` name, and `CiDepsGate` reads any `-SNAPSHOT`
   pin as a source install.
 - `plugin publish`'s snapshot-contract refusal no longer points at `.deps.env`.
+- **A release writes real versions into the poms** instead of a `.deps.env`. For each module it makes a
+  release commit — its own version and each upstream pin at its released version — tags it, then commits
+  the next patch `-SNAPSHOT` and pushes both. A dependent outside the release has its pin moved to the new
+  snapshot in the same run. Every edit is `versions-maven-plugin` 2.18.0 (`set`, `set-property`), run
+  locally. A failure puts the snapshot back in the working tree before the release stops.
+- **New gate, `VersionsGate`:** a module is refused when its pom on `main` is not a `-SNAPSHOT`, or an
+  upstream pin differs from that upstream's pom version; `--force` overrides. A pin on a module the release
+  does not list is refused even under `--force`.
+- A pom whose only change since the tag is versions no longer makes a module read as changed.
 
 No source changes since v0.1.3; re-released for updated upstream pins.
 

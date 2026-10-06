@@ -83,8 +83,10 @@
  *       decides, gates and computes exactly as a real one does and echoes each command instead of running
  *       it, which is what makes {@code --dry-run} worth trusting. Nothing in this package may write,
  *       commit, tag or push except through it.</li>
- *   <li>{@link com.botmaker.cli.release.DepsEnv} — {@code write_deps_env}, including the {@code git add}
- *       whose absence tagged three modules with no {@code .deps.env} at all on 2026-09-02.</li>
+ *   <li>{@link com.botmaker.cli.release.PomVersions} — what replaced {@code write_deps_env} on 2026-10-06:
+ *       the release commit's real versions, the back-to-snapshot commit after the tag, and each dependent's
+ *       pin, all through {@code versions-maven-plugin} (umbrella {@code docs/refactor/43-real-versions.md}).
+ *       {@link com.botmaker.cli.release.VersionsGate} holds {@code main} to what it left.</li>
  *   <li>{@link com.botmaker.cli.release.Stamp} — {@code stamp_changelog}, the half that makes {@code --all}
  *       usable: the version is not knowable while the prose is written, so it is stamped a moment before
  *       the tag.</li>

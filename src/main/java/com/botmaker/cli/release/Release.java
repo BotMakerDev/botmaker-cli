@@ -94,8 +94,10 @@ public final class Release {
             throw new ReleaseRefusal(STOPPED_BY_YOU + " before the first tag — nothing was tagged.");
         }
         LocalDateTime when = LocalDateTime.now();
-        Chain chain = tagChain(runner, umbrella, releasing, when,
-                (module, version, at) -> release(runner, umbrella, module, version, releasing, wait, at));
+        java.util.Set<Module> followed = java.util.EnumSet.noneOf(Module.class);
+        Chain chain = tagChain(runner, umbrella, releasing, when, followed,
+                (module, version, at) -> release(runner, umbrella, module, version, releasing, wait, followed,
+                        at));
         Path log = chain.log();
 
         if (log == null && runner.dryRun()) {
@@ -122,7 +124,7 @@ public final class Release {
             runner.say("Timing: verify pass " + timing.verifyPass() + " · total " + timing.total());
         }
 
-        String pointers = Umbrella.recordPointers(runner, umbrella, releasing, log != null);
+        String pointers = Umbrella.recordPointers(runner, umbrella, releasing, followed, log != null);
         boolean pushed = Umbrella.pushBranches(runner, umbrella);
         // After the verify pass, so the registry's gate resolves a tag JitPack has already built.
         pushed &= RegistryPin.bump(runner, tagged(chain.rows()), when.toLocalDate());
@@ -167,6 +169,15 @@ public final class Release {
      */
     static Chain tagChain(Runner runner, Path umbrella, Map<Module, Version> releasing, LocalDateTime when,
                           Step step) {
+        return tagChain(runner, umbrella, releasing, when, java.util.Set.of(), step);
+    }
+
+    /**
+     * @param followed the dependents outside the release whose pins the steps moved so far, read when the
+     *                 chain stops so their pointers are recorded with the tagged modules'
+     */
+    static Chain tagChain(Runner runner, Path umbrella, Map<Module, Version> releasing, LocalDateTime when,
+                          java.util.Set<Module> followed, Step step) {
         List<ReleaseLog.Row> rows = new ArrayList<>(ReleaseLog.rows(releasing));
         Path log = ReleaseLog.write(runner, umbrella, when, rows);
         Map<Module, Version> tagged = new java.util.EnumMap<>(Module.class);
@@ -181,7 +192,7 @@ public final class Release {
                 notReachedAfter(rows, i);
                 runner.say("error: " + STOPPED_BY_YOU + " before " + row.module().directory() + " — "
                         + tagged.size() + " of " + rows.size() + " modules were tagged.");
-                recordStop(runner, umbrella, when, log, rows, tagged);
+                recordStop(runner, umbrella, when, log, rows, tagged, followed);
                 throw new ReleaseRefusal(STOPPED_BY_YOU + " before " + row.module().directory() + ". "
                         + tagged.size() + " of " + rows.size() + " modules were tagged.");
             }
@@ -210,7 +221,7 @@ public final class Release {
                 runner.say("error: " + row.module().directory() + " failed at " + at[0]
                         + " — the release stopped here. " + tagged.size() + " of " + rows.size()
                         + " modules were tagged.");
-                recordStop(runner, umbrella, when, log, rows, tagged);
+                recordStop(runner, umbrella, when, log, rows, tagged, followed);
                 throw e;
             }
             if (log != null) {
@@ -228,33 +239,94 @@ public final class Release {
 
     /** The log as it stands and the pointers of what was tagged, committed locally; nothing is pushed. */
     private static void recordStop(Runner runner, Path umbrella, LocalDateTime when, Path log,
-                                   List<ReleaseLog.Row> rows, Map<Module, Version> tagged) {
+                                   List<ReleaseLog.Row> rows, Map<Module, Version> tagged,
+                                   java.util.Set<Module> followed) {
         if (log != null) {
             runner.write(log, ReleaseLog.render(when, rows));
         }
-        Umbrella.recordStopped(runner, umbrella, tagged, log != null);
+        // A dependent the chain never reached still pins the snapshot its tagged upstream left: move it now,
+        // or its main names a version nobody builds until somebody edits the pin by hand.
+        java.util.Set<Module> moved = java.util.EnumSet.noneOf(Module.class);
+        moved.addAll(followed);
+        for (Map.Entry<Module, Version> done : tagged.entrySet()) {
+            java.util.Set<Module> skip = java.util.EnumSet.noneOf(Module.class);
+            skip.addAll(tagged.keySet());
+            skip.addAll(moved);
+            moved.addAll(PomVersions.follow(runner, umbrella, done.getKey(), done.getValue(), skip));
+        }
+        Umbrella.recordStopped(runner, umbrella, tagged, moved, log != null);
     }
 
     /**
-     * One module: its pins, the constants it holds about other modules, its changelog heading, its tag, and
-     * the wait for its JitPack build.
+     * One module: the release commit ({@link #prepare}), its tag, the back-to-snapshot commit, the push, its
+     * dependents' pins, and the wait for its JitPack build.
      *
-     * <p>The two source edits between the pins and the stamp are the script's order and it is the only one
-     * that works: both land in <i>this module's</i> release commit, so they have to happen before
-     * {@link CommitTagPush} and after the {@code .deps.env} they sit beside.
+     * <p><b>The tag goes on the release commit and the push carries both</b>, so origin never sees
+     * {@code main} at a release version, and a tag's pom names the versions it was built against
+     * (umbrella {@code docs/refactor/43-real-versions.md}).
      *
      * <p><b>A failed push stops the release</b>, since 2026-09-16. It used to be returned and ignored, which
      * is safe for nothing downstream: every module tagged after this one pins its tag, and a tag that is not
      * on origin is one no CI can check out.
+     *
+     * @param followed collects the dependents outside this release whose pins moved, so the umbrella records
+     *                 their pointers too
      */
     private static ReleaseLog.Stage release(Runner runner, Path umbrella, Module module, Version version,
                                             Map<Module, Version> releasing, boolean wait,
+                                            java.util.Set<Module> followed,
                                             java.util.function.Consumer<String> at) {
         runner.say("Releasing " + module.directory() + " " + version.tag());
-        if (DepsEnv.writes(module)) {
-            at.accept(".deps.env");
-            DepsEnv.write(runner, umbrella, module, releasing);
+        // An APK has no CHANGELOG.md and nothing else to commit, so it takes no message — as the pilot has
+        // since the stamp arrived and the other three stopped passing an empty one. The question is what a
+        // release COMMITS and not what it stamps: a template has no changelog either, and a pom pin to
+        // rewrite, so conditioning this on hasChangelog() would have tagged the bump without committing it.
+        String message = module.commitsOnRelease()
+                ? "release: " + module.shortName() + " " + version.tag() : "";
+        try {
+            prepare(runner, umbrella, module, version, releasing, at);
+            at.accept("commit and tag");
+            CommitTagPush.commit(runner, umbrella, module, message);
+        } catch (RuntimeException e) {
+            // Nothing is committed yet: put the snapshot back, so a stopped release leaves main building at
+            // its -SNAPSHOT rather than at a version that was never published.
+            PomVersions.restore(runner, umbrella, module, false);
+            throw e;
         }
+        try {
+            CommitTagPush.tag(runner, umbrella, module, version);
+            at.accept("back to snapshot");
+            PomVersions.backToSnapshot(runner, umbrella, module, version, releasing);
+        } catch (RuntimeException e) {
+            // The release commit is made and nothing is pushed: the working tree goes back to the snapshot
+            // that commit replaced, and the operator decides about the local commit and tag.
+            PomVersions.restore(runner, umbrella, module, true);
+            throw new ReleaseRefusal(module.directory() + ": " + e.getMessage() + "\n     The release commit"
+                    + " is local and nothing was pushed; pom.xml is back at its -SNAPSHOT in the working tree.");
+        }
+        at.accept("push");
+        if (!CommitTagPush.push(runner, umbrella, module, version)) {
+            throw new ReleaseRefusal(module.directory() + ": pushing " + version.tag() + " failed. Every"
+                    + " module after it pins that tag, so the release stops here.");
+        }
+        at.accept("dependents' pins");
+        followed.addAll(PomVersions.follow(runner, umbrella, module, version, releasing.keySet()));
+        if (module == Module.STUDIO) {
+            runner.say("botmaker-studio " + version.tag()
+                    + " tagged — last, so every tag its package matrix checks out is already on origin.");
+        }
+        return waitFor(runner, module, version, releasing, wait, at);
+    }
+
+    /**
+     * The release commit's edits, in the script's order: the pom's versions first, then the constants a
+     * module holds about other modules, then the changelog heading. Every one lands in <i>this module's</i>
+     * release commit, so all of them happen before {@link CommitTagPush}.
+     */
+    private static void prepare(Runner runner, Path umbrella, Module module, Version version,
+                                Map<Module, Version> releasing, java.util.function.Consumer<String> at) {
+        at.accept("pom versions");
+        PomVersions.release(runner, umbrella, module, version, releasing);
         if (module == Module.STUDIO) {
             // What a freshly generated bot's pom pins, which is Studio's source and not Studio's dependency.
             at.accept("fallback versions");
@@ -282,21 +354,12 @@ public final class Release {
         Japicmp.bump(runner, umbrella, module);
         at.accept("changelog stamp");
         Stamp.changelog(runner, umbrella, module, version);
-        // An APK has no CHANGELOG.md and nothing else to commit, so it takes no message — as the pilot has
-        // since the stamp arrived and the other three stopped passing an empty one. The question is what a
-        // release COMMITS and not what it stamps: a template has no changelog either, and a pom pin to
-        // rewrite, so conditioning this on hasChangelog() would have tagged the bump without committing it.
-        String message = module.commitsOnRelease()
-                ? "release: " + module.shortName() + " " + version.tag() : "";
-        at.accept("commit, tag and push");
-        if (!CommitTagPush.run(runner, umbrella, module, version, message)) {
-            throw new ReleaseRefusal(module.directory() + ": pushing " + version.tag() + " failed. Every"
-                    + " module after it pins that tag, so the release stops here.");
-        }
-        if (module == Module.STUDIO) {
-            runner.say("botmaker-studio " + version.tag()
-                    + " tagged — last, so every tag its package matrix checks out is already on origin.");
-        }
+    }
+
+    /** The JitPack wait a later module is owed, or none. */
+    private static ReleaseLog.Stage waitFor(Runner runner, Module module, Version version,
+                                            Map<Module, Version> releasing, boolean wait,
+                                            java.util.function.Consumer<String> at) {
         if (wait && ReleaseLog.onJitpack(module) && !Waits.owed(module, releasing.keySet())) {
             // Still TAGGED, which is true: the verify pass fills its JitPack cell exactly as before.
             runner.say(Waits.notWaiting(module, version));

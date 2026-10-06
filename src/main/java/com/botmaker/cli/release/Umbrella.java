@@ -3,6 +3,7 @@ package com.botmaker.cli.release;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The two writes that belong to the umbrella rather than to any module — {@code release.sh}'s pointer
@@ -39,11 +40,20 @@ public final class Umbrella {
      */
     public static String recordPointers(Runner runner, Path umbrella, Map<Module, Version> released,
                                         boolean withLog) {
-        return record(runner, umbrella, released, withLog, "release: ");
+        return recordPointers(runner, umbrella, released, Set.of(), withLog);
     }
 
-    private static String record(Runner runner, Path umbrella, Map<Module, Version> released, boolean withLog,
-                                 String prefix) {
+    /**
+     * @param followed modules outside the release whose upstream pins the release moved
+     *                 ({@link PomVersions#follow}); staged with the released ones, never named in the subject
+     */
+    public static String recordPointers(Runner runner, Path umbrella, Map<Module, Version> released,
+                                        Set<Module> followed, boolean withLog) {
+        return record(runner, umbrella, released, followed, withLog, "release: ");
+    }
+
+    private static String record(Runner runner, Path umbrella, Map<Module, Version> released,
+                                 Set<Module> followed, boolean withLog, String prefix) {
         runner.say("Recording submodule pointers in the umbrella");
         StringBuilder pointers = new StringBuilder();
         for (Module module : Order.DECIDE) {
@@ -51,6 +61,8 @@ public final class Umbrella {
             if (version != null) {
                 runner.git(umbrella, "add", module.directory());
                 pointers.append(module.pointerName()).append(' ').append(version.tag()).append(' ');
+            } else if (followed.contains(module)) {
+                runner.git(umbrella, "add", module.directory());
             }
         }
         if (withLog) {
@@ -73,8 +85,8 @@ public final class Umbrella {
      * that decision may be a re-run, which records its own commit.
      */
     public static String recordStopped(Runner runner, Path umbrella, Map<Module, Version> tagged,
-                                       boolean withLog) {
-        return record(runner, umbrella, tagged, withLog, "release (stopped): ");
+                                       Set<Module> followed, boolean withLog) {
+        return record(runner, umbrella, tagged, followed, withLog, "release (stopped): ");
     }
 
     /**

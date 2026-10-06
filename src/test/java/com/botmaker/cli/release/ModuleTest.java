@@ -44,13 +44,14 @@ class ModuleTest {
     @Test
     void aTemplateIsExemptFromEverythingItHasNoFileFor() {
         // Each of these is a fact about the repository rather than a preference: botmaker-gamebot has no
-        // CHANGELOG.md, no .github/workflows and no .deps.env, and nobody resolves a template as an
+        // CHANGELOG.md, no .github/workflows and no main pin, and nobody resolves a template as an
         // artifact. What it does have is a pom pinning a released SDK, which is why it is a module at all.
         assertTrue(Module.GAMEBOT.template());
         assertTrue(Module.GAMEBOT.mavenBuild());
         assertFalse(Module.GAMEBOT.onJitpack());
         assertFalse(Module.GAMEBOT.hasChangelog());
-        assertFalse(DepsEnv.writes(Module.GAMEBOT));
+        assertTrue(Module.GAMEBOT.upstreams().isEmpty());
+        assertFalse(PomVersions.moves(Module.GAMEBOT));
         // The exemptions are asked of the module, never by naming it — so nothing else answers `template`.
         assertEquals(List.of(Module.GAMEBOT),
                 java.util.Arrays.stream(Module.values()).filter(Module::template).toList());

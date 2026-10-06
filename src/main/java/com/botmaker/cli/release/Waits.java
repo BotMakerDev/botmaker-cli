@@ -15,8 +15,8 @@ import java.util.List;
  *
  * <p><b>The rule is derived, never listed.</b> A hand-kept list of "modules worth waiting for" would be a
  * second statement of the dependency graph and would go stale the first time an edge was added — the failure
- * {@link DepsEnv} and {@link Forcing} are both written to avoid. So it is read off what the release already
- * knows: {@link Order#TAG} for who comes after, {@link DepsEnv#upstreams} for who pins whom, and
+ * {@link Module#upstreams()} and {@link Forcing} are both written to avoid. So it is read off what the release
+ * already knows: {@link Order#TAG} for who comes after, {@link Module#upstreams()} for who pins whom, and
  * {@link Module#onJitpack()} for whether the consumer's build is a JitPack build at all.
  *
  * <p><b>{@code onJitpack()} on the <i>consumer</i> is the load-bearing half.</b> Studio's and the dashboard's
@@ -51,7 +51,7 @@ public final class Waits {
         }
         return tagOrder.subList(at + 1, tagOrder.size()).stream()
                 .filter(Module::onJitpack)
-                .anyMatch(consumer -> DepsEnv.upstreams(consumer).contains(module));
+                .anyMatch(consumer -> consumer.upstreams().contains(module));
     }
 
     /** The sentence a skipped wait prints, so a shorter release is a fact in the log rather than a mystery. */

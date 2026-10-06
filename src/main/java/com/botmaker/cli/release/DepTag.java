@@ -8,10 +8,11 @@ import java.util.Optional;
  *
  * <p>Two cases, and the first is why this is not simply "the newest tag": when <b>this run</b> is releasing
  * the module, the pin is the version being cut, which does not exist as a tag yet at the moment the
- * downstream's {@code .deps.env} is written. Reading the repository there would pin the <i>previous</i>
+ * downstream's release commit is written. Reading the repository there would pin the <i>previous</i>
  * release, and the downstream would be published resolving an upstream it was not built against.
  *
- * <p>That is the guess this file replaced. Five {@code .deps.env} values were once
+ * <p>That is the guess this file replaced. Five {@code .deps.env} values (the pin file a release wrote until
+ * 2026-10-06, before the poms named real versions) were once
  * {@code git ls-remote --tags | sort -V | tail -1} — "newest tag", which is only <i>usually</i> "the tag
  * this release just cut".
  *
@@ -35,12 +36,23 @@ public final class DepTag {
         if (cutting.isPresent()) {
             return cutting.get().tag();
         }
-        Optional<Version> latest = Tags.latest(umbrella, module);
-        if (latest.isEmpty()) {
-            throw new ReleaseRefusal(module.directory() + ": no tag to pin a downstream build to");
-        }
+        Version latest = version(umbrella, module, cutting);
         // The script falls back to the v-prefixed spelling when neither ref resolves, so a checkout that
         // cannot answer still produces the name the tag is about to have rather than nothing.
-        return Tags.existingRef(umbrella, module, latest.get()).orElseGet(() -> latest.get().tag());
+        return Tags.existingRef(umbrella, module, latest).orElseGet(latest::tag);
+    }
+
+    /**
+     * The released version a downstream pom pins {@code module} at — the same choice as {@link #of}, as the
+     * bare number a pom names ({@code 0.4.2}). JitPack resolves it against the tag {@code v0.4.2}.
+     *
+     * @throws ReleaseRefusal as {@link #of} does
+     */
+    public static Version version(Path umbrella, Module module, Optional<Version> cutting) {
+        if (cutting.isPresent()) {
+            return cutting.get();
+        }
+        return Tags.latest(umbrella, module).orElseThrow(() ->
+                new ReleaseRefusal(module.directory() + ": no tag to pin a downstream build to"));
     }
 }

@@ -52,7 +52,7 @@ public record Version(int major, int minor, int patch) implements Comparable<Ver
         return major + "." + minor + "." + patch;
     }
 
-    /** {@code v1.2.3} — what git holds, and what a {@code .deps.env} pin records. */
+    /** {@code v1.2.3} — what git holds. A pom pins the bare {@link #toString()}. */
     public String tag() {
         return "v" + this;
     }
