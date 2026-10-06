@@ -1,7 +1,13 @@
 package com.botmaker.cli.release;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * The two gates that only run when the SDK is being cut — {@code release.sh}'s {@code check_api_pointers}
@@ -81,7 +87,6 @@ public final class SdkGates {
             return GateVerdict.skipped("  sdk: mvn not on PATH — plugin gate skipped");
         }
         Path cli = umbrella.resolve(Module.CLI.directory());
-        Path jar = cli.resolve("target/botmaker-cli-0.0.0-SNAPSHOT-all.jar");
         Proc.Result build = Proc.run(umbrella, "mvn", "-B", "-q",
                 "-pl", Module.CLI.directory(), "-am", "package", "-DskipTests");
         if (!build.ok()) {
@@ -95,10 +100,18 @@ public final class SdkGates {
                     + "     Fix the CLI build, or --force.\n\n"
                     + errors(build));
         }
+        Optional<Path> jar = shadedJar(cli.resolve("target"));
+        if (jar.isEmpty()) {
+            if (force) {
+                return GateVerdict.forced("  sdk: botmaker-cli built no -all jar — plugin gate FORCED");
+            }
+            return GateVerdict.refused("sdk: botmaker-cli built, but no target/botmaker-cli-*-all.jar was"
+                    + " produced, so the plugin gate cannot run. Fix the shade setup, or --force.");
+        }
         // `plugin validate`, not `validate`: the noun-first tree landed 2026-09-05 and the bare verb is a
         // hidden MovedCommand that prints its replacement and exits 2. A gate spelling it the old way would
         // refuse every SDK release, with a message about a command line rather than about the SDK.
-        Proc.Result validate = Proc.run(umbrella, "java", "-jar", jar.toString(),
+        Proc.Result validate = Proc.run(umbrella, "java", "-jar", jar.get().toString(),
                 "plugin", "validate", umbrella.resolve(Module.SDK.directory()).toString());
         if (validate.ok()) {
             return GateVerdict.ok("  sdk: botmaker plugin validate passes — ok");
@@ -121,6 +134,30 @@ public final class SdkGates {
                 .filter(line -> line.contains("[ERROR]"))
                 .limit(QUOTED)
                 .toList());
+    }
+
+    /**
+     * The newest {@code botmaker-cli-*-all.jar} in {@code target}. The name carries the pom's version, and a
+     * {@code target} not cleaned since the version moved still holds a jar under the old one.
+     */
+    static Optional<Path> shadedJar(Path target) {
+        try (Stream<Path> files = Files.list(target)) {
+            return files.filter(f -> {
+                        String name = f.getFileName().toString();
+                        return name.startsWith("botmaker-cli-") && name.endsWith("-all.jar");
+                    })
+                    .max(Comparator.comparing(SdkGates::modified));
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    private static FileTime modified(Path file) {
+        try {
+            return Files.getLastModifiedTime(file);
+        } catch (IOException e) {
+            return FileTime.fromMillis(0);
+        }
     }
 
     /** The validator's output from its first {@code FAIL} onwards, as the script's {@code sed} takes it. */

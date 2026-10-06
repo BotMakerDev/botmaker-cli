@@ -31,9 +31,13 @@ import java.util.regex.Pattern;
  */
 public final class CiDepsGate {
 
-    /** Property keys this pom declares at {@code 0.0.0-SNAPSHOT} — those resolved from a source install. */
+    /**
+     * Property keys this pom declares at a {@code -SNAPSHOT} — those resolved from a source install. Any
+     * snapshot since 2026-10-06, when every pom took its real version (umbrella doc 43); only
+     * {@code 0.0.0-SNAPSHOT} before.
+     */
     private static final Pattern SNAPSHOT_PIN =
-            Pattern.compile("<botmaker\\.([a-z]*)\\.version>0\\.0\\.0-SNAPSHOT<");
+            Pattern.compile("<botmaker\\.([a-z]*)\\.version>[^<]*-SNAPSHOT<");
 
     private CiDepsGate() {
     }
@@ -68,7 +72,7 @@ public final class CiDepsGate {
         }
         if (missing.isEmpty()) {
             return GateVerdict.ok("  " + module.shortName()
-                    + ": ci.yml checks out every 0.0.0-SNAPSHOT upstream — ok");
+                    + ": ci.yml checks out every -SNAPSHOT upstream — ok");
         }
         String names = String.join(" ", missing);
         if (force) {
@@ -76,7 +80,7 @@ public final class CiDepsGate {
                     + ": ci.yml is missing " + names + " — FORCED");
         }
         return GateVerdict.refused(module.directory() + ": pom.xml resolves " + names
-                + " at 0.0.0-SNAPSHOT and .github/workflows/ci.yml never checks it out.\n"
+                + " at a -SNAPSHOT and .github/workflows/ci.yml never checks it out.\n"
                 + "     That module's own CI cannot build, and the umbrella reactor hides it: there the"
                 + " upstream is a sibling\n"
                 + "     module and resolves for free, so `mvn install` at the root is green while the"

@@ -59,7 +59,7 @@ jobs:
       # configuration that loses the manifest transformer produces a jar that builds, publishes, and then
       # answers `no main manifest attribute` to the first person who downloads it.
       - name: The executable jar runs
-        run: java -jar target/botmaker-cli-0.0.0-SNAPSHOT-all.jar --help
+        run: java -jar target/botmaker-cli-*-all.jar --help
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -94,12 +94,12 @@ jobs:
       # before JReleaser runs — under the name jreleaser.yml expects, which is the part that failed on
       # v0.0.1.
       #
-      # SHADE NAMES THE JAR FROM THE POM'S <version>, AND THIS POM'S VERSION IS THE COSMETIC
-      # 0.0.0-SNAPSHOT (JitPack overrides a build's own version with the tag; see the umbrella CLAUDE.md).
-      # There is no <finalName> renaming it — deliberately, since finalName renames only the MAIN artifact
-      # and would produce a mismatched pair. So the shaded jar is ALWAYS botmaker-cli-0.0.0-SNAPSHOT-all.jar
-      # whatever the tag says, and jreleaser.yml's asset path used to template the RELEASE version, which
-      # this build never produces: `Path does not exist … resolved: target/botmaker-cli-0.0.1-all.jar`.
+      # SHADE NAMES THE JAR FROM THE POM'S <version>. There is no <finalName> renaming it — deliberately,
+      # since finalName renames only the MAIN artifact and would produce a mismatched pair. Until 2026-10-06
+      # the version was a cosmetic 0.0.0-SNAPSHOT whatever the tag said, and jreleaser.yml's asset path once
+      # templated the release version: `Path does not exist … resolved: target/botmaker-cli-0.0.1-all.jar`.
+      # The pom carries the real version now (umbrella docs/refactor/43-real-versions.md); the glob below
+      # takes whichever one it is.
       #
       # The rename happens HERE rather than in a JReleaser `transform:` so that exactly one name exists
       # from this point on — the one the README's `releases/latest/download/botmaker-cli-all.jar` names.
@@ -110,12 +110,12 @@ jobs:
           source .github/mvn-retry.sh
           mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
-          # The tag reaches the manifest here and nowhere else: ${project.version} is the cosmetic
-          # 0.0.0-SNAPSHOT, so without this `botmaker --version` answers "(dev)" on a released package.
+          # The tag reaches the manifest here and nowhere else, so without this `botmaker --version`
+          # answers "(dev)" on a released package.
           mvn_retry mvn -B package -DskipTests "-Dbotmaker.cli.version=${GITHUB_REF_NAME#v}"
-          shaded=target/botmaker-cli-0.0.0-SNAPSHOT-all.jar
-          if [ ! -f "$shaded" ]; then
-            echo "::error::$shaded was not produced — maven-shade-plugin attached nothing, or the pom's <version> is no longer 0.0.0-SNAPSHOT. jreleaser.yml expects target/botmaker-cli-all.jar." >&2
+          shaded=$(ls -1 target/botmaker-cli-*-all.jar 2>/dev/null | head -1)
+          if [ -z "$shaded" ]; then
+            echo "::error::no target/botmaker-cli-*-all.jar was produced — maven-shade-plugin attached nothing. jreleaser.yml expects target/botmaker-cli-all.jar." >&2
             ls -la target >&2
             exit 1
           fi

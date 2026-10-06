@@ -15,7 +15,7 @@ class CiDepsGateTest {
     private static final String POM = """
             <project>
               <properties>
-                <botmaker.shared.version>0.0.0-SNAPSHOT</botmaker.shared.version>
+                <botmaker.shared.version>0.1.3-SNAPSHOT</botmaker.shared.version>
                 <botmaker.studioapi.version>0.0.0-SNAPSHOT</botmaker.studioapi.version>
                 <botmaker.sdk.version>1.1.6</botmaker.sdk.version>
               </properties>
@@ -24,8 +24,8 @@ class CiDepsGateTest {
 
     @Test
     void onlySnapshotPinsAreUpstreamsCiHasToCheckOut() {
-        // A pin at a real version resolves from JitPack and needs no checkout; only 0.0.0-SNAPSHOT means
-        // "this comes from a source install".
+        // A pin at a released version resolves from JitPack and needs no checkout; any -SNAPSHOT means
+        // "this comes from a source install" — a real one as on main since 2026-10-06, or the old 0.0.0.
         assertEquals(Set.of("shared", "studioapi"), CiDepsGate.keys(POM));
     }
 
@@ -35,7 +35,7 @@ class CiDepsGateTest {
                 + "LiQiyeDev/botmaker-shared\n  - run: git clone …/botmaker-studio-api\n";
         GateVerdict verdict = CiDepsGate.check(Module.SDK, POM, Optional.of(ci), false);
         assertEquals(GateVerdict.Status.OK, verdict.status());
-        assertEquals("  sdk: ci.yml checks out every 0.0.0-SNAPSHOT upstream — ok", verdict.line());
+        assertEquals("  sdk: ci.yml checks out every -SNAPSHOT upstream — ok", verdict.line());
     }
 
     @Test
@@ -43,7 +43,7 @@ class CiDepsGateTest {
         GateVerdict verdict = CiDepsGate.check(Module.SDK, POM, Optional.of("steps: []"), false);
         assertTrue(verdict.stops());
         assertTrue(verdict.refusal().startsWith(
-                "botmaker-sdk: pom.xml resolves botmaker-shared botmaker-studio-api at 0.0.0-SNAPSHOT"),
+                "botmaker-sdk: pom.xml resolves botmaker-shared botmaker-studio-api at a -SNAPSHOT"),
                 verdict.refusal());
         // The reason this gate exists, in the refusal itself: the umbrella reactor hides the failure.
         assertTrue(verdict.refusal().contains("the umbrella reactor hides it"));

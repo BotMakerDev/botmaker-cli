@@ -69,13 +69,13 @@ class PublishVersionTest {
                 "the refusal must name the option that fixes it: " + refusal);
     }
 
-    /** A committed pom here says {@code 0.0.0-SNAPSHOT} because JitPack overrides it with the tag. */
+    /** A committed pom on main says {@code X.Y.Z-SNAPSHOT}; only a tag's pom names a released contract. */
     @Test
     void a_snapshot_contract_version_is_refused_too() {
-        String refusal = PluginPublishCommand.contractVersionRefusal("0.0.0-SNAPSHOT");
+        String refusal = PluginPublishCommand.contractVersionRefusal("0.4.3-SNAPSHOT");
 
         assertNotNull(refusal);
-        assertTrue(refusal.contains(".deps.env"),
+        assertTrue(refusal.contains("released botmaker-studio-api version"),
                 "the refusal must say where a module of this project finds the real answer: " + refusal);
     }
 

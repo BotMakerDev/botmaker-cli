@@ -264,11 +264,11 @@ final class PluginPublishCommand implements Callable<Integer> {
      * <p>Three ways it is unusable, and the third is the one this project hits every time. An unresolved
      * {@code ${…}} means the property lives somewhere this reader cannot see — a parent pom, the settings —
      * and would be published literally. A blank means the plugin declares no contract at all, which
-     * {@code pom-scopes} refuses anyway. And a {@code -SNAPSHOT} is what every BotMaker module's own
-     * committed pom carries, because JitPack overrides it with the tag: it is the cosmetic version, never
-     * the one the plugin was built against. In all three the author knows the answer and the tool does not,
-     * so it asks rather than guessing — {@code --min-contract-version} is the flag, and for a module of this
-     * project the value is the {@code STUDIO_API_TAG} in its own {@code .deps.env}.
+     * {@code pom-scopes} refuses anyway. And a {@code -SNAPSHOT} is what every BotMaker module's pom carries
+     * on {@code main}: a version that exists only in a local build, never one a stranger resolves. In all
+     * three the author knows the answer and the tool does not, so it asks rather than guessing —
+     * {@code --min-contract-version} is the flag, and for a module of this project the value is the released
+     * contract its last tag's pom names.
      */
     static String contractVersionRefusal(String contractVersion) {
         if (contractVersion == null || contractVersion.isBlank()) {
@@ -283,10 +283,10 @@ final class PluginPublishCommand implements Callable<Integer> {
                     + " was actually built against.";
         }
         if (contractVersion.endsWith("-SNAPSHOT")) {
-            return "the contract version reads " + contractVersion + ", which is a snapshot: JitPack"
-                    + " overrides it with the tag, so it is not a version anyone can resolve. Pass"
-                    + " --min-contract-version <version> — for a module of this project that is the"
-                    + " STUDIO_API_TAG in its own .deps.env.";
+            return "the contract version reads " + contractVersion + ", which is a snapshot: it exists"
+                    + " only in a local build, so it is not a version anyone can resolve. Pass"
+                    + " --min-contract-version <version> with the released botmaker-studio-api version"
+                    + " this plugin was built against.";
         }
         return null;
     }

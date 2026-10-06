@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  * <p><b>The pin is a property since 2026-09-24</b> — {@code <botmaker.sdk.version>} in the template's
  * {@code <properties>}, which its dependency names as {@code ${botmaker.sdk.version}}. That is what lets the
  * umbrella's {@code templates} profile build the template against the reactor's SDK with
- * {@code -Dbotmaker.sdk.version=0.0.0-SNAPSHOT} on every commit, so an {@code api.*} break fails the commit
+ * {@code -Dbotmaker.sdk.version=<the SDK pom's -SNAPSHOT>} on every commit, so an {@code api.*} break fails the commit
  * that made it rather than the next release. The anchor is the property element, which names one thing.
  */
 public final class TemplatePin {

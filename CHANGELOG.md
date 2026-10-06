@@ -7,9 +7,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.2.0; re-released for updated upstream pins.
+### Changed
 
-No source changes since v0.1.4; re-released for updated upstream pins.
+- The pom carries a real version and names its upstreams' versions, so a tag's pom says what it was built
+  against; `.deps.env` is gone and JitPack runs a plain `mvn install` (umbrella
+  `docs/refactor/43-real-versions.md`). The release's SDK plugin gate finds the newest
+  `botmaker-cli-*-all.jar` instead of a fixed `0.0.0-SNAPSHOT` name, and `CiDepsGate` reads any `-SNAPSHOT`
+  pin as a source install.
+- `plugin publish`'s snapshot-contract refusal no longer points at `.deps.env`.
 
 No source changes since v0.1.3; re-released for updated upstream pins.
 
