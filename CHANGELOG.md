@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- `plugin run` says what a `-SNAPSHOT` plugin needs in Studio: Studio loads one only in a project with dev
+  mode on (*Project ▸ Plugins & Libraries ▸ Dev mode*), and Reload picks up each rebuild. The command does
+  not switch dev mode on itself. Its no-`--project` hint names *Plugins & Libraries* instead of the old
+  *Manage Libraries*.
+
 - The pom carries a real version and names its upstreams' versions, so a tag's pom says what it was built
   against; `.deps.env` is gone and JitPack runs a plain `mvn install` (umbrella
   `docs/refactor/43-real-versions.md`). The release's SDK plugin gate finds the newest

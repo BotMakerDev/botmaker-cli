@@ -21,6 +21,12 @@ import java.util.concurrent.Callable;
  * checks {@code ~/.m2} before JitPack. Nothing clever, and deliberately nothing new — the local dev loop is
  * the one thing in this project that is not to be reinvented.
  *
+ * <p><b>Studio loads the pinned {@code -SNAPSHOT} only in dev mode</b> (since 2026-10-06; before that, not at
+ * all). Dev mode is a per-project switch in Studio's <i>Project ▸ Plugins &amp; Libraries</i> window, stored
+ * in the project's {@code .botmaker/settings.json}. This command prints {@link #DEV_MODE_HINT} and does not
+ * write that file: Studio owns it, and turning dev mode on is the author's choice, made in front of the
+ * banner that says so. Publish refuses a {@code -SNAPSHOT} pin either way.
+ *
  * <p><b>It does not create a bot project.</b> Composing one means composing its pom, which is
  * {@code MavenService}'s job in Studio and stays there for a reason worth repeating: only the thing that
  * knows the whole plugin set can write the file that names them. So this points at a project that already
@@ -43,6 +49,11 @@ final class PluginRunCommand implements Callable<Integer> {
      */
     static final Path PROJECTS_ROOT =
             Path.of(System.getProperty("user.home"), "BotMakerProjects");
+
+    /** What a {@code -SNAPSHOT} plugin needs before Studio loads it; printed after the pin. */
+    static final String DEV_MODE_HINT = "Studio loads a -SNAPSHOT plugin only in dev mode: tick Dev mode in"
+            + " Project ▸ Plugins & Libraries (Studio offers it on the refused row), and press Reload after"
+            + " each rebuild. Publish refuses the pin until you release the plugin and pin its tag.";
 
     @ParentCommand
     private PluginCommand parent;
@@ -95,7 +106,10 @@ final class PluginRunCommand implements Callable<Integer> {
             }
         } else {
             console.warn("no --project given, so nothing was added to a bot's pom. The plugin is in ~/.m2;"
-                    + " add it through Project ▸ Manage Libraries, or re-run with --project <name>.");
+                    + " add it through Project ▸ Plugins & Libraries, or re-run with --project <name>.");
+        }
+        if (plugin.version().endsWith("-SNAPSHOT")) {
+            console.step(DEV_MODE_HINT);
         }
 
         return launchStudio();

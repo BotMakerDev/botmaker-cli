@@ -6,6 +6,11 @@ that put it there (2026-08-26) is recorded in the umbrella `CLAUDE.md`. `run` po
 already exists and adds one dependency, idempotently: it runs on every launch, and a pom rewritten every
 time is a project Studio believes has changed every time.
 
+It does not turn on Studio's dev mode (2026-10-06). Studio loads a `-SNAPSHOT` plugin only in a project
+whose dev mode is on, a flag in the project's `.botmaker/settings.json`. That file is Studio's, so `run`
+prints `DEV_MODE_HINT` after a `-SNAPSHOT` pin and leaves the switch to the author, in front of the banner
+that says the project loads unreleased builds.
+
 `PROJECTS_ROOT` is duplicated from `studio/config/Constants` rather than imported, because importing it would
 mean depending on an app with JavaFX, OpenCV and JNA behind it to learn one path.
 
