@@ -120,32 +120,95 @@ public final class PomVersions {
             if (skip.contains(dependent) || !Files.exists(theirs)) {
                 continue;
             }
-            Path dir = theirs.getParent();
-            if (!runner.dryRun() && (!Git.run(dir, "diff", "--quiet", "--", "pom.xml").ok()
-                    || !Git.run(dir, "diff", "--cached", "--quiet", "--", "pom.xml").ok())) {
-                // Committing it would sweep somebody's edit, staged or not, into the pin commit.
-                runner.say("warn: " + dependent.directory() + ": pom.xml has uncommitted changes — its "
-                        + module.shortName() + " pin was not moved to " + next);
-                continue;
-            }
-            if (!runner.dryRun() && Git.capture(dir, "symbolic-ref", "--quiet", "--short", "HEAD")
-                    .filter(branch -> !branch.isBlank()).isEmpty()) {
-                // A commit on a detached HEAD is never pushed, and the umbrella would record a pointer to it.
-                runner.say("warn: " + dependent.directory() + ": detached HEAD — its " + module.shortName()
-                        + " pin was not moved to " + next);
-                continue;
-            }
-            try {
-                setProperty(runner, theirs, module, next);
-                commitPom(runner, dir, "pin " + module.shortName() + " " + next);
+            if (pin(runner, dependent, theirs, module, next)) {
                 moved.add(dependent);
-            } catch (ReleaseRefusal e) {
-                runner.git(dir, "checkout", "--", "pom.xml");
-                runner.say("warn: " + dependent.directory() + ": its " + module.shortName()
-                        + " pin was not moved to " + next + " — " + e.getMessage());
             }
         }
         return List.copyOf(moved);
+    }
+
+    /**
+     * Every pin on {@code main} that is not its upstream's {@code main} version, moved to it — the repair for
+     * what {@link VersionsGate} refuses, and the same comparison ({@link VersionsGate#stale}). One commit per
+     * pin, subjects as {@link #follow} writes them; nothing is pushed.
+     *
+     * <p>For a release that stopped before it could move a dependent: on 2026-10-07 cli's push failed after
+     * its back-to-snapshot commit, and the dashboard kept pinning cli 0.2.1-SNAPSHOT against cli's
+     * 0.2.2-SNAPSHOT until somebody would have edited it by hand.
+     *
+     * @return the modules committed, whose pointers the umbrella records, and how many stale pins stayed
+     */
+    public static Synced syncPins(Runner runner, Path umbrella) {
+        List<Module> moved = new ArrayList<>();
+        int left = 0;
+        for (Module module : Order.DECIDE) {
+            Path pom = pom(umbrella, module);
+            if (!moves(module) || !Files.exists(pom)) {
+                continue;
+            }
+            boolean any = false;
+            for (VersionsGate.Stale stale : VersionsGate.stale(module, read(pom),
+                    VersionsGate.upstreamVersions(umbrella, module))) {
+                if (stale.pinned().equals("(none)") || stale.theirs().equals("(none)")) {
+                    runner.say("warn: " + module.directory() + ": " + stale.line() + " — not moved");
+                    left++;
+                    continue;
+                }
+                runner.say("  " + module.directory() + ": " + stale.line() + " — moving it");
+                if (pin(runner, module, pom, stale.upstream(), stale.theirs())) {
+                    any = true;
+                } else {
+                    left++;
+                }
+            }
+            if (any) {
+                moved.add(module);
+            }
+        }
+        return new Synced(List.copyOf(moved), left);
+    }
+
+    /**
+     * What {@link #syncPins} did.
+     *
+     * @param moved the modules with a pin commit
+     * @param left  the stale pins it warned about and did not move
+     */
+    public record Synced(List<Module> moved, int left) {
+    }
+
+    /**
+     * One pin moved and committed in {@code dependent}'s repository. Never fatal: a pin left behind is a
+     * warning, and {@link VersionsGate} names it on the next release.
+     *
+     * @return whether the pin commit was made
+     */
+    private static boolean pin(Runner runner, Module dependent, Path theirs, Module upstream, String next) {
+        Path dir = theirs.getParent();
+        if (!runner.dryRun() && (!Git.run(dir, "diff", "--quiet", "--", "pom.xml").ok()
+                || !Git.run(dir, "diff", "--cached", "--quiet", "--", "pom.xml").ok())) {
+            // Committing it would sweep somebody's edit, staged or not, into the pin commit.
+            runner.say("warn: " + dependent.directory() + ": pom.xml has uncommitted changes — its "
+                    + upstream.shortName() + " pin was not moved to " + next);
+            return false;
+        }
+        if (!runner.dryRun() && Git.capture(dir, "symbolic-ref", "--quiet", "--short", "HEAD")
+                .filter(branch -> !branch.isBlank()).isEmpty()) {
+            // A commit on a detached HEAD is never pushed, and the umbrella would record a pointer to it.
+            runner.say("warn: " + dependent.directory() + ": detached HEAD — its " + upstream.shortName()
+                    + " pin was not moved to " + next);
+            return false;
+        }
+        try {
+            setProperty(runner, theirs, upstream, next);
+            commitPom(runner, dir, "pin " + upstream.shortName() + " " + next);
+            return true;
+        } catch (ReleaseRefusal e) {
+            runner.git(dir, "checkout", "--", "pom.xml");
+            runner.say("warn: " + dependent.directory() + ": its " + upstream.shortName()
+                    + " pin was not moved to " + next + " — " + e.getMessage());
+            return false;
+        }
     }
 
     /**

@@ -2,6 +2,7 @@ package com.botmaker.cli.release;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,6 +33,21 @@ class VersionsGateTest {
         assertTrue(verdict.stops());
         assertTrue(verdict.refusal().contains("botmaker.studioapi.version is 0.4.2-SNAPSHOT,"
                 + " botmaker-studio-api's pom says 0.4.3-SNAPSHOT"), verdict.refusal());
+    }
+
+    @Test
+    void theRefusalNamesTheRepair() {
+        GateVerdict verdict = VersionsGate.check(Module.PLUGIN_HOST, pom("0.3.3-SNAPSHOT", "0.4.2-SNAPSHOT"),
+                CONTRACT_ON_MAIN, false);
+        assertTrue(verdict.refusal().contains("botmaker release --sync-pins --execute"), verdict.refusal());
+    }
+
+    @Test
+    void staleListsOnlyThePinsOffTheirUpstreamsMain() {
+        assertEquals(List.of(new VersionsGate.Stale(Module.STUDIO_API, "0.4.2-SNAPSHOT", "0.4.3-SNAPSHOT")),
+                VersionsGate.stale(Module.PLUGIN_HOST, pom("0.3.3-SNAPSHOT", "0.4.2-SNAPSHOT"), CONTRACT_ON_MAIN));
+        assertEquals(List.of(),
+                VersionsGate.stale(Module.PLUGIN_HOST, pom("0.3.3-SNAPSHOT", "0.4.3-SNAPSHOT"), CONTRACT_ON_MAIN));
     }
 
     @Test

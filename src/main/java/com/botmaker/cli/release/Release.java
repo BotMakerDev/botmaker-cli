@@ -181,6 +181,7 @@ public final class Release {
         List<ReleaseLog.Row> rows = new ArrayList<>(ReleaseLog.rows(releasing));
         Path log = ReleaseLog.write(runner, umbrella, when, rows);
         Map<Module, Version> tagged = new java.util.EnumMap<>(Module.class);
+        Map<Module, Version> unpushed = new java.util.EnumMap<>(Module.class);
         String[] at = {""};
 
         for (int i = 0; i < rows.size(); i++) {
@@ -192,7 +193,7 @@ public final class Release {
                 notReachedAfter(rows, i);
                 runner.say("error: " + STOPPED_BY_YOU + " before " + row.module().directory() + " — "
                         + tagged.size() + " of " + rows.size() + " modules were tagged.");
-                recordStop(runner, umbrella, when, log, rows, tagged, followed);
+                recordStop(runner, umbrella, when, log, rows, tagged, unpushed, followed);
                 throw new ReleaseRefusal(STOPPED_BY_YOU + " before " + row.module().directory() + ". "
                         + tagged.size() + " of " + rows.size() + " modules were tagged.");
             }
@@ -216,12 +217,16 @@ public final class Release {
                 } else {
                     rows.set(i, row.failed(at[0], e.getMessage() == null ? e.getClass().getSimpleName()
                             : e.getMessage()).withElapsed(took));
+                    if (e instanceof NotPushed) {
+                        unpushed.put(row.module(), row.version());
+                    }
                 }
                 notReachedAfter(rows, i);
                 runner.say("error: " + row.module().directory() + " failed at " + at[0]
                         + " — the release stopped here. " + tagged.size() + " of " + rows.size()
-                        + " modules were tagged.");
-                recordStop(runner, umbrella, when, log, rows, tagged, followed);
+                        + " modules were tagged" + (unpushed.isEmpty() ? "." : ", and "
+                        + row.module().directory() + " " + row.version().tag() + " is tagged locally only."));
+                recordStop(runner, umbrella, when, log, rows, tagged, unpushed, followed);
                 throw e;
             }
             if (log != null) {
@@ -237,10 +242,16 @@ public final class Release {
         }
     }
 
-    /** The log as it stands and the pointers of what was tagged, committed locally; nothing is pushed. */
+    /**
+     * The log as it stands and the pointers of what was tagged, committed locally; nothing is pushed.
+     *
+     * @param unpushed the module whose push failed ({@link NotPushed}), if any: tagged and back on its
+     *                 snapshot locally, so its dependents follow it and its pointer is staged, while the
+     *                 commit subject leaves it out — origin has no tag of it
+     */
     private static void recordStop(Runner runner, Path umbrella, LocalDateTime when, Path log,
                                    List<ReleaseLog.Row> rows, Map<Module, Version> tagged,
-                                   java.util.Set<Module> followed) {
+                                   Map<Module, Version> unpushed, java.util.Set<Module> followed) {
         if (log != null) {
             runner.write(log, ReleaseLog.render(when, rows));
         }
@@ -251,8 +262,11 @@ public final class Release {
         // the moved set too left plugin-basics and the SDK at toolkit 0.3.3-SNAPSHOT on 2026-10-06.
         java.util.Set<Module> moved = java.util.EnumSet.noneOf(Module.class);
         moved.addAll(followed);
-        for (Map.Entry<Module, Version> done : tagged.entrySet()) {
-            moved.addAll(PomVersions.follow(runner, umbrella, done.getKey(), done.getValue(), tagged.keySet()));
+        moved.addAll(unpushed.keySet());
+        Map<Module, Version> local = new java.util.EnumMap<>(tagged);
+        local.putAll(unpushed);
+        for (Map.Entry<Module, Version> done : local.entrySet()) {
+            moved.addAll(PomVersions.follow(runner, umbrella, done.getKey(), done.getValue(), local.keySet()));
         }
         Umbrella.recordStopped(runner, umbrella, tagged, moved, log != null);
     }
@@ -305,9 +319,15 @@ public final class Release {
                     + " is local and nothing was pushed; pom.xml is back at its -SNAPSHOT in the working tree.");
         }
         at.accept("push");
-        if (!CommitTagPush.push(runner, umbrella, module, version)) {
-            throw new ReleaseRefusal(module.directory() + ": pushing " + version.tag() + " failed. Every"
-                    + " module after it pins that tag, so the release stops here.");
+        Proc.Result pushed = CommitTagPush.push(runner, umbrella, module, version);
+        if (!pushed.ok()) {
+            List<String> said = pushed.lines();
+            throw new NotPushed(module.directory() + ": pushing " + version.tag() + " failed:\n"
+                    + said.subList(Math.max(0, said.size() - 5), said.size()).stream()
+                    .map(line -> "       " + line).reduce((a, b) -> a + "\n" + b).orElse("       (git said nothing)")
+                    + "\n     The tag and the back-to-snapshot commit are local; once git can push, run"
+                    + " git -C " + module.directory() + " push origin HEAD " + version.tag() + ".\n"
+                    + "     Every module after it pins that tag, so the release stops here.");
         }
         at.accept("dependents' pins");
         followed.addAll(PomVersions.follow(runner, umbrella, module, version, releasing.keySet()));
@@ -387,6 +407,21 @@ public final class Release {
     }
 
     static final String STOPPED_BY_YOU = "stopped by you";
+
+    /**
+     * A module whose release commit, tag and back-to-snapshot commit are made and whose push failed.
+     *
+     * <p>Its row says {@code FAILED} at {@code push}, which is what origin sees: no tag. But its {@code main}
+     * is at the next snapshot already, so {@link #tagChain} still moves its dependents' pins and records its
+     * pointer. On 2026-10-07 it did neither: cli's {@code main} went to 0.2.2-SNAPSHOT, the dashboard kept
+     * pinning 0.2.1-SNAPSHOT, and {@link VersionsGate} refused the dashboard from then on.
+     */
+    static final class NotPushed extends ReleaseRefusal {
+
+        NotPushed(String message) {
+            super(message);
+        }
+    }
 
     /**
      * A module that was tagged and pushed, and still stops the chain — its JitPack build failed, timed out, or

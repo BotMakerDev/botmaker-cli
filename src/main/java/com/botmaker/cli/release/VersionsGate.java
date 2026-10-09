@@ -41,12 +41,47 @@ public final class VersionsGate {
             return GateVerdict.refused(module.directory() + ": mvn is not on PATH, and the release moves pom"
                     + " versions with " + PomVersions.PLUGIN + ". --force does not override it.");
         }
+        return check(module, PomVersions.read(pom), upstreamVersions(umbrella, module), force);
+    }
+
+    /** Each upstream's own pom version as checked out, {@code (none)} for one that names none. */
+    static java.util.Map<Module, String> upstreamVersions(Path umbrella, Module module) {
         java.util.Map<Module, String> upstreamVersions = new java.util.EnumMap<>(Module.class);
         for (Module upstream : module.upstreams()) {
             upstreamVersions.put(upstream, PomVersions.projectVersion(
                     PomVersions.read(PomVersions.pom(umbrella, upstream))).orElse("(none)"));
         }
-        return check(module, PomVersions.read(pom), upstreamVersions, force);
+        return upstreamVersions;
+    }
+
+    /**
+     * A pin that is not its upstream's {@code main} version.
+     *
+     * @param pinned what the pom says, {@code (none)} when it declares no property
+     * @param theirs the upstream pom's own version
+     */
+    record Stale(Module upstream, String pinned, String theirs) {
+
+        String line() {
+            return "botmaker." + upstream.propertyKey().orElseThrow() + ".version is " + pinned + ", "
+                    + upstream.directory() + "'s pom says " + theirs;
+        }
+    }
+
+    /**
+     * The pins this gate refuses — the one comparison it and {@link PomVersions#syncPins} make, so the repair
+     * moves exactly what the refusal names.
+     */
+    static List<Stale> stale(Module module, String pom, java.util.Map<Module, String> upstreamVersions) {
+        List<Stale> stale = new ArrayList<>();
+        for (Module upstream : module.upstreams()) {
+            String pinned = PomVersions.property(pom, upstream).orElse("(none)");
+            String theirs = upstreamVersions.get(upstream);
+            if (!pinned.equals(theirs)) {
+                stale.add(new Stale(upstream, pinned, theirs));
+            }
+        }
+        return List.copyOf(stale);
     }
 
     /**
@@ -57,18 +92,12 @@ public final class VersionsGate {
                                     boolean force) {
         String own = PomVersions.projectVersion(pom).orElse("(none)");
         List<String> wrong = new ArrayList<>();
+        List<Stale> stale = stale(module, pom, upstreamVersions);
         if (!own.endsWith("-SNAPSHOT")) {
             wrong.add("its own version is " + own + ", not a -SNAPSHOT — the last release did not return"
                     + " main to its snapshot");
         }
-        for (Module upstream : module.upstreams()) {
-            String pinned = PomVersions.property(pom, upstream).orElse("(none)");
-            String theirs = upstreamVersions.get(upstream);
-            if (!pinned.equals(theirs)) {
-                wrong.add("botmaker." + upstream.propertyKey().orElseThrow() + ".version is " + pinned
-                        + ", " + upstream.directory() + "'s pom says " + theirs);
-            }
-        }
+        stale.forEach(pin -> wrong.add(pin.line()));
         Matcher keys = PIN.matcher(pom.replaceAll("(?s)<!--.*?-->", ""));
         while (keys.find()) {
             String key = keys.group(1);
@@ -90,6 +119,8 @@ public final class VersionsGate {
         }
         return GateVerdict.refused(module.directory() + ": pom.xml is not where the last release left it:\n"
                 + wrong.stream().map(line -> "       " + line).reduce((a, b) -> a + "\n" + b).orElse("")
-                + "\n     Fix the pom on main (umbrella docs/refactor/43-real-versions.md), or --force.");
+                + (stale.isEmpty() ? "\n     Fix the pom on main (umbrella docs/refactor/43-real-versions.md)"
+                : "\n     Move the pins with botmaker release --sync-pins --execute (umbrella"
+                + " docs/refactor/43-real-versions.md)") + ", or --force.");
     }
 }

@@ -1,9 +1,12 @@
 package com.botmaker.cli.release;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -80,14 +83,40 @@ class PomVersionsTest {
             if (!PomVersions.moves(module) || !Files.exists(PomVersions.pom(umbrella, module))) {
                 continue;
             }
-            java.util.Map<Module, String> upstreams = new java.util.EnumMap<>(Module.class);
-            for (Module upstream : module.upstreams()) {
-                upstreams.put(upstream, PomVersions.projectVersion(
-                        PomVersions.read(PomVersions.pom(umbrella, upstream))).orElseThrow());
-            }
             GateVerdict verdict = VersionsGate.check(module, PomVersions.read(PomVersions.pom(umbrella, module)),
-                    upstreams, false);
+                    VersionsGate.upstreamVersions(umbrella, module), false);
             assertEquals(GateVerdict.Status.OK, verdict.status(), module + ": " + verdict.refusal());
         }
+    }
+
+    @Test
+    void syncPinsMovesExactlyThePinsTheGateRefuses(@TempDir Path umbrella) throws Exception {
+        // 2026-10-07: cli's push failed after its back-to-snapshot, and the dashboard kept cli 0.2.1-SNAPSHOT.
+        write(umbrella, Module.STUDIO_API, "0.5.1-SNAPSHOT", "");
+        write(umbrella, Module.PLUGIN_HOST, "0.4.1-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
+                + "</botmaker.studioapi.version>");
+        write(umbrella, Module.SHARED, "0.1.3-SNAPSHOT", "");
+        write(umbrella, Module.CLI, "0.2.2-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
+                + "</botmaker.studioapi.version><botmaker.pluginhost.version>0.4.1-SNAPSHOT"
+                + "</botmaker.pluginhost.version>");
+        write(umbrella, Module.DASHBOARD, "0.2.1-SNAPSHOT", "<botmaker.shared.version>0.1.3-SNAPSHOT"
+                + "</botmaker.shared.version><botmaker.cli.version>0.2.1-SNAPSHOT</botmaker.cli.version>");
+        List<String> said = new ArrayList<>();
+
+        PomVersions.Synced synced = PomVersions.syncPins(new Runner(true, said::add), umbrella);
+
+        assertEquals(List.of(Module.DASHBOARD), synced.moved());
+        assertEquals(0, synced.left());
+        assertTrue(said.stream().anyMatch(line -> line.contains("-Dproperty=botmaker.cli.version")
+                && line.contains("-DnewVersion=0.2.2-SNAPSHOT")), said.toString());
+        assertTrue(said.stream().anyMatch(line -> line.contains("botmaker-dashboard")
+                && line.endsWith("commit -m 'pin cli 0.2.2-SNAPSHOT' -- pom.xml")), said.toString());
+        assertTrue(said.stream().noneMatch(line -> line.contains("botmaker.shared.version")), said.toString());
+    }
+
+    private static void write(Path umbrella, Module module, String version, String pins) throws Exception {
+        Path dir = Files.createDirectories(umbrella.resolve(module.directory()));
+        Files.writeString(dir.resolve("pom.xml"), "<project><version>" + version + "</version><properties>"
+                + pins + "</properties></project>");
     }
 }

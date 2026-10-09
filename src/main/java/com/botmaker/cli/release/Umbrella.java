@@ -90,6 +90,23 @@ public final class Umbrella {
     }
 
     /**
+     * The pointer commit of {@link PomVersions#syncPins}: the modules whose pins moved, as a {@code pointers:}
+     * commit like any other bump. Path-limited, so nothing else staged in the umbrella rides along; not
+     * pushed, as the pin commits are not.
+     */
+    public static void recordSynced(Runner runner, Path umbrella, List<Module> moved) {
+        if (moved.isEmpty()) {
+            return;
+        }
+        runner.say("Recording submodule pointers in the umbrella");
+        List<String> dirs = moved.stream().map(Module::directory).toList();
+        List<String> argv = new java.util.ArrayList<>(List.of("commit", "-m",
+                "pointers: " + String.join(", ", dirs) + " — pins synced to their upstreams' main", "--"));
+        argv.addAll(dirs);
+        runner.git(umbrella, argv.toArray(String[]::new));
+    }
+
+    /**
      * Pushes every branch that is ahead of its upstream — submodules first, then the umbrella.
      *
      * @return false when a push failed, so the caller can say so without stopping

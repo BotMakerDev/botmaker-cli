@@ -14,6 +14,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   Two declarations of one id still fail.
 - `plugin validate`'s `types` check knows withers: a call's factory is checked against the parts before the
   withers', and each wither's argument must be a type a host writes.
+- A release whose push fails says what git said, and still moves the pins of that module's dependents and
+  records its pointer: its tag and back-to-snapshot commit are local by then. Before, the dashboard kept
+  pinning a cli snapshot nobody built, and every later release was refused over it.
+
+### Added
+
+- `botmaker release --sync-pins` moves every `botmaker.*.version` on `main` to its upstream's `main` version
+  — what the versions gate refuses, which now names the command — one commit per pin, plus the umbrella
+  pointer commit. Previews unless `--execute`; pushes nothing.
 
 ## [0.2.1] — 2026-10-07
 

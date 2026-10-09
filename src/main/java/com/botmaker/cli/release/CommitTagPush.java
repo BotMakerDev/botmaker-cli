@@ -37,7 +37,7 @@ public final class CommitTagPush {
     public static boolean run(Runner runner, Path umbrella, Module module, Version version, String message) {
         commit(runner, umbrella, module, message);
         tag(runner, umbrella, module, version);
-        return push(runner, umbrella, module, version);
+        return push(runner, umbrella, module, version).ok();
     }
 
     /**
@@ -65,15 +65,16 @@ public final class CommitTagPush {
     /**
      * Pushes the branch and the tag.
      *
-     * @return false when a push failed — reported by the caller rather than thrown, because by the time a
-     *         push runs the tag may already exist and aborting would leave a release that is done but looks
-     *         failed
+     * @return the first push that failed, git's own words in it, or the tag's successful push — reported by
+     *         the caller rather than thrown, because by the time a push runs the tag may already exist and
+     *         aborting would leave a release that is done but looks failed. The 2026-10-07 release dropped
+     *         git's answer here and said only "pushing v0.2.1 failed". The tag is not pushed when the branch
+     *         push failed: origin would hold a tag on a commit its {@code main} does not have.
      */
-    public static boolean push(Runner runner, Path umbrella, Module module, Version version) {
+    public static Proc.Result push(Runner runner, Path umbrella, Module module, Version version) {
         Path dir = umbrella.resolve(module.directory());
-        boolean head = runner.git(dir, "push", "origin", "HEAD").ok();
-        boolean tag = runner.git(dir, "push", "origin", version.tag()).ok();
-        return head && tag;
+        Proc.Result head = runner.git(dir, "push", "origin", "HEAD");
+        return head.ok() ? runner.git(dir, "push", "origin", version.tag()) : head;
     }
 
     /** Whether there is anything to commit — worktree modifications <b>or</b> a staged addition. */

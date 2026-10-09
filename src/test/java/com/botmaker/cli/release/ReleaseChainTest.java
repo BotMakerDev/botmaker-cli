@@ -168,6 +168,36 @@ class ReleaseChainTest {
     }
 
     @Test
+    void aFailedPushStillMovesItsDependentsPinsAndStagesItsPointer(@TempDir Path umbrella)
+            throws Exception {
+        // 2026-10-07: cli was tagged and back at 0.2.2-SNAPSHOT locally, its push failed, and the dashboard
+        // kept pinning 0.2.1-SNAPSHOT.
+        for (Module module : List.of(Module.CLI, Module.DASHBOARD)) {
+            Path dir = Files.createDirectories(umbrella.resolve(module.directory()));
+            Files.writeString(dir.resolve("pom.xml"), "<project><version>0.2.1-SNAPSHOT</version><properties>"
+                    + "<botmaker.cli.version>0.2.1-SNAPSHOT</botmaker.cli.version></properties></project>");
+        }
+        Map<Module, Version> releasing = new EnumMap<>(Module.class);
+        releasing.put(Module.CLI, new Version(0, 2, 1));
+        List<String> said = new ArrayList<>();
+
+        assertThrows(ReleaseRefusal.class, () ->
+                Release.tagChain(new Runner(true, said::add), umbrella, releasing, WHEN,
+                        (module, version, at) -> {
+                            at.accept("push");
+                            throw new Release.NotPushed("botmaker-cli: pushing v0.2.1 failed");
+                        }));
+
+        // A dry run, so pin commits are echoed rather than made — and the log is not written.
+        assertTrue(said.stream().anyMatch(line -> line.startsWith("error: botmaker-cli failed at push")
+                && line.endsWith("0 of 1 modules were tagged, and botmaker-cli v0.2.1 is tagged locally only.")),
+                said.toString());
+        assertTrue(said.stream().anyMatch(line -> line.contains("botmaker-dashboard")
+                && line.endsWith("commit -m 'pin cli 0.2.2-SNAPSHOT' -- pom.xml")), said.toString());
+        assertTrue(said.stream().anyMatch(line -> line.endsWith("add botmaker-cli")), said.toString());
+    }
+
+    @Test
     void aStopIsHonouredBetweenModules(@TempDir Path umbrella) throws Exception {
         List<String> said = new ArrayList<>();
         java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();

@@ -40,7 +40,11 @@ both. A dependent outside the release then has its pin moved and committed (`Pom
 fatal), and the umbrella records its pointer with the release's. Every edit is `versions-maven-plugin`
 (`set`, `set-property`), pinned in `PomVersions.PLUGIN`, run locally and never on JitPack. A failure before
 the release commit puts `pom.xml` back; one between the two commits puts the snapshot back in the working
-tree, and nothing is pushed. `ChangeKind` does not count a pom whose only change is versions, or every
+tree, and nothing is pushed. A failed push (`Release.NotPushed`, git's own lines in the message) leaves the
+tag and both commits local, so the stopped chain still follows that module's dependents and stages its
+pointer; until 2026-10-10 it did neither, and the dashboard kept a cli pin nobody built. A pin left behind
+anyway is repaired by `botmaker release --sync-pins` (`PomVersions.syncPins`: the same comparison as
+`VersionsGate.stale`, one `pin <module> <version>` commit each, a `pointers:` commit, nothing pushed). `ChangeKind` does not count a pom whose only change is versions, or every
 released module would read as changed by its own back-to-snapshot commit. This replaced `.deps.env`
 (`DepsEnv`, deleted) and the `-D` injection in each `jitpack.yml`.
 

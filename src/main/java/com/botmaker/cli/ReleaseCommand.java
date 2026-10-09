@@ -1,23 +1,22 @@
 package com.botmaker.cli;
 
 import com.botmaker.cli.release.Module;
+import com.botmaker.cli.release.PomVersions;
 import com.botmaker.cli.release.Release;
 import com.botmaker.cli.release.ReleaseRefusal;
 import com.botmaker.cli.release.ReleaseStatus;
 import com.botmaker.cli.release.Requested;
 import com.botmaker.cli.release.Runner;
+import com.botmaker.cli.release.Umbrella;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
@@ -150,6 +149,12 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "Re-poll a releases/*.md instead of planning (default: the newest).")
     private String status;
 
+    @Option(names = "--sync-pins",
+            description = "Instead of planning, move every botmaker.*.version on main to its upstream's main "
+                    + "version (what the versions gate refuses) and commit each pin. Previews unless --execute; "
+                    + "pushes nothing.")
+    private boolean syncPins;
+
     /**
      * The umbrella checkout, always absolute.
      *
@@ -181,6 +186,9 @@ public final class ReleaseCommand implements Callable<Integer> {
                 parent.console().error("not a botmaker umbrella checkout: " + umbrella);
                 return 2;
             }
+            if (syncPins) {
+                return syncPins(runner);
+            }
             if (status != null) {
                 ReleaseStatus.repoll(runner, umbrella,
                         status.isBlank() ? Optional.empty() : Optional.of(Path.of(status)));
@@ -191,6 +199,23 @@ public final class ReleaseCommand implements Callable<Integer> {
             parent.console().error(refused.getMessage());
             return 1;
         }
+    }
+
+    private int syncPins(Runner runner) {
+        if (!requested().isEmpty() || status != null) {
+            parent.console().error("--sync-pins releases and polls nothing — drop the module flags and --status.");
+            return 2;
+        }
+        PomVersions.Synced synced = PomVersions.syncPins(runner, umbrella);
+        Umbrella.recordSynced(runner, umbrella, synced.moved());
+        if (synced.left() > 0) {
+            parent.console().error(synced.left() + " stale pin(s) not moved — see the warnings above.");
+            return 1;
+        }
+        if (synced.moved().isEmpty()) {
+            runner.say("Every pin on main is at its upstream's main version — nothing to move.");
+        }
+        return 0;
     }
 
     private int plan(Runner runner) {
