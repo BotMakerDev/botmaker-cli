@@ -53,7 +53,7 @@ public enum Check {
      * plugin, a holder that is a simple class name, a value type some loaded plugin declares, and a first
      * value of that type that its declaration takes apart and puts back unchanged.
      */
-    MANAGED("managed", "Every @Managed value is one a host can write"),
+    MANAGED("managed", "Every managed value is one a host can write"),
 
     /** {@code slotEditors()} builds, and every predicate answers without throwing. */
     EDITORS("editors", "Every slot editor builds and answers"),

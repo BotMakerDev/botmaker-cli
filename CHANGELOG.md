@@ -9,9 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
-- `plugin validate`'s `managed` check accepts a typed id (`ManagedValue.method(SdkValue.Id.FLOW)`): its
-  spelling is the enum's, so only a string id is held to the lowercase-words pattern. Two declarations of
-  one id still fail.
+- `plugin validate`'s `managed` check takes typed ids only (`ManagedValue.method(SdkValue.Id.FLOW)`), as
+  the contract now does: their spelling is the enum's, so the lowercase-words pattern for string ids is gone.
+  Two declarations of one id still fail.
 
 ## [0.2.1] — 2026-10-07
 

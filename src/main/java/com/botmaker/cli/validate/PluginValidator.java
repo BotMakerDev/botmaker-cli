@@ -807,9 +807,6 @@ public final class PluginValidator {
     // 5b — managed values
     // -------------------------------------------------------------------------------------------------
 
-    /** A managed value's id: lowercase words joined by dots or dashes — {@code flow}, {@code flow.layout}. */
-    private static final Pattern MANAGED_ID = Pattern.compile("[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*");
-
     /**
      * Every value a judged plugin declares in {@code managedValues()} is one a host can write — the only method
      * it ever writes being {@code public static T id() { return <expression>; }} (2026-09-27).
@@ -818,8 +815,8 @@ public final class PluginValidator {
      * a class some loaded plugin declares (a type, or the parts of one) or one the host writes itself (a JDK
      * literal, an enum), and the first value — {@code initial}, or the declared type's {@code fresh()} — is
      * taken apart by its declaration and put back unchanged. A type declared only by its parts has no fresh
-     * value, so it owes an {@code initial}. An open set ({@code @Managed} on a class, no value type) is
-     * written as an empty class and asks only for its holder.
+     * value, so it owes an {@code initial}. An open set (the plugin's marker on a class) is written as an empty
+     * class, and asks for its holder and a host-writable element type.
      */
     private static CheckResult checkManaged(List<StudioPlugin> plugins, PluginSubject subject) {
         Map<String, ComponentType<?>> shapes = new HashMap<>();
@@ -874,11 +871,8 @@ public final class PluginValidator {
         String id = value.id();
         String at = plugin + ": managed value \"" + id + "\"";
         List<String> problems = new ArrayList<>();
-        // A typed id is an enum constant the contract checked when it was declared; only a string has a spelling.
-        if (value.marker() == null && (id == null || !MANAGED_ID.matcher(id).matches())) {
-            problems.add(at + " is not a well-formed id; use lowercase words joined by '.' or '-', as the"
-                    + " bot's @Managed(\"…\") will spell it");
-        } else if (!seen.add(id)) {
+        // The id is an enum constant the contract checked when it was declared, so it has no spelling to judge.
+        if (!seen.add(id)) {
             problems.add(at + " is declared twice; the bot's annotation can only mean one of them");
         }
         if (value.reason() == null || value.reason().isBlank()) {
@@ -894,9 +888,7 @@ public final class PluginValidator {
             List<Class<?>> known = new ArrayList<>();
             types.values().forEach(type -> known.add(type.type()));
             shapes.values().forEach(shape -> known.add(shape.type()));
-            // No element type: the deprecated untyped step a plugin built against contract 0.3 calls, still
-            // loaded by every host; javac's deprecation warning is what tells its author.
-            if (element != null && (element.isArray() || !writableClass(element, known))) {
+            if (element.isArray() || !writableClass(element, known)) {
                 problems.add(at + " holds constants of " + element.getName() + ", which no loaded plugin"
                         + " declares, so no host can write one");
             }
@@ -913,7 +905,7 @@ public final class PluginValidator {
         ComponentType<?> shape = shapes.get(raw.getName());
         if (!hostWrites && declared == null && shape == null) {
             problems.add(at + " returns " + raw.getName() + ", which no loaded plugin declares, so no host can"
-                    + " write `public static " + raw.getSimpleName() + " " + id + "()`");
+                    + " write the `public static " + raw.getSimpleName() + "` method holding it");
             return problems;
         }
         Object first = value.initial();
@@ -1168,7 +1160,8 @@ public final class PluginValidator {
             problems.add(CONTRACT_ARTIFACT + " is declared at scope '" + scope(contract)
                     + "'; it must be `provided` or `compile`, the two scopes a plugin's own source compiles"
                     + " against. `provided` for a plugin nothing else builds on, `compile` for one a bot"
-                    + " compiles against, since a bot writes the contract's @Param and @Managed");
+                    + " compiles against, since a bot writes the contract's @Param and the plugin's managed"
+                    + " marker");
         }
         Poms.Dependency toolkit = Poms.find(declared, CONTRACT_GROUP, TOOLKIT_ARTIFACT).orElse(null);
         if (toolkit != null && "provided".equals(toolkit.scope())) {
