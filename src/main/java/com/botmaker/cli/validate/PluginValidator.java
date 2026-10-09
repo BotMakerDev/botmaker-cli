@@ -11,6 +11,7 @@ import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.plugin.api.value.Wither;
 import com.botmaker.plugin.host.ContractLinks;
 import com.botmaker.plugin.host.Palettes;
 import com.botmaker.plugin.host.PluginLoader;
@@ -573,12 +574,41 @@ public final class PluginValidator {
             problems.add(id + ": " + name + " factory() returned null; the host has nothing to write it with");
             return problems;
         }
-        String why = factoryProblem(factory, cls, kinds);
+        // A wither's part follows the factory's, one each (Wither): the factory takes only the parts before them.
+        List<? extends Wither<?>> withers;
+        try {
+            withers = shape.withers();
+        } catch (RuntimeException | LinkageError e) {
+            problems.add(id + ": " + name + " withers() threw " + e);
+            return problems;
+        }
+        if (withers == null || withers.stream().anyMatch(Objects::isNull) || withers.size() > kinds.size()) {
+            problems.add(id + ": " + name + " withers() answered " + withers + ", which componentTypes() "
+                    + kinds.size() + " part(s) cannot follow; declare them with .with and .flag");
+            return problems;
+        }
+        String why = factoryProblem(factory, cls, kinds.subList(0, kinds.size() - withers.size()));
         if (why != null) {
             problems.add(id + ": " + name + " factory() " + factory + " " + why);
             return problems;
         }
-        for (String unwritable : known == null ? List.<String>of() : unwritableParts(factory, known)) {
+        List<String> unwritables = new ArrayList<>();
+        if (known != null) {
+            unwritables.addAll(unwritableParts(factory, known));
+            // A wither's argument only: the host writes the call it follows, never the receiver on its own.
+            int fixed = kinds.size() - withers.size();
+            for (int i = 0; i < withers.size(); i++) {
+                Wither<?> wither = withers.get(i);
+                if (wither.flag()) continue;
+                Type part = wither.method().getGenericParameterTypes()[0];
+                String leaf = unwritable(part, known, new HashSet<>());
+                if (leaf != null) {
+                    unwritables.add("part " + (fixed + i) + " (" + part.getTypeName() + ", ."
+                            + wither.method().getName() + ") " + leaf);
+                }
+            }
+        }
+        for (String unwritable : unwritables) {
             problems.add(id + ": " + name + " " + unwritable + ", so a host cannot write a " + cls.getSimpleName()
                     + " holding one: declare it, or write the part as a type a host writes");
         }

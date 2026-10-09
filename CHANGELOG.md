@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `plugin validate`'s `managed` check takes typed ids only (`ManagedValue.method(SdkValue.Id.FLOW)`), as
   the contract now does: their spelling is the enum's, so the lowercase-words pattern for string ids is gone.
   Two declarations of one id still fail.
+- `plugin validate`'s `types` check knows withers: a call's factory is checked against the parts before the
+  withers', and each wither's argument must be a type a host writes.
 
 ## [0.2.1] — 2026-10-07
 

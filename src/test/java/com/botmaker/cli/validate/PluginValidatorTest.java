@@ -295,6 +295,37 @@ class PluginValidatorTest {
         assertTrue(types.detail().getFirst().contains("does not survive"), types.detail()::toString);
     }
 
+    /** A call written with withers: its factory takes the parts before theirs, which the check must not count. */
+    private static final String TASK_PLUGIN = """
+            package p;
+            import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.value.ComponentType;
+            import com.botmaker.plugin.api.value.DeclaredCall;
+            import java.util.List;
+            public final class TaskPlugin implements StudioPlugin {
+                @Override public String id() { return "com.example.task"; }
+                public record Task(String name, String note, boolean home) {
+                    public static Task of(String name) { return new Task(name, "", false); }
+                    public Task described(String note) { return new Task(name, note, home); }
+                    public Task goesHome() { return new Task(name, note, true); }
+                }
+                public static final DeclaredCall<Task> TASK = ComponentType.part(Task.class)
+                        .writtenAs(Task::of, Task::name)
+                        .with(Task::described, Task::note)
+                        .flag(Task::goesHome, Task::home);
+                @Override public List<ComponentType<?>> componentTypes() { return List.of(TASK); }
+            }
+            """;
+
+    @Test
+    void a_call_with_withers_is_judged_on_its_factorys_parts(@TempDir Path dir) throws IOException {
+        Path classes = compile(dir, GOOD_PLUGIN, GOOD_API, TASK_PLUGIN);
+        services(classes, "p.GoodPlugin", "p.TaskPlugin");
+        CheckResult types = result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)),
+                Check.TYPES);
+        assertEquals(Status.PASS, types.status(), types::toString);
+    }
+
     @Test
     void a_type_with_no_fresh_value_fails(@TempDir Path dir) throws IOException {
         PluginSubject subject = subject(dir, GOOD_POM,
