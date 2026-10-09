@@ -874,11 +874,12 @@ public final class PluginValidator {
         String id = value.id();
         String at = plugin + ": managed value \"" + id + "\"";
         List<String> problems = new ArrayList<>();
-        if (id == null || !MANAGED_ID.matcher(id).matches()) {
+        // A typed id is an enum constant the contract checked when it was declared; only a string has a spelling.
+        if (value.marker() == null && (id == null || !MANAGED_ID.matcher(id).matches())) {
             problems.add(at + " is not a well-formed id; use lowercase words joined by '.' or '-', as the"
                     + " bot's @Managed(\"…\") will spell it");
         } else if (!seen.add(id)) {
-            problems.add(at + " is declared twice; a bot's @Managed(\"" + id + "\") can only mean one of them");
+            problems.add(at + " is declared twice; the bot's annotation can only mean one of them");
         }
         if (value.reason() == null || value.reason().isBlank()) {
             problems.add(at + " has no reason; it is the sentence the canvas shows when it refuses an edit there");

@@ -410,6 +410,21 @@ class PluginValidatorTest {
         assertEquals(Status.PASS, managed.status(), managed::toString);
     }
 
+    /** A typed id is spelt by its enum, not by the string pattern, and passes as one. */
+    @Test
+    void a_typed_id_passes(@TempDir Path dir) throws IOException {
+        String marker = "@com.botmaker.plugin.api.managed.ManagedMarker"
+                + " @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)"
+                + " public @interface GreetingValue { Id value(); enum Id { GREETING } } ";
+        String plugin = managing("com.botmaker.plugin.api.source.ManagedValue.method(GreetingValue.Id.GREETING)"
+                + ".in(\"Values\").holds(Greeting.class, null).because(\"why\")")
+                .replace("@Override public List<com.botmaker.plugin.api.source.ManagedValue<?>>",
+                        marker + "@Override public List<com.botmaker.plugin.api.source.ManagedValue<?>>");
+        CheckResult managed = result(PluginValidator.validate(subject(dir, GOOD_POM, plugin, GOOD_API)),
+                Check.MANAGED);
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+    }
+
     @Test
     void an_id_a_bot_could_not_spell_fails(@TempDir Path dir) throws IOException {
         CheckResult managed = managed(dir, "com.botmaker.plugin.api.source.ManagedValue.method(\"My Greeting\")"
