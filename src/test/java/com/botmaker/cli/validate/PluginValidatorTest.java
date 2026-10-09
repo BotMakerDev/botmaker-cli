@@ -648,7 +648,7 @@ class PluginValidatorTest {
     // ------------------------------------------------------------------------------------------------
 
     /**
-     * A {@code compile} contract passes since 2026-09-23: a bot writes {@code @Param} and {@code @Managed},
+     * A {@code compile} contract passes since 2026-09-23: a bot writes {@code @Param} and a plugin's managed mark,
      * so the SDK hands the contract on, and the loader is parent-first for it whatever the scope.
      */
     @Test

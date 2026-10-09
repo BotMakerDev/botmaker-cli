@@ -9,7 +9,6 @@ import com.botmaker.plugin.api.slot.ValueContext;
 
 import java.lang.reflect.Executable;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -75,7 +74,7 @@ final class StubContexts {
     }
 
     /**
-     * A value of {@code type} with no call behind it — a Parameters row, or a {@code @Managed} method.
+     * A value of {@code type} with no call behind it — a Parameters row, or a managed method.
      * An editor chosen by the call must decline this one, which is the property the archetype's generated
      * test holds and the reason the validator asks both shapes rather than only the slot.
      */
