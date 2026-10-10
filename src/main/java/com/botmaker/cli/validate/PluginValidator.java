@@ -355,6 +355,7 @@ public final class PluginValidator {
         List<String> unlinked = new ArrayList<>();
         Map<String, String> owners = new HashMap<>();
         List<Class<?>> known = declaredClasses(plugins);
+        List<Class<?>> literals = classLiterals(plugins);
         int roundTrips = 0;
         for (StudioPlugin plugin : plugins) {
             String id = safeId(plugin);
@@ -457,7 +458,7 @@ public final class PluginValidator {
                 continue;
             }
             for (ComponentType<?> shape : shapes) {
-                List<String> found = shapeProblems(id, shape, fresh, known);
+                List<String> found = shapeProblems(id, shape, fresh, known, literals);
                 if (found == null) {
                     roundTrips++;
                 } else {
@@ -546,7 +547,7 @@ public final class PluginValidator {
      * back. An empty list means it answered and there was no value to try it on.
      */
     private static List<String> shapeProblems(String id, ComponentType<?> shape, Map<String, Object> fresh,
-                                              List<Class<?>> known) {
+                                              List<Class<?>> known, List<Class<?>> literals) {
         List<String> problems = new ArrayList<>();
         Class<?> cls;
         List<Class<?>> kinds;
@@ -594,14 +595,14 @@ public final class PluginValidator {
         }
         List<String> unwritables = new ArrayList<>();
         if (known != null) {
-            unwritables.addAll(unwritableParts(factory, known));
+            unwritables.addAll(unwritableParts(factory, known, literals));
             // A wither's argument only: the host writes the call it follows, never the receiver on its own.
             int fixed = kinds.size() - withers.size();
             for (int i = 0; i < withers.size(); i++) {
                 Wither<?> wither = withers.get(i);
                 if (wither.flag()) continue;
                 Type part = wither.method().getGenericParameterTypes()[0];
-                String leaf = unwritable(part, known, new HashSet<>());
+                String leaf = unwritable(part, known, literals, new HashSet<>());
                 if (leaf != null) {
                     unwritables.add("part " + (fixed + i) + " (" + part.getTypeName() + ", ."
                             + wither.method().getName() + ") " + leaf);
@@ -720,7 +721,7 @@ public final class PluginValidator {
      * enum, {@code Object}, or a class some loaded plugin declares (or one such class's supertype, written
      * through the declaration of the value's own class).
      */
-    static List<String> unwritableParts(Executable factory, List<Class<?>> known) {
+    static List<String> unwritableParts(Executable factory, List<Class<?>> known, List<Class<?>> literals) {
         List<Type> parts = new ArrayList<>();
         if (factory instanceof Method method && !Modifier.isStatic(method.getModifiers())) {
             parts.add(method.getDeclaringClass());
@@ -737,7 +738,7 @@ public final class PluginValidator {
         }
         List<String> problems = new ArrayList<>();
         for (int i = 0; i < parts.size(); i++) {
-            String leaf = unwritable(parts.get(i), known, new HashSet<>());
+            String leaf = unwritable(parts.get(i), known, literals, new HashSet<>());
             if (leaf != null) {
                 problems.add("part " + i + " (" + parts.get(i).getTypeName() + ") " + leaf);
             }
@@ -745,14 +746,24 @@ public final class PluginValidator {
         return problems;
     }
 
-    /** Why a host could not write a value of {@code type}, or {@code null} when it can. */
-    private static String unwritable(Type type, List<Class<?>> known,
+    /**
+     * Why a host could not write a value of {@code type}, or {@code null} when it can. A {@code Class<X>} is
+     * written as a class literal of a bot's nested enum ({@code Activities.Collect.class}) when some loaded plugin
+     * declares a grouped open set whose element is an {@code X} — {@code literals}, from {@link #classLiterals}.
+     */
+    private static String unwritable(Type type, List<Class<?>> known, List<Class<?>> literals,
                                      Set<Type> seen) {
         if (!seen.add(type)) return null;
         return switch (type) {
             case Class<?> cls when cls.isArray() -> "is an array, which no host writes outside a varargs tail";
             case Class<?> cls -> writableClass(cls, known) ? null
                     : "holds " + cls.getName() + ", which no loaded plugin declares";
+            case ParameterizedType generic when generic.getRawType() == Class.class -> {
+                Class<?> bound = erasure(generic.getActualTypeArguments()[0]);
+                yield literals.stream().anyMatch(bound::isAssignableFrom) ? null
+                        : "holds java.lang.Class, which no loaded plugin's grouped open set writes as a class"
+                          + " literal of " + bound.getName();
+            }
             case ParameterizedType generic -> {
                 Class<?> raw = (Class<?>) generic.getRawType();
                 boolean container = HOST_CONTAINERS.contains(raw);
@@ -762,17 +773,47 @@ public final class PluginValidator {
                 // A method reference writes a functional interface whole: its type arguments are never values.
                 if (!container && functional(raw) && known.stream().noneMatch(raw::isAssignableFrom)) yield null;
                 for (Type argument : generic.getActualTypeArguments()) {
-                    String why = unwritable(argument, known, seen);
+                    String why = unwritable(argument, known, literals, seen);
                     if (why != null) yield why;
                 }
                 yield null;
             }
-            case WildcardType wildcard -> unwritable(wildcard.getUpperBounds()[0], known, seen);
-            case TypeVariable<?> variable -> unwritable(variable.getBounds()[0], known, seen);
+            case WildcardType wildcard -> unwritable(wildcard.getUpperBounds()[0], known, literals, seen);
+            case TypeVariable<?> variable -> unwritable(variable.getBounds()[0], known, literals, seen);
             case GenericArrayType ignored ->
                     "is an array, which no host writes outside a varargs tail";
             default -> "is a " + type.getTypeName() + ", which no host writes";
         };
+    }
+
+    /** The class {@code type} stands for: itself, its raw type, or its upper bound, {@code Object} for anything else. */
+    private static Class<?> erasure(Type type) {
+        return switch (type) {
+            case Class<?> cls -> cls;
+            case ParameterizedType generic -> erasure(generic.getRawType());
+            case WildcardType wildcard -> erasure(wildcard.getUpperBounds()[0]);
+            case TypeVariable<?> variable -> erasure(variable.getBounds()[0]);
+            default -> Object.class;
+        };
+    }
+
+    /**
+     * The element of each grouped open set ({@code ofEnums(…).groupedAs(…)}) some loaded plugin declares — the
+     * types a {@code Class<…>} part may be written for, as a class literal of one of the bot's nested enums. Every
+     * plugin, judged or not; a plugin whose values throw adds nothing, and the managed check reports it.
+     */
+    private static List<Class<?>> classLiterals(List<StudioPlugin> plugins) {
+        List<Class<?>> literals = new ArrayList<>();
+        for (StudioPlugin plugin : plugins) {
+            try {
+                for (ManagedValue<?> value : nonNull(plugin.managedValues())) {
+                    if (value != null && value.isOpenSet() && value.isGrouped()) literals.add(value.type());
+                }
+            } catch (RuntimeException | LinkageError e) {
+                // the managed check reports it
+            }
+        }
+        return List.copyOf(literals);
     }
 
     private static boolean writableClass(Class<?> cls, List<Class<?>> known) {

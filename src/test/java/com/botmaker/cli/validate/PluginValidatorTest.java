@@ -403,6 +403,36 @@ class PluginValidatorTest {
         assertEquals(Status.PASS, types.status(), types::toString);
     }
 
+    /** A {@code Class} part with no grouped open set to write it from: nothing a host could write a literal of. */
+    @Test
+    void a_class_part_with_no_grouped_set_fails(@TempDir Path dir) throws IOException {
+        CheckResult types = bagTypes(dir, "Class<? extends Loose>", "Class");
+        assertEquals(Status.FAIL, types.status(), types::toString);
+        assertTrue(types.detail().getFirst().contains("class literal of p.BagPlugin$Loose"), types.detail()::toString);
+    }
+
+    /**
+     * The same part beside a grouped open set of {@code Tag}s ({@code ofEnums(…).groupedAs(…)}): the host writes a
+     * class literal of one of the bot's nested enums ({@code Activities.Collect.class}), so it passes (2026-10-11).
+     */
+    @Test
+    void a_class_part_a_grouped_set_writes_passes(@TempDir Path dir) throws IOException {
+        String plugin = BAG_PLUGIN.replace("PART_RAW", "Class").replace("PART", "Class<? extends Tag>").replace(
+                "@Override public List<PluginType<?>> types() {",
+                MARKER + "public interface Tag { } "
+                        + "public static Tag tag(String group, String name) { return new Tag() { }; } "
+                        + "public static Loose group(String name) { return new Loose(); } "
+                        + "@Override public List<com.botmaker.plugin.api.source.ManagedValue<?>> managedValues() {"
+                        + " return List.of(com.botmaker.plugin.api.source.ManagedValue.openSet(GreetingValue.Id.GREETINGS)"
+                        + ".ofEnums(Tag.class, BagPlugin::tag).groupedAs(Loose.class, BagPlugin::group)"
+                        + ".in(\"Tags\").because(\"why\")); }"
+                        + " @Override public List<PluginType<?>> types() {");
+        Path classes = compile(dir, plugin);
+        services(classes, "p.BagPlugin");
+        CheckResult types = result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)), Check.TYPES);
+        assertEquals(Status.PASS, types.status(), types::toString);
+    }
+
     /** Containers over what the host writes itself — literals and enums, nested — are writable all the way down. */
     @Test
     void containers_of_literals_and_enums_pass(@TempDir Path dir) throws IOException {

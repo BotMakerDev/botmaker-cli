@@ -7,7 +7,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-No source changes since v0.3.1; re-released for updated upstream pins.
+### Fixed
+
+- `plugin validate`'s `types` check accepts a `Class<…>` part when a loaded plugin declares a grouped open set
+  (`ofEnums(…).groupedAs(…)`) whose element fits it: the host writes it as a class literal of one of the bot's
+  nested enums (`Activities.Collect.class`). It refused the SDK's `Flow.activity(Activities.Collect.class, …)`,
+  which stopped a release at the SDK's validation gate.
 
 No source changes since v0.3.0; re-released for updated upstream pins.
 
