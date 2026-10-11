@@ -3,7 +3,6 @@ package com.botmaker.cli.registry;
 import com.botmaker.cli.Console;
 import com.botmaker.cli.Mvn;
 import com.botmaker.cli.Subjects;
-import com.botmaker.cli.release.Git;
 import com.botmaker.cli.validate.CheckResult;
 import com.botmaker.cli.validate.PluginSubject;
 import com.botmaker.cli.validate.PluginValidator;
@@ -12,7 +11,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * The registry's gate: the check that decides a pull request, run from the registry's own CI.
@@ -43,13 +41,6 @@ import java.util.Optional;
  * itself was wrong. The same three the CLI uses, for the same reason — a workflow reads them.
  */
 public final class RegistryGate {
-
-    /**
-     * The pull request's base commit, from which an updated entry's current release is read (2026-10-11): the
-     * plugin's {@code managed-history} is checked {@code --against} it, so an update cannot reshape the managed
-     * values of every bot on the registered release without a conversion.
-     */
-    public static final String BASE_VARIABLE = "BOTMAKER_REGISTRY_BASE";
 
     private RegistryGate() {
     }
@@ -125,13 +116,6 @@ public final class RegistryGate {
             }
         }
 
-        String base = System.getenv(BASE_VARIABLE);
-        if (base == null || base.isBlank()) {
-            console.warn(BASE_VARIABLE + " is not set, so an updated entry is not compared with the release the"
-                    + " registry holds now, and managed-history is skipped. Set it to the pull request's base"
-                    + " commit.");
-        }
-
         int failures = 0;
         for (String path : entryPaths) {
             Path file = root.resolve(path);
@@ -143,7 +127,7 @@ public final class RegistryGate {
             }
             console.out("");
             console.out("── " + path);
-            failures += validate(console, subjects, registry, bundled, root, base, path) ? 0 : 1;
+            failures += validate(console, subjects, registry, bundled, root, path) ? 0 : 1;
         }
 
         console.out("");
@@ -166,27 +150,8 @@ public final class RegistryGate {
         return args;
     }
 
-    /**
-     * {@code groupId:artifactId:version} of the entry at {@code path} in the registry's {@code base} commit, or
-     * {@code null} when there is no base, no such entry there, or it does not read.
-     */
-    static String previousCoordinate(Path root, String base, String path) {
-        if (base == null || base.isBlank()) return null;
-        Optional<String> json = Git.capture(root, "show", base.strip() + ":" + path);
-        if (json.isEmpty()) return null;
-        try {
-            RegistryEntry held = Registry.mapper().readValue(json.get(), RegistryEntry.class);
-            if (held.coordinate() == null || held.verifiedVersion() == null || held.verifiedVersion().isBlank()) {
-                return null;
-            }
-            return held.coordinate() + ":" + held.verifiedVersion();
-        } catch (IOException e) {
-            return null;
-        }
-    }
-
     private static boolean validate(Console console, Subjects subjects, Registry registry, Bundled bundled,
-                                    Path root, String base, String path) {
+                                    Path root, String path) {
         Path file = root.resolve(path);
         Registry.Entry submitted;
         try {
@@ -234,19 +199,6 @@ public final class RegistryGate {
         } catch (IOException e) {
             console.error("could not resolve " + coordinate + ": " + e.getMessage());
             return false;
-        }
-
-        // The entry as the registry holds it before this pull request: its verified release is the previous one,
-        // which managed-history compares the managed values against. A new entry has none.
-        String previous = previousCoordinate(root, base, path);
-        if (previous != null && !previous.equals(coordinate)) {
-            try {
-                subject = subject.against(subjects.previous(previous, null));
-            } catch (IOException e) {
-                console.error("could not resolve " + previous + ", the release the registry holds now, to compare"
-                        + " against: " + e.getMessage());
-                return false;
-            }
         }
 
         List<CheckResult> results = PluginValidator.validate(subject);

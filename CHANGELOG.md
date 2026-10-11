@@ -10,25 +10,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - `plugin validate` reads a plugin's own parameters (`ManagedValue.param`). It checks that a generic one starts
-  as a value of its type, and `managed-history` reports a changed field type.
-
-- `plugin validate` has two new checks for a plugin's managed values.
-  - `conversions`: every `Conversion` a plugin declares reads and writes values its `managedValues()` declares.
-    Every retired value must be read by some conversion.
-  - `managed-history`: this check runs only with `--against <version|G:A:V>`, the previous release. Every
-    managed id that release declared must still be declared with the same marker, holder, shape and element
-    type. Every declared type reachable from it must still be written with the same factory and at least the
-    same withers. The one exception is an id that was retired there; it may be dropped.
-  - Messages spell an id `SdkValue.Id.FLOW` and types without packages.
-  - A reshaped value keeps its old id, retired, and the new shape takes a new id, converted from the old one.
-    `managed-history` is skipped in three cases:
-    - no `--against` is given;
-    - the previous release does not resolve, because no bot holds a release nobody can download;
-    - the previous release does not load against this contract.
-- The SDK plugin gate in the release library passes `--against` the SDK's last tag.
-- The registry gate compares an updated entry with the release the registry holds at the pull request's
-  base. The workflow passes that commit as `BOTMAKER_REGISTRY_BASE`. When the variable is unset, the gate
-  warns and skips the comparison.
+  as a value of its type.
+- A plugin may change a managed value's shape between releases. Nothing checks it against the previous
+  release: Studio's upgrade repairs a bot's values like the rest of its code.
 
 ### Fixed
 

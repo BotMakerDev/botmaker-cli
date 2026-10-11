@@ -102,16 +102,13 @@ may be fewer than this list:
 | `records` | every recorded-input method can be filled from a recording |
 | `value-types` | every declared type answers a class and a fresh value, no class is declared by two plugins, and a component type takes its fresh value apart and puts it back |
 | `managed` | every managed value is one a host can write as `public static T id() { return <expr>; }` |
-| `conversions` | every retired managed value is read by a declared `Conversion` |
-| `managed-history` | with `--against <previous release>`: no managed value changed shape without a new id and a conversion |
 | `editors` | every slot editor builds and every predicate answers without throwing |
 | `pickers` | every declared type has an editor, its own or another plugin's |
 | `pom-scopes` | `botmaker-studio-api` is `provided` or `compile`; `botmaker-plugin-toolkit` is not `provided` |
 | `plugin-deps` | nothing the plugin's own code links is `optional` — `optional` means *not transitive*, so a host resolves the plugin without it |
 
 `--coordinate G:A:V` validates a **published** artifact instead of your working copy. That is the one that
-catches a plugin which builds on your machine and publishes a pom nobody else can resolve. `--against`
-takes the previous release, as a version or a full coordinate.
+catches a plugin which builds on your machine and publishes a pom nobody else can resolve.
 
 **A local pass is not a promise the pull request passes.** Two of the checks ask whether an id is already
 claimed, and locally nothing is claimed — the registry's index holds those answers. The report says so.
