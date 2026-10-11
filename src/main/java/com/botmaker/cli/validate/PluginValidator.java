@@ -973,6 +973,16 @@ public final class PluginValidator {
             // Opened, never created: nothing here is written by a host, so there is nothing more to prove.
             return problems;
         }
+        if (value.isParam() && !(value.form() instanceof Class<?>)) {
+            // A generic field — Set<Class<? extends Outcome>> — is written by the host's grammar from its leaves,
+            // which no single declaration here stands for; what is left to prove is that it starts as one.
+            Object first = value.initial();
+            if (first != null && !value.type().isInstance(first)) {
+                problems.add(at + "'s first value is a " + first.getClass().getName() + ", not a "
+                        + value.form().getTypeName());
+            }
+            return problems;
+        }
         Class<?> raw = value.type();
         boolean hostWrites = raw.isPrimitive() || raw.isEnum() || raw == String.class
                 || Number.class.isAssignableFrom(boxed(raw)) || boxed(raw) == Boolean.class;
@@ -1094,6 +1104,11 @@ public final class PluginValidator {
                 for (ManagedValue<?> target : conversion.targets()) {
                     problems.addAll(undeclared(id, conversion, target, byId));
                 }
+                // Studio converts no plugin parameter yet, and refuses an upgrade whose conversion names one.
+                java.util.stream.Stream.concat(conversion.sources().stream(), conversion.targets().stream())
+                        .filter(ManagedValue::isParam).findFirst()
+                        .ifPresent(param -> problems.add(id + ": a conversion names the parameter \""
+                                + simple(param.id()) + "\", which Studio cannot convert yet"));
             }
             for (ManagedValue<?> value : byId.values()) {
                 if (!value.isRetired()) continue;
@@ -1250,6 +1265,11 @@ public final class PluginValidator {
         if (was.shape() != is.shape()) changed.add("shape (" + was.shape().id() + " → " + is.shape().id() + ")");
         if (!was.type().getName().equals(is.type().getName())) {
             changed.add("type (" + shortTypes(was.type().getName()) + " → " + shortTypes(is.type().getName()) + ")");
+        }
+        if (was.shape() == is.shape() && was.isParam()
+                && !was.form().getTypeName().equals(is.form().getTypeName())) {
+            changed.add("field type (" + shortTypes(was.form().getTypeName()) + " → "
+                    + shortTypes(is.form().getTypeName()) + ")");
         }
         if (was.shape() != is.shape() || !was.isOpenSet()) return changed;
         if (was.isEnum() != is.isEnum() || was.isGrouped() != is.isGrouped()) {

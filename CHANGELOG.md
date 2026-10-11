@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `plugin validate` reads a plugin's own parameters (`ManagedValue.param`). It checks that a generic one starts
+  as a value of its type, and `managed-history` reports a changed field type.
+
 - `plugin validate` has two new checks for a plugin's managed values.
   - `conversions`: every `Conversion` a plugin declares reads and writes values its `managedValues()` declares.
     Every retired value must be read by some conversion.
