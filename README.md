@@ -6,7 +6,7 @@ under `bot`, everything a bot author does that is not writing the bot.
 ```bash
 botmaker plugin new discord-notifier   # generate a plugin project from the archetype
 cd discord-notifier
-botmaker plugin validate               # the seven checks the plugin registry runs
+botmaker plugin validate               # the plugin registry's checks, run locally
 botmaker plugin run --project MyBot    # build it, add it to a bot, open Studio on the result
 botmaker plugin publish --repo me/discord-notifier
 ```
@@ -68,11 +68,11 @@ disagree, `--help` is right.
 ## Two nouns
 
 `plugin` is what extends Studio; `bot` is what you build with it. Each is created, tried and published the
-same way, and each spells its noun — **the four plugin verbs sat at the top level until v0.1.0** (`botmaker
-new`, `validate`, `run`, `publish`) and now live under `botmaker plugin`. Typing an old one tells you where
-it went and runs nothing.
+same way, and each spells its noun. The plugin verbs once sat at the top level (`botmaker new`, `validate`,
+`run`, `publish`); typing one of those tells you where it went and runs nothing.
 
-Two more verbs belong to the tool rather than to either noun: `doctor` and `completion`.
+Three more verbs belong to the tool rather than to either noun: `doctor`, `completion`, and `release` — the
+maintainer's cross-module release, run from the umbrella checkout.
 
 ## `botmaker plugin` — about a plugin
 
@@ -88,21 +88,30 @@ botmaker plugin new discord-notifier --group com.example --plugin-id com.example
 
 ### `botmaker plugin validate [dir]`
 
-The eight checks, and the same code the registry's CI runs on a pull request:
+The checks, in the same code the registry's CI runs on a pull request. The registry pins a released CLI
+(`BOTMAKER_CLI_VERSION` in its `validate.yml`), so until that pin moves it runs that release's checks, which
+may be fewer than this list:
 
 | check | passes when |
 |---|---|
 | `classpath` | the plugin's classpath resolves and every entry exists |
+| `contract-links` | every contract member the plugin's classes link exists in this build's contract — the check a host makes before loading it |
 | `loads` | `ServiceLoader` finds at least one `StudioPlugin` through the real loader |
 | `id` | every id is well formed and claimed by nobody else |
 | `palette` | `catalog().problems()` is empty and every entry names a real public member |
-| `value-types` | every declared type has a class and a fresh value (or a public static no-argument `freshCall()` returning the type), no class is declared by two plugins, and a `ComponentType` gives back the same parts through `build(components(fresh()))` |
-| `editors` | `slotEditors()` builds and every predicate answers without throwing |
+| `records` | every recorded-input method can be filled from a recording |
+| `value-types` | every declared type answers a class and a fresh value, no class is declared by two plugins, and a component type takes its fresh value apart and puts it back |
+| `managed` | every managed value is one a host can write as `public static T id() { return <expr>; }` |
+| `conversions` | every retired managed value is read by a declared `Conversion` |
+| `managed-history` | with `--against <previous release>`: no managed value changed shape without a new id and a conversion |
+| `editors` | every slot editor builds and every predicate answers without throwing |
+| `pickers` | every declared type has an editor, its own or another plugin's |
 | `pom-scopes` | `botmaker-studio-api` is `provided` or `compile`; `botmaker-plugin-toolkit` is not `provided` |
-| `plugin-deps` | `botmaker-plugin-toolkit` is not `optional` — `optional` means *not transitive*, so a host resolves a plugin without it |
+| `plugin-deps` | nothing the plugin's own code links is `optional` — `optional` means *not transitive*, so a host resolves the plugin without it |
 
 `--coordinate G:A:V` validates a **published** artifact instead of your working copy. That is the one that
-catches a plugin which builds on your machine and publishes a pom nobody else can resolve.
+catches a plugin which builds on your machine and publishes a pom nobody else can resolve. `--against`
+takes the previous release, as a version or a full coordinate.
 
 **A local pass is not a promise the pull request passes.** Two of the checks ask whether an id is already
 claimed, and locally nothing is claimed — the registry's index holds those answers. The report says so.
@@ -162,7 +171,7 @@ botmaker bot new farmer --from BotMakerDev/botmaker-gamebot   # from a published
 
 **Blank means blank**: a pom and one `main()` that prints a line. No SDK,
 no plugin, no BotMaker API — that is what a project with no plugins installed looks like, and it is one step
-from being a bot (**Project ▸ Manage Plugins** in Studio). The repositories are declared, so that step needs
+from being a bot (**Project ▸ Plugins & Libraries…** in Studio). The repositories are declared, so that step needs
 no hand-edited XML.
 
 `--from` downloads that template's release archive and renames **its package** — the one holding its
@@ -222,18 +231,30 @@ One script for both shells, because picocli emits bash and zsh runs it through `
 committed completion file: a hand-written one is a third statement of what the options are — beside the
 parser and the usage text — and the one that fails silently, by quietly not offering a verb somebody added.
 
-## Using `validate` as a library
+## `botmaker release` — the cross-module release
 
-The main artifact is a **library**, and the executable jar is the `all` classifier. That split exists for one
-reason: `com.botmaker.cli.validate` has two callers in two repositories — the author's `botmaker plugin validate`
-and the registry's CI — and a submission that fails for a reason its author could not have seen coming is
-exactly what the gate exists to prevent.
+```bash
+botmaker release --umbrella ~/IdeaProjects/botmaker --studio-api 0.6.0          # preview: decides, runs the gates
+botmaker release --umbrella ~/IdeaProjects/botmaker --studio-api 0.6.0 --execute
+```
+
+The maintainer's tool, and the one implementation behind the umbrella's `release.sh` and the dashboard's
+Release tab. It previews unless `--execute` is passed. Each module flag takes `x.y.z` or
+`patch|minor|major`; `--why` also says why each forced module is in the release. The umbrella's `README.md` describes forcing and the
+gates.
+
+## Using it as a library
+
+The main artifact is a **library**, and the executable jar is the `all` classifier. It holds two packages
+other repositories call: `com.botmaker.cli.validate` — the author's `botmaker plugin validate` and the
+registry's CI run the same code, so a submission never fails for a reason its author could not have seen —
+and `com.botmaker.cli.release`, which the dashboard runs in-process.
 
 ```xml
 <dependency>
     <groupId>com.github.BotMakerDev</groupId>
     <artifactId>botmaker-cli</artifactId>
-    <version>v0.1.0</version>
+    <version><!-- latest tag: https://github.com/BotMakerDev/botmaker-cli/tags --></version>
 </dependency>
 ```
 
@@ -257,5 +278,5 @@ The `-all` jar carries the version in its name because nothing renames it — a 
 renamed only the *main* artifact and left the pair spelled two different ways. The release renames the asset
 once, on the way out (`jreleaser.yml`), so the download URL above stays stable.
 
-Published through JitPack, which serves each git tag under `com.github.BotMakerDev` regardless of this pom's
-`groupId`/`version`. Releases are cut from the umbrella with `../release.sh --cli <version>`.
+Published through JitPack, which serves each git tag under `com.github.BotMakerDev`. Releases are cut from the
+umbrella only, with `--cli <version>` plus the downstream it forces (dashboard); `/release-check` names it.
