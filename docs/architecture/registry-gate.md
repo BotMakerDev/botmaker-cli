@@ -41,6 +41,13 @@ claimed the way every other id is — by `plugins/com.botmaker.sdk.json` existin
 gate distinguishes the two states rather than treating them alike: **unset** warns (nobody said, and the
 hole is open), **set and empty** is silent (the host bundles nothing, and says so).
 
+**An updated entry is checked `--against` the release the registry holds now (2026-10-11).**
+`BOTMAKER_REGISTRY_BASE` is the pull request's base commit. The gate reads the entry from there with `git show`
+and compares the submitted release's managed values with that release's (`managed-history`), so an update
+cannot reshape the values of every bot on the registered release without a conversion. A new entry has nothing
+to compare against. An unset variable warns and skips the check. The commit and the entry's path are passed to
+`git` as one argument, never through a shell.
+
 It parses two positional arguments by reading an array, and that is not laziness: picocli is `optional`
 precisely so a library consumer resolves no parser, and a gate that needed one would undo it. Changed paths
 arrive as `@file` because a pull request chooses its own filenames — a path interpolated into a workflow's

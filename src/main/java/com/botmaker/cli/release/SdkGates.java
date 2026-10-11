@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -111,8 +112,8 @@ public final class SdkGates {
         // `plugin validate`, not `validate`: the noun-first tree landed 2026-09-05 and the bare verb is a
         // hidden MovedCommand that prints its replacement and exits 2. A gate spelling it the old way would
         // refuse every SDK release, with a message about a command line rather than about the SDK.
-        Proc.Result validate = Proc.run(umbrella, "java", "-jar", jar.get().toString(),
-                "plugin", "validate", umbrella.resolve(Module.SDK.directory()).toString());
+        Proc.Result validate = Proc.run(umbrella, validateCommand(jar.get(), umbrella.resolve(Module.SDK.directory()),
+                previousRef(umbrella)).toArray(String[]::new));
         if (validate.ok()) {
             return GateVerdict.ok("  sdk: botmaker plugin validate passes — ok");
         }
@@ -126,6 +127,24 @@ public final class SdkGates {
                 + " cannot enforce\n"
                 + "     on anybody else. Fix it, or --force.\n\n"
                 + fromFail(validate));
+    }
+
+    /**
+     * The validate command line, {@code --against} the SDK's last release when there is one (2026-10-11): its
+     * {@code managed-history} check refuses a release whose managed values changed shape since that tag without a
+     * conversion, which would leave every bot upgrading to it with values nothing reads. The tag name is the
+     * JitPack version.
+     */
+    static List<String> validateCommand(Path jar, Path sdk, Optional<String> previous) {
+        List<String> command = new ArrayList<>(List.of("java", "-jar", jar.toString(),
+                "plugin", "validate", sdk.toString()));
+        previous.ifPresent(tag -> command.addAll(List.of("--against", tag)));
+        return command;
+    }
+
+    /** The tag of the SDK's newest release, as it is spelled in this checkout, or empty before its first. */
+    private static Optional<String> previousRef(Path umbrella) {
+        return Tags.latest(umbrella, Module.SDK).flatMap(version -> Tags.existingRef(umbrella, Module.SDK, version));
     }
 
     /** The {@code [ERROR]} lines a Maven failure is quoted by. */

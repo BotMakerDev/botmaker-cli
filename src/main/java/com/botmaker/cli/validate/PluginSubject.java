@@ -33,9 +33,35 @@ import java.util.Set;
  *                         classpath, {@code ServiceLoader} finds both, and the second one's id belongs to
  *                         its own entry. Without this the gate refuses the SDK for claiming an id it does
  *                         not claim.
+ * @param previous         the plugin's previous release, resolved, which {@link Check#MANAGED_HISTORY} compares
+ *                         the managed values against; {@code null} when nobody named one ({@code --against})
  */
 public record PluginSubject(List<Path> classpath, Path pom, Set<String> claimedPluginIds,
-                            String entryPluginId) {
+                            String entryPluginId, Previous previous) {
+
+    /**
+     * A release this plugin is compared against: what it was asked as, for the report, and its resolved classpath.
+     *
+     * @param coordinate {@code groupId:artifactId:version}
+     * @param unresolved why it did not resolve, or {@code null} when it did. A release nobody can download is a
+     *                   release no bot holds, so its check is skipped with this reason rather than failed: failing
+     *                   would refuse the very release that repairs a broken one
+     */
+    public record Previous(String coordinate, List<Path> classpath, String unresolved) {
+
+        public Previous {
+            classpath = List.copyOf(classpath);
+        }
+
+        public Previous(String coordinate, List<Path> classpath) {
+            this(coordinate, classpath, null);
+        }
+
+        /** A release that did not resolve, and why. */
+        public static Previous unresolved(String coordinate, String why) {
+            return new Previous(coordinate, List.of(), why);
+        }
+    }
 
     public PluginSubject {
         classpath = List.copyOf(classpath);
@@ -43,19 +69,29 @@ public record PluginSubject(List<Path> classpath, Path pom, Set<String> claimedP
         entryPluginId = entryPluginId == null ? "" : entryPluginId.strip();
     }
 
+    /** Everything but the previous release, which only a caller that resolved one has. */
+    public PluginSubject(List<Path> classpath, Path pom, Set<String> claimedPluginIds, String entryPluginId) {
+        this(classpath, pom, claimedPluginIds, entryPluginId, null);
+    }
+
     /** Everything but the entry id, which only the registry knows. */
     public PluginSubject(List<Path> classpath, Path pom, Set<String> claimedPluginIds) {
-        this(classpath, pom, claimedPluginIds, "");
+        this(classpath, pom, claimedPluginIds, "", null);
     }
 
     /** A local run: nothing is claimed yet, because nothing has been submitted. */
     public static PluginSubject local(List<Path> classpath, Path pom) {
-        return new PluginSubject(classpath, pom, Set.of(), "");
+        return new PluginSubject(classpath, pom, Set.of(), "", null);
     }
 
     /** The same subject, told which plugin the submission is about. */
     public PluginSubject about(String pluginId) {
-        return new PluginSubject(classpath, pom, claimedPluginIds, pluginId);
+        return new PluginSubject(classpath, pom, claimedPluginIds, pluginId, previous);
+    }
+
+    /** The same subject, compared against {@code release}, its previous release. */
+    public PluginSubject against(Previous release) {
+        return new PluginSubject(classpath, pom, claimedPluginIds, entryPluginId, release);
     }
 
     /**

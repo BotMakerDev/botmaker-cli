@@ -1,5 +1,6 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.project.Poms;
 import com.botmaker.cli.validate.PluginSubject;
 
 import java.io.IOException;
@@ -124,6 +125,43 @@ public final class Subjects {
             published = null;
         }
         return new PluginSubject(classpath, published, claimedIds);
+    }
+
+    /**
+     * The plugin's previous release, resolved for {@code --against}: {@code against} is a whole
+     * {@code groupId:artifactId:version}, or a version alone, which takes the group and artifact {@code pom}
+     * declares for itself — the subject's own, so a plugin is compared with an earlier release of itself.
+     */
+    public PluginSubject.Previous previous(String against, Path pom) throws IOException {
+        String coordinate = against.strip();
+        if (!coordinate.contains(":")) {
+            if (pom == null) {
+                throw new IOException("--against " + against + " names a version, and there is no pom to take the"
+                        + " groupId and artifactId from; pass groupId:artifactId:version");
+            }
+            Poms.Dependency self = Poms.coordinate(pom);
+            coordinate = self.groupId() + ":" + self.artifactId() + ":" + coordinate;
+        }
+        String[] parts = coordinate.split(":");
+        if (parts.length != 3 || java.util.Arrays.stream(parts).anyMatch(String::isBlank)) {
+            throw new IOException("expected --against groupId:artifactId:version or a version, got '" + against + "'");
+        }
+        Path work = Files.createTempDirectory("botmaker-against");
+        Path resolver = work.resolve("pom.xml");
+        Files.writeString(resolver, resolverPom(List.<String[]>of(parts)));
+        console.step("Resolving " + coordinate + " to compare against…");
+        // A release that does not resolve (a JitPack build that failed for good) is one no bot holds: the check
+        // skips with the reason, so the release repairing it is not refused.
+        List<Path> classpath;
+        try {
+            classpath = runtimeClasspath(work, resolver);
+        } catch (IOException e) {
+            return PluginSubject.Previous.unresolved(coordinate, e.getMessage());
+        }
+        if (classpath.isEmpty()) {
+            return PluginSubject.Previous.unresolved(coordinate, "it resolved to an empty classpath");
+        }
+        return new PluginSubject.Previous(coordinate, classpath);
     }
 
     /**

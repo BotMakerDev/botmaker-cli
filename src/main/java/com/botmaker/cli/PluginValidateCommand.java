@@ -48,6 +48,11 @@ final class PluginValidateCommand implements Callable<Integer> {
     @Option(names = "--no-build", description = "Trust the existing target/classes.")
     private boolean noBuild;
 
+    @Option(names = "--against", paramLabel = "<version|G:A:V>",
+            description = "The plugin's previous release, to check that no managed value changed shape since it"
+                    + " without a conversion. A version alone takes the groupId and artifactId from the pom.")
+    private String against;
+
     @Override
     public Integer call() throws IOException {
         Console console = parent.main().console();
@@ -58,6 +63,9 @@ final class PluginValidateCommand implements Callable<Integer> {
             String directory = dirArgument != null ? dirArgument : dirOption != null ? dirOption : ".";
             subject = parent.main().subjects()
                     .fromDirectory(Path.of(directory).toAbsolutePath().normalize(), !noBuild);
+        }
+        if (against != null) {
+            subject = subject.against(parent.main().subjects().previous(against, subject.pom()));
         }
 
         List<CheckResult> results = PluginValidator.validate(subject);

@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.catalog.FacadeEntry;
 import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
+import com.botmaker.plugin.api.source.Conversion;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
@@ -107,7 +108,8 @@ public final class PluginValidator {
         results.add(classpath);
         if (classpath.failed()) {
             for (Check check : List.of(Check.CONTRACT_LINKS, Check.LOADS, Check.ID, Check.PALETTE, Check.RECORDS,
-                    Check.TYPES, Check.MANAGED, Check.EDITORS, Check.PICKERS)) {
+                    Check.TYPES, Check.MANAGED, Check.CONVERSIONS, Check.MANAGED_HISTORY, Check.EDITORS,
+                    Check.PICKERS)) {
                 results.add(CheckResult.skip(check, "the classpath did not resolve"));
             }
             results.add(checkPomScopes(subject));
@@ -130,7 +132,7 @@ public final class PluginValidator {
                         "check that src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin"
                                 + " exists and names your plugin's fully qualified class")));
                 for (Check check : List.of(Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES, Check.MANAGED,
-                        Check.EDITORS, Check.PICKERS)) {
+                        Check.CONVERSIONS, Check.MANAGED_HISTORY, Check.EDITORS, Check.PICKERS)) {
                     results.add(CheckResult.skip(check, "nothing loaded"));
                 }
             } else {
@@ -140,6 +142,8 @@ public final class PluginValidator {
                 results.add(checkRecords(plugins, subject));
                 results.add(checkTypes(plugins, subject));
                 results.add(checkManaged(plugins, subject));
+                results.add(checkConversions(plugins, subject));
+                results.add(checkHistory(plugins, subject));
                 results.add(checkEditors(plugins));
                 results.add(checkPickers(plugins, subject));
             }
@@ -1034,6 +1038,210 @@ public final class PluginValidator {
             if (!Character.isJavaIdentifierPart(name.charAt(i))) return false;
         }
         return true;
+    }
+
+    // -------------------------------------------------------------------------------------------------
+    // 5c — conversions
+    // -------------------------------------------------------------------------------------------------
+
+    /**
+     * Every conversion a judged plugin declares reads and writes values its own {@code managedValues()} declares,
+     * in the state the conversion names them (a {@code from} retired there too), and every retired value it
+     * declares is read by some conversion. Studio refuses an upgrade whose conversion names a value its plugin
+     * does not declare, and a retired value nothing reads is one a bot may hold and no upgrade carries over.
+     *
+     * <p>The contract's steps already refuse the rest when the plugin's class initialises: a {@code from} that is
+     * not retired, a {@code to} that is, an id both read and written, and a lambda where a method reference
+     * belongs.
+     */
+    private static CheckResult checkConversions(List<StudioPlugin> plugins, PluginSubject subject) {
+        List<String> problems = new ArrayList<>();
+        int conversions = 0;
+        int retired = 0;
+        for (StudioPlugin plugin : plugins) {
+            String id = safeId(plugin);
+            if (!subject.judges(id)) continue;
+            List<ManagedValue<?>> values;
+            List<Conversion> declared;
+            try {
+                values = nonNull(plugin.managedValues());
+            } catch (RuntimeException | LinkageError e) {
+                continue;   // MANAGED reports it
+            }
+            try {
+                declared = plugin.conversions();
+            } catch (RuntimeException | LinkageError e) {
+                problems.add(id + "#conversions() threw " + e);
+                continue;
+            }
+            if (declared == null) {
+                problems.add(id + "#conversions() returned null; return List.of()");
+                continue;
+            }
+            Map<String, ManagedValue<?>> byId = new HashMap<>();
+            for (ManagedValue<?> value : values) if (value != null) byId.putIfAbsent(value.id(), value);
+            Set<String> read = new HashSet<>();
+            for (Conversion conversion : declared) {
+                if (conversion == null) {
+                    problems.add(id + ": conversions() holds a null");
+                    continue;
+                }
+                conversions++;
+                for (ManagedValue<?> source : conversion.sources()) {
+                    read.add(source.id());
+                    problems.addAll(undeclared(id, conversion, source, byId));
+                }
+                for (ManagedValue<?> target : conversion.targets()) {
+                    problems.addAll(undeclared(id, conversion, target, byId));
+                }
+            }
+            for (ManagedValue<?> value : byId.values()) {
+                if (!value.isRetired()) continue;
+                retired++;
+                if (!read.contains(value.id())) {
+                    problems.add(id + ": managed value \"" + value.id() + "\" is retired and no conversion reads"
+                            + " it, so a bot holding it keeps it unread through every upgrade; declare"
+                            + " Conversion.from(it), or remove it once no supported release wrote it");
+                }
+            }
+        }
+        if (!problems.isEmpty()) return CheckResult.fail(Check.CONVERSIONS, problems);
+        return CheckResult.pass(Check.CONVERSIONS, conversions == 0 && retired == 0 ? "declares no conversions"
+                : conversions + " conversion(s) reading " + retired + " retired value(s)");
+    }
+
+    /** Why {@code value}, named by {@code conversion}, is not one {@code byId} declares in that state; empty when it is. */
+    private static List<String> undeclared(String plugin, Conversion conversion, ManagedValue<?> value,
+                                           Map<String, ManagedValue<?>> byId) {
+        ManagedValue<?> declared = byId.get(value.id());
+        if (declared == null) {
+            return List.of(plugin + ": " + conversion + " names \"" + value.id() + "\", which managedValues() does"
+                    + " not declare; a host reads and writes only the values a plugin declares");
+        }
+        if (declared.isRetired() != value.isRetired()) {
+            return List.of(plugin + ": " + conversion + " names \"" + value.id() + "\" "
+                    + (value.isRetired() ? "retired" : "live") + ", where managedValues() declares it "
+                    + (declared.isRetired() ? "retired" : "live") + "; name the constant managedValues() lists");
+        }
+        return List.of();
+    }
+
+    // -------------------------------------------------------------------------------------------------
+    // 5d — managed history
+    // -------------------------------------------------------------------------------------------------
+
+    /**
+     * Against the previous release: every managed id a judged plugin declared there is still declared with the
+     * same marker, holder, shape and element type, or was retired there and has been dropped since (2026-10-11).
+     *
+     * <p><b>A changed id fails even when a conversion reads it.</b> The host finds a bot's values by the id on
+     * their annotation and reads them through the declaration of that id, so a declaration whose shape changed
+     * reads the bot's old values through the new shape. A release that reshapes a value keeps the old
+     * declaration under the old id, retired, and declares the new shape under a new id, converted from it —
+     * which {@link Check#CONVERSIONS} then holds it to. Types are compared by binary name: the two jars load in
+     * two class loaders.
+     *
+     * <p>Skipped when no previous release was named, or when it does not load against the contract this build
+     * carries: a host carrying this contract cannot read its declarations either.
+     */
+    private static CheckResult checkHistory(List<StudioPlugin> plugins, PluginSubject subject) {
+        PluginSubject.Previous previous = subject.previous();
+        if (previous == null) {
+            return CheckResult.skip(Check.MANAGED_HISTORY, "no previous release named; pass --against <version>"
+                    + " to compare the managed values with it");
+        }
+        if (previous.unresolved() != null) {
+            return CheckResult.skip(Check.MANAGED_HISTORY, previous.coordinate() + " did not resolve, so no bot can"
+                    + " hold its values: " + previous.unresolved());
+        }
+        try (PluginLoader loaded = PluginLoader.open(previous.classpath().stream().map(Object::toString).toList())) {
+            Map<String, StudioPlugin> before = new HashMap<>();
+            if (loaded != null) for (StudioPlugin plugin : loaded.plugins()) before.putIfAbsent(safeId(plugin), plugin);
+            List<String> problems = new ArrayList<>();
+            List<String> compared = new ArrayList<>();
+            List<String> unread = new ArrayList<>();
+            for (StudioPlugin plugin : plugins) {
+                String id = safeId(plugin);
+                if (!subject.judges(id)) continue;
+                // The previous release of this same plugin: an id it lacks did not load against this contract
+                // (a plugin's id never changes), and a host carrying this contract cannot read it either.
+                StudioPlugin old = before.get(id);
+                if (old == null) {
+                    unread.add(id + " does not load from " + previous.coordinate() + " against this contract");
+                    continue;
+                }
+                List<ManagedValue<?>> was;
+                List<ManagedValue<?>> is;
+                try {
+                    was = nonNull(old.managedValues());
+                } catch (RuntimeException | LinkageError e) {
+                    unread.add(previous.coordinate() + "'s " + id + "#managedValues() threw here: " + e);
+                    continue;
+                }
+                try {
+                    is = nonNull(plugin.managedValues());
+                } catch (RuntimeException | LinkageError e) {
+                    continue;   // MANAGED reports it
+                }
+                Map<String, ManagedValue<?>> now = new HashMap<>();
+                for (ManagedValue<?> value : is) if (value != null) now.putIfAbsent(value.id(), value);
+                int kept = 0;
+                for (ManagedValue<?> value : was) {
+                    if (value == null) continue;
+                    String at = id + ": managed value \"" + value.id() + "\"";
+                    ManagedValue<?> current = now.get(value.id());
+                    if (current == null) {
+                        if (!value.isRetired()) {
+                            problems.add(at + " was declared by " + previous.coordinate() + " and is gone, so a"
+                                    + " bot holding it is left unread; keep it declared .retired() and declare a"
+                                    + " Conversion from it");
+                        }
+                        continue;
+                    }
+                    List<String> changed = changes(value, current);
+                    if (!changed.isEmpty()) {
+                        problems.add(at + " changed its " + String.join(", ", changed) + " since "
+                                + previous.coordinate() + "; a host reads a bot's values through the declaration"
+                                + " of their id, so keep this one as it was, .retired(), declare the new shape"
+                                + " under a new id, and convert to it");
+                        continue;
+                    }
+                    kept++;
+                }
+                compared.add(id + ": " + kept + " managed value(s) as " + previous.coordinate() + " declared them");
+            }
+            if (!problems.isEmpty()) return CheckResult.fail(Check.MANAGED_HISTORY, problems);
+            if (!unread.isEmpty()) {
+                return CheckResult.skip(Check.MANAGED_HISTORY, String.join("; ", unread)
+                        + ", so those managed values could not be compared");
+            }
+            return CheckResult.pass(Check.MANAGED_HISTORY, String.join("; ", compared));
+        } catch (RuntimeException | LinkageError e) {
+            return CheckResult.skip(Check.MANAGED_HISTORY, previous.coordinate() + " could not be loaded to"
+                    + " compare against: " + e);
+        }
+    }
+
+    /** What differs between two declarations of one id, as words for a sentence; empty when nothing does. */
+    static List<String> changes(ManagedValue<?> was, ManagedValue<?> is) {
+        List<String> changed = new ArrayList<>();
+        if (!Objects.equals(was.marker(), is.marker())) changed.add("marker (" + was.marker() + " → " + is.marker() + ")");
+        if (!Objects.equals(was.holder(), is.holder())) changed.add("holder (" + was.holder() + " → " + is.holder() + ")");
+        if (was.shape() != is.shape()) changed.add("shape (" + was.shape().id() + " → " + is.shape().id() + ")");
+        if (!was.type().getName().equals(is.type().getName())) {
+            changed.add("type (" + was.type().getName() + " → " + is.type().getName() + ")");
+        }
+        if (was.shape() != is.shape() || !was.isOpenSet()) return changed;
+        if (was.isEnum() != is.isEnum() || was.isGrouped() != is.isGrouped()) {
+            changed.add("set kind (" + setKind(was) + " → " + setKind(is) + ")");
+        } else if (was.isGrouped() && !was.groupType().getName().equals(is.groupType().getName())) {
+            changed.add("group type (" + was.groupType().getName() + " → " + is.groupType().getName() + ")");
+        }
+        return changed;
+    }
+
+    private static String setKind(ManagedValue<?> value) {
+        return value.isGrouped() ? "nested enums" : value.isEnum() ? "enum" : "constants";
     }
 
     // -------------------------------------------------------------------------------------------------

@@ -55,6 +55,21 @@ public enum Check {
      */
     MANAGED("managed", "Every managed value is one a host can write"),
 
+    /**
+     * Every {@code Conversion} a judged plugin declares reads and writes values its {@code managedValues()}
+     * declares, and every retired value is read by one (2026-10-11): a retired value no conversion reads is a
+     * shape a bot may still hold and no upgrade carries over.
+     */
+    CONVERSIONS("conversions", "Every retired managed value has a conversion"),
+
+    /**
+     * Against the previous release ({@code --against}): every managed id it declared is still declared with
+     * the same marker, holder, shape and element type, or was dropped after being retired (2026-10-11). The
+     * host reads a bot's values by id, so an id whose shape changed reads the bot's old values through the
+     * new shape; the new shape takes a new id, and the old one stays retired with a conversion.
+     */
+    MANAGED_HISTORY("managed-history", "No managed value changed shape since the previous release"),
+
     /** {@code slotEditors()} builds, and every predicate answers without throwing. */
     EDITORS("editors", "Every slot editor builds and answers"),
 
