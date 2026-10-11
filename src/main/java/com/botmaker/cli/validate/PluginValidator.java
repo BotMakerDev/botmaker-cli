@@ -1099,7 +1099,7 @@ public final class PluginValidator {
                 if (!value.isRetired()) continue;
                 retired++;
                 if (!read.contains(value.id())) {
-                    problems.add(id + ": managed value \"" + value.id() + "\" is retired and no conversion reads"
+                    problems.add(id + ": managed value \"" + simple(value.id()) + "\" is retired and no conversion reads"
                             + " it, so a bot holding it keeps it unread through every upgrade; declare"
                             + " Conversion.from(it), or remove it once no supported release wrote it");
                 }
@@ -1115,11 +1115,11 @@ public final class PluginValidator {
                                            Map<String, ManagedValue<?>> byId) {
         ManagedValue<?> declared = byId.get(value.id());
         if (declared == null) {
-            return List.of(plugin + ": " + conversion + " names \"" + value.id() + "\", which managedValues() does"
+            return List.of(plugin + ": " + conversion + " names \"" + simple(value.id()) + "\", which managedValues() does"
                     + " not declare; a host reads and writes only the values a plugin declares");
         }
         if (declared.isRetired() != value.isRetired()) {
-            return List.of(plugin + ": " + conversion + " names \"" + value.id() + "\" "
+            return List.of(plugin + ": " + conversion + " names \"" + simple(value.id()) + "\" "
                     + (value.isRetired() ? "retired" : "live") + ", where managedValues() declares it "
                     + (declared.isRetired() ? "retired" : "live") + "; name the constant managedValues() lists");
         }
@@ -1139,7 +1139,8 @@ public final class PluginValidator {
      * reads the bot's old values through the new shape. A release that reshapes a value keeps the old
      * declaration under the old id, retired, and declares the new shape under a new id, converted from it —
      * which {@link Check#CONVERSIONS} then holds it to. Types are compared by binary name: the two jars load in
-     * two class loaders.
+     * two class loaders. So are the value's parts ({@link #partChanges}): a declaration can stay the same while the
+     * factory its value is written with changes, and the bot's old value is as unreadable.
      *
      * <p>Skipped when no previous release was named, or when it does not load against the contract this build
      * carries: a host carrying this contract cannot read its declarations either.
@@ -1160,6 +1161,12 @@ public final class PluginValidator {
             List<String> problems = new ArrayList<>();
             List<String> compared = new ArrayList<>();
             List<String> unread = new ArrayList<>();
+            Map<String, ComponentType<?>> oldShapes = componentTypes(List.copyOf(before.values()));
+            Map<String, ComponentType<?>> newShapes = componentTypes(plugins);
+            if (oldShapes == null || newShapes == null) {
+                unread.add("the declared types of " + (oldShapes == null ? previous.coordinate() : "this build")
+                        + " do not link here, so the parts of the managed values were not compared");
+            }
             for (StudioPlugin plugin : plugins) {
                 String id = safeId(plugin);
                 if (!subject.judges(id)) continue;
@@ -1188,7 +1195,7 @@ public final class PluginValidator {
                 int kept = 0;
                 for (ManagedValue<?> value : was) {
                     if (value == null) continue;
-                    String at = id + ": managed value \"" + value.id() + "\"";
+                    String at = id + ": managed value \"" + simple(value.id()) + "\"";
                     ManagedValue<?> current = now.get(value.id());
                     if (current == null) {
                         if (!value.isRetired()) {
@@ -1199,6 +1206,17 @@ public final class PluginValidator {
                         continue;
                     }
                     List<String> changed = changes(value, current);
+                    if (changed.isEmpty() && oldShapes != null && newShapes != null) {
+                        List<String> parts = partChanges(value.type(), oldShapes, current.type(), newShapes);
+                        if (!parts.isEmpty()) {
+                            problems.add(at + " is written differently since " + previous.coordinate() + " ("
+                                    + String.join("; ", parts) + "), so a bot's value of it no longer reads. One class has"
+                                    + " one declaration: keep the old types declared as they were and this value"
+                                    + " .retired(), give the new shape types of its own under a new id, and convert"
+                                    + " to it");
+                            continue;
+                        }
+                    }
                     if (!changed.isEmpty()) {
                         problems.add(at + " changed its " + String.join(", ", changed) + " since "
                                 + previous.coordinate() + "; a host reads a bot's values through the declaration"
@@ -1225,23 +1243,185 @@ public final class PluginValidator {
     /** What differs between two declarations of one id, as words for a sentence; empty when nothing does. */
     static List<String> changes(ManagedValue<?> was, ManagedValue<?> is) {
         List<String> changed = new ArrayList<>();
-        if (!Objects.equals(was.marker(), is.marker())) changed.add("marker (" + was.marker() + " → " + is.marker() + ")");
+        if (!Objects.equals(was.marker(), is.marker())) {
+            changed.add("marker (" + shortTypes(was.marker()) + " → " + shortTypes(is.marker()) + ")");
+        }
         if (!Objects.equals(was.holder(), is.holder())) changed.add("holder (" + was.holder() + " → " + is.holder() + ")");
         if (was.shape() != is.shape()) changed.add("shape (" + was.shape().id() + " → " + is.shape().id() + ")");
         if (!was.type().getName().equals(is.type().getName())) {
-            changed.add("type (" + was.type().getName() + " → " + is.type().getName() + ")");
+            changed.add("type (" + shortTypes(was.type().getName()) + " → " + shortTypes(is.type().getName()) + ")");
         }
         if (was.shape() != is.shape() || !was.isOpenSet()) return changed;
         if (was.isEnum() != is.isEnum() || was.isGrouped() != is.isGrouped()) {
             changed.add("set kind (" + setKind(was) + " → " + setKind(is) + ")");
         } else if (was.isGrouped() && !was.groupType().getName().equals(is.groupType().getName())) {
-            changed.add("group type (" + was.groupType().getName() + " → " + is.groupType().getName() + ")");
+            changed.add("group type (" + shortTypes(was.groupType().getName()) + " → "
+                    + shortTypes(is.groupType().getName()) + ")");
         }
         return changed;
     }
 
     private static String setKind(ManagedValue<?> value) {
         return value.isGrouped() ? "nested enums" : value.isEnum() ? "enum" : "constants";
+    }
+
+    /**
+     * How a held value's parts are written, where they changed between the two releases: every declared component
+     * type reachable from the value's type through its factory and withers, compared by {@link #describe}. A bot's
+     * {@code Sdk.flow()} keeps its declaration when {@code Flow.activity(Activity, …)} becomes
+     * {@code Flow.activity(Class, …)}, and is unreadable all the same.
+     */
+    static List<String> partChanges(Class<?> was, Map<String, ComponentType<?>> oldShapes,
+                                    Class<?> is, Map<String, ComponentType<?>> newShapes) {
+        Map<String, Written> before = reachable(was, oldShapes);
+        Map<String, Written> after = reachable(is, newShapes);
+        List<String> changed = new ArrayList<>();
+        before.forEach((type, written) -> {
+            // A part the older release cannot describe here is unknown, not changed.
+            if (written.unreadable()) return;
+            Written now = after.get(type);
+            if (now == null) {
+                changed.add(simple(type) + " is no longer declared (it was written " + written + ")");
+            } else if (!now.reads(written)) {
+                changed.add(simple(type) + ": " + written + " → " + now);
+            }
+        });
+        return changed;
+    }
+
+    /**
+     * How a component type is written, by binary names so two class loaders compare: its factory with generic
+     * parameter types, and each wither. A release may add a wither, since no value it already wrote calls one.
+     * Printed with packages left out.
+     */
+    record Written(String factory, List<String> withers) {
+
+        static final String UNREADABLE = "unreadable";
+
+        /** Whether reading this declaration threw here, so how it is written is unknown. */
+        boolean unreadable() {
+            return factory.startsWith(UNREADABLE);
+        }
+
+        /** Whether a value written as {@code old} still reads: the same factory, and every wither it could call. */
+        boolean reads(Written old) {
+            return factory.equals(old.factory) && withers.containsAll(old.withers);
+        }
+
+        @Override
+        public String toString() {
+            return shortTypes(factory + withers.stream().map(wither -> "." + wither)
+                    .collect(java.util.stream.Collectors.joining()));
+        }
+    }
+
+    /**
+     * Every class some loaded plugin declares a component type for, by binary name; {@code null} when a plugin's
+     * declarations do not link here (no JavaFX, or an older release against this contract), so its parts are
+     * unknown rather than absent and nothing is compared.
+     */
+    private static Map<String, ComponentType<?>> componentTypes(List<StudioPlugin> plugins) {
+        Map<String, ComponentType<?>> shapes = new HashMap<>();
+        for (StudioPlugin plugin : plugins) {
+            try {
+                for (PluginType<?> type : nonNull(plugin.types())) {
+                    if (type instanceof ComponentType<?> shape) shapes.putIfAbsent(shape.type().getName(), shape);
+                }
+                for (ComponentType<?> shape : nonNull(plugin.componentTypes())) {
+                    if (shape != null) shapes.putIfAbsent(shape.type().getName(), shape);
+                }
+            } catch (LinkageError e) {
+                return null;
+            } catch (RuntimeException e) {
+                // a throwing surface declares nothing; TYPES reports it for the judged release
+            }
+        }
+        return shapes;
+    }
+
+    /** Each declared type reachable from {@code root} through factories and withers, mapped to how it is written. */
+    private static Map<String, Written> reachable(Class<?> root, Map<String, ComponentType<?>> shapes) {
+        Map<String, Written> found = new LinkedHashMap<>();
+        Deque<Type> queue = new java.util.ArrayDeque<>(List.of(root));
+        Set<Type> seen = new HashSet<>();
+        while (!queue.isEmpty()) {
+            Type type = queue.poll();
+            if (!seen.add(type)) continue;
+            switch (type) {
+                case ParameterizedType generic -> {
+                    queue.add(generic.getRawType());
+                    queue.addAll(List.of(generic.getActualTypeArguments()));
+                }
+                case WildcardType wildcard -> queue.addAll(List.of(wildcard.getUpperBounds()));
+                case TypeVariable<?> variable -> queue.addAll(List.of(variable.getBounds()));
+                case GenericArrayType array -> queue.add(array.getGenericComponentType());
+                case Class<?> cls -> {
+                    ComponentType<?> shape = shapes.get(cls.getName());
+                    if (shape == null || found.containsKey(cls.getName())) continue;
+                    try {
+                        found.put(cls.getName(), describe(shape));
+                        Executable factory = shape.factory();
+                        if (factory != null) queue.addAll(List.of(factory.getGenericParameterTypes()));
+                        for (Wither<?> wither : nonNull(shape.withers())) {
+                            if (!wither.flag()) queue.add(wither.method().getGenericParameterTypes()[0]);
+                        }
+                    } catch (RuntimeException | LinkageError e) {
+                        found.put(cls.getName(), new Written(Written.UNREADABLE + " (" + e + ")", List.of()));
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+        return found;
+    }
+
+    /** {@code Flow.activity(Class<O>, ActivityBody<O>)}, {@code [described(String), off()]}. */
+    static Written describe(ComponentType<?> shape) {
+        Executable factory = shape.factory();
+        String written = factory == null ? "" : factory.getDeclaringClass().getName() + "."
+                + (factory instanceof Constructor<?> ? "new" : factory.getName()) + "("
+                + String.join(", ", java.util.Arrays.stream(factory.getGenericParameterTypes())
+                        .map(PluginValidator::written).toList()) + ")";
+        List<String> withers = new ArrayList<>();
+        for (Wither<?> wither : nonNull(shape.withers())) {
+            withers.add(wither.method().getName() + "("
+                    + (wither.flag() ? "" : written(wither.method().getGenericParameterTypes()[0])) + ")");
+        }
+        return new Written(written, List.copyOf(withers));
+    }
+
+    /**
+     * A parameter type as the bot's Java reads it: a type variable or a wildcard is its bound, so renaming
+     * {@code <O>} to {@code <T>}, or widening {@code List<Step>} to {@code List<? extends Step>}, changes nothing.
+     */
+    static String written(Type type) {
+        return switch (type) {
+            case Class<?> cls -> cls.isArray() ? written(cls.getComponentType()) + "[]" : cls.getName();
+            case ParameterizedType generic -> written(generic.getRawType()) + "<" + String.join(", ",
+                    java.util.Arrays.stream(generic.getActualTypeArguments()).map(PluginValidator::written).toList()) + ">";
+            case WildcardType wildcard -> written(wildcard.getUpperBounds()[0]);
+            // Erased, not walked: a bound may name its own variable (<E extends Enum<E>>).
+            case TypeVariable<?> variable -> erasure(variable).getName();
+            case GenericArrayType array -> written(array.getGenericComponentType()) + "[]";
+            default -> type.getTypeName();
+        };
+    }
+
+    /** {@code java.util.List<com.botmaker.sdk.api.flow.Flow$Step>} as {@code List<Flow.Step>}. */
+    static String shortTypes(String typeName) {
+        return typeName.replaceAll("\\b(?:[a-z_][a-z0-9_]*\\.)+(?=[A-Z])", "").replace('$', '.');
+    }
+
+    /** {@code com.botmaker.sdk.api.flow.Flow$Step} as {@code Flow.Step}; an id as {@code SdkValue.Id.FLOW}. */
+    static String simple(String binaryName) {
+        String[] segments = binaryName.replace('$', '.').split("\\.");
+        for (int i = 0; i < segments.length; i++) {
+            if (!segments[i].isEmpty() && Character.isUpperCase(segments[i].charAt(0))) {
+                return String.join(".", java.util.Arrays.copyOfRange(segments, i, segments.length));
+            }
+        }
+        return binaryName;
     }
 
     // -------------------------------------------------------------------------------------------------

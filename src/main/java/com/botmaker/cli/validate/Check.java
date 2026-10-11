@@ -64,7 +64,8 @@ public enum Check {
 
     /**
      * Against the previous release ({@code --against}): every managed id it declared is still declared with
-     * the same marker, holder, shape and element type, or was dropped after being retired (2026-10-11). The
+     * the same marker, holder, shape and element type, its parts written with the same factories and at least the
+     * same withers, or was dropped after being retired (2026-10-11). The
      * host reads a bot's values by id, so an id whose shape changed reads the bot's old values through the
      * new shape; the new shape takes a new id, and the old one stays retired with a conversion.
      */

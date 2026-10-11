@@ -14,7 +14,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
     Every retired value must be read by some conversion.
   - `managed-history`: this check runs only with `--against <version|G:A:V>`, the previous release. Every
     managed id that release declared must still be declared with the same marker, holder, shape and element
-    type. The one exception is an id that was retired there; it may be dropped.
+    type. Every declared type reachable from it must still be written with the same factory and at least the
+    same withers. The one exception is an id that was retired there; it may be dropped.
+  - Messages spell an id `SdkValue.Id.FLOW` and types without packages.
   - A reshaped value keeps its old id, retired, and the new shape takes a new id, converted from the old one.
     `managed-history` is skipped in three cases:
     - no `--against` is given;
