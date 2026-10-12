@@ -77,6 +77,15 @@ the `--studio-api 0.9.0` release cut SDK v1.4.3, Studio v1.4.3 and dashboard v0.
 is a real change**: `ChangeKind.pinsMove` counts a module `REAL` when its tag would pin an upstream at another
 release than its last tag did, whatever its commits are, so the repair of such a module is a plain flag.
 
+**A tag compiles against what it pins (2026-10-12).** CI builds a module against its upstreams' `main`; its tag
+builds against their releases. SDK v1.4.3 called shared's `LaunchSpec.runsOn`, on shared's `main` and in no
+release. `BuildsAtPinsGate` checks the module's `HEAD` out into a throwaway `git worktree` and runs `mvn
+compile` with each upstream *outside* the release pinned to its newest tag (`-Dbotmaker.shared.version=v0.2.4`);
+an upstream *in* the release stays on its `main` snapshot from `~/.m2`. A compile error refuses, naming the
+upstreams' flags; a snapshot missing from `~/.m2` is the machine's, so `SKIPPED` with the install command. It
+costs about a minute for the SDK and Studio together; a module whose upstreams are all in the release is not
+built. Refusing whenever an upstream had unreleased commits was the cheaper option, and a guess.
+
 **Three orders exist and none is a preference.** `Module`'s declaration order is the order `--help` lists the
 flags; `Order.DECIDE` is dependency order, which it must be because each forced flag reads the versions
 decided *so far*; `Order.TAG` puts the two longest CI jobs first (pilot, then studio) so they run while the

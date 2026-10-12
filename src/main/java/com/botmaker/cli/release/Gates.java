@@ -51,6 +51,12 @@ public final class Gates {
             record(runner, refusals, CiDepsGate.check(umbrella, module, force));
             record(runner, refusals, VersionsGate.check(umbrella, module, force));
         }
+        // A build per module whose tag pins an upstream outside this release: slower than the reads above,
+        // cheaper than the SDK's and the templates' below, and the one check of what the tag compiles against
+        // (2026-10-12: SDK v1.4.3 needed a shared method no shared release had).
+        for (GateVerdict verdict : BuildsAtPinsGate.check(umbrella, releasing, force)) {
+            record(runner, refusals, verdict);
+        }
         for (Module module : GatePlan.jitpackPlugins(modules)) {
             GateVerdict script = JitpackScriptGate.check(umbrella, module, force);
             record(runner, refusals, script);

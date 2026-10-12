@@ -13,6 +13,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   every pin a cut module's tag carries on an upstream outside the release, and names the flag to add. On
   2026-10-12 SDK v1.4.3, Studio v1.4.3 and dashboard v0.3.1 were cut pinning botmaker-shared v0.2.4, which never
   built, and all three were broken for good.
+- **A release refuses a module that does not compile against the releases its tag pins.** `BuildsAtPinsGate`
+  compiles a clean worktree of the module with every upstream outside the release pinned to its newest tag, and
+  quotes the compiler. SDK v1.4.3 called a shared method no shared release had; CI, building against shared's
+  `main`, was green.
 - **Releasing shared forces the dashboard**, which pins it; every pin is a forcing edge now, which a test derives
   from the modules' pins.
 - **A module whose tag would pin a newer upstream is released when named**, not skipped as "only docs": its
