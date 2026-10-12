@@ -353,8 +353,10 @@ public final class PluginValidator {
         List<String> problems = new ArrayList<>();
         List<String> declared = new ArrayList<>();
         List<String> unlinked = new ArrayList<>();
+        List<String> unpointed = new ArrayList<>();
         Map<String, String> owners = new HashMap<>();
         List<Class<?>> known = declaredClasses(plugins);
+        Set<String> pickable = typeNames(plugins);
         List<Class<?>> literals = classLiterals(plugins);
         int roundTrips = 0;
         for (StudioPlugin plugin : plugins) {
@@ -421,6 +423,17 @@ public final class PluginValidator {
                 if (!judged) {
                     continue;
                 }
+                try {
+                    Class<?> replacement = type.replacedBy();
+                    if (replacement == null) {
+                        if (cls.isAnnotationPresent(Deprecated.class)) unpointed.add(cls.getSimpleName());
+                    } else {
+                        String why = replacementProblem(type, replacement, pickable);
+                        if (why != null) problems.add(id + ": " + name + " " + why);
+                    }
+                } catch (RuntimeException | LinkageError e) {
+                    problems.add(id + ": " + name + " replacedBy() threw " + e);
+                }
                 Object value;
                 try {
                     value = type.fresh();
@@ -474,8 +487,55 @@ public final class PluginValidator {
                     + String.join(", ", unlinked) + " could not be linked without it. Put javafx-controls on"
                     + " the classpath to check them here");
         }
-        return CheckResult.pass(Check.TYPES, declared.isEmpty() ? "none declared"
-                : String.join(", ", declared) + (roundTrips == 0 ? "" : "; " + roundTrips + " round-tripped"));
+        String summary = declared.isEmpty() ? "none declared"
+                : String.join(", ", declared) + (roundTrips == 0 ? "" : "; " + roundTrips + " round-tripped");
+        return unpointed.isEmpty() ? CheckResult.pass(Check.TYPES, summary)
+                : CheckResult.pass(Check.TYPES, summary, "deprecated with no replacedBy, so Studio suggests no"
+                        + " target when a bot's author migrates their values: " + String.join(", ", unpointed));
+    }
+
+    /**
+     * Why a bot's author could not be offered {@code replacement} for {@code declared}'s values, or {@code null}
+     * when they can. The declaration step refuses the first two already, but a hand-written {@code PluginType}
+     * skips the step: the type is marked {@link Deprecated} and the replacement is not; the old values can be
+     * taken apart into what a {@code @Migrate} method maps (a call's parts, or an enum's constants); and the
+     * replacement is a type some plugin on the classpath lists in {@code types()}, compared by name, so the
+     * author can pick it and the host can write the migrated values.
+     */
+    static String replacementProblem(PluginType<?> declared, Class<?> replacement, Set<String> pickable) {
+        Class<?> type = declared.type();
+        if (replacement.getName().equals(type.getName())) return "names itself in replacedBy()";
+        if (!type.isAnnotationPresent(Deprecated.class)) {
+            return "is replaced by " + replacement.getName() + " but not marked @Deprecated";
+        }
+        if (replacement.isAnnotationPresent(Deprecated.class)) {
+            return "is replaced by " + replacement.getName() + ", which is deprecated too; point at the type that"
+                    + " stays";
+        }
+        if (!(declared instanceof ComponentType<?>) && !type.isEnum()) {
+            return "is replaced but neither written as a call nor an enum, so its values have no parts a"
+                    + " migration could map";
+        }
+        if (!pickable.contains(replacement.getName())) {
+            return "is replaced by " + replacement.getName() + ", which no plugin on the classpath lists in"
+                    + " types(); the author could not pick it and the host could not write the migrated values";
+        }
+        return null;
+    }
+
+    /** The binary names of every type a loaded plugin lists in {@code types()}; a failing plugin adds none. */
+    private static Set<String> typeNames(List<StudioPlugin> plugins) {
+        Set<String> names = new HashSet<>();
+        for (StudioPlugin plugin : plugins) {
+            try {
+                for (PluginType<?> type : nonNull(plugin.types())) {
+                    if (type != null && type.type() != null) names.add(type.type().getName());
+                }
+            } catch (RuntimeException | LinkageError e) {
+                // the types check reports it
+            }
+        }
+        return names;
     }
 
     /**

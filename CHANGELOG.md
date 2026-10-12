@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `plugin validate`'s `value-types` check reads a deprecated type's `replacedBy()`: it refuses a pointer on a type
+  whose class is not `@Deprecated`, one naming the type itself or another deprecated type, one on a type that is
+  neither a call nor an enum (nothing to map), and one naming a type no plugin on the classpath lists in
+  `types()` (compared by name); a `@Deprecated` declared type with no pointer passes with a note.
+
 - `plugin validate` reads a plugin's own parameters (`ManagedValue.param`). It checks that a generic one starts
   as a value of its type.
 - A plugin may change a managed value's shape between releases. Nothing checks it against the previous
