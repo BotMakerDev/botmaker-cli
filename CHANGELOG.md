@@ -23,7 +23,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   published pom differs (`ChangeKind.pinsMove`).
 - **A gate whose Maven run could not find an upstream's `-SNAPSHOT` in `~/.m2` skips with the install command**
   instead of refusing the module: the redirect-pointer, plugin, template and builds-at-pins gates all read the
-  failure through `MissingSnapshot`. It also names the missing artifact, not the project Maven was building.
+  failure through `MissingSnapshot`. It also names the missing artifact, not the project Maven was building, and
+  reads a miss Maven cached ("was not found in … during a previous attempt").
 - **`--no-wait-jitpack` stops before tagging on top of an upstream JitPack already failed to build**, asked once
   per upstream this run tagged.
 

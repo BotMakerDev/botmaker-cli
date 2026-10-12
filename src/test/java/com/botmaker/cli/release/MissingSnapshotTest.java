@@ -30,6 +30,11 @@ class MissingSnapshotTest {
                 + "The following artifacts could not be resolved: "
                 + "com.github.BotMakerDev:botmaker-shared:jar:0.2.6-SNAPSHOT (absent)")
                 .flatMap(MissingSnapshot::module), "Maven 3.9's wording");
+        assertEquals(Optional.of(Module.SHARED), MissingSnapshot.in("[ERROR] Failed to execute goal on project "
+                + "botmaker-dashboard: Could not resolve dependencies for project com.github.BotMakerDev:"
+                + "botmaker-dashboard:jar:0.3.3-SNAPSHOT\n[ERROR] \tcom.github.BotMakerDev:botmaker-shared:jar:"
+                + "0.2.6-SNAPSHOT was not found in https://jitpack.io during a previous attempt.")
+                .flatMap(MissingSnapshot::module), "a miss Maven cached");
         assertEquals(Optional.empty(), MissingSnapshot.in("[ERROR] /x/A.java:[3,1] cannot find symbol"));
     }
 

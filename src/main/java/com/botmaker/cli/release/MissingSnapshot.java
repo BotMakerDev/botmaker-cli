@@ -20,9 +20,12 @@ import java.util.regex.Pattern;
 record MissingSnapshot(String artifact, String artifactId) {
 
     private static final Pattern ARTIFACT = Pattern.compile("(com\\.github\\.[\\w.]+:([\\w-]+):\\w+:[\\w.]+-SNAPSHOT)");
-    /** Maven 3.6 says "Could not find artifact", 3.9 "could not be resolved"; both after "Could not resolve…". */
-    private static final Pattern UNRESOLVED =
-            Pattern.compile("could not find artifact|could not resolve|could not be resolved", Pattern.CASE_INSENSITIVE);
+    /**
+     * Maven 3.6 says "Could not find artifact", 3.9 "could not be resolved", or "was not found in … during a previous
+     * attempt" when the miss is cached; all after "Could not resolve…".
+     */
+    private static final Pattern UNRESOLVED = Pattern.compile(
+            "could not find artifact|could not resolve|could not be resolved|was not found in", Pattern.CASE_INSENSITIVE);
     /** The project being built, which the line names first and which is never what is missing. */
     private static final Pattern FOR_PROJECT = Pattern.compile("for project \\S+");
 
