@@ -2,7 +2,12 @@ package com.botmaker.cli.release;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -60,6 +65,37 @@ class WaitsTest {
     @Test
     void aModuleNotInTheReleaseIsOwedNothing() {
         assertFalse(Waits.owed(Module.SHARED, EnumSet.of(Module.SESSION)));
+    }
+
+    @Test
+    void aRunThatDoesNotWaitStillStopsOnAnUpstreamJitpackAlreadyFailed() {
+        // 2026-10-12: shared v0.2.4 failed on Central's 429, and the SDK, Studio and dashboard pinned it anyway.
+        Map<Module, Version> releasing = new EnumMap<>(Module.class);
+        releasing.put(Module.SHARED, Version.parse("0.2.4").orElseThrow());
+        releasing.put(Module.SESSION, Version.parse("0.2.2").orElseThrow());
+        releasing.put(Module.SDK, Version.parse("1.4.3").orElseThrow());
+        List<String> asked = new ArrayList<>();
+        Jitpack.Probe sharedFailed = new Jitpack.Probe() {
+            @Override
+            public boolean built(String pomUrl) {
+                return false;
+            }
+
+            @Override
+            public Optional<String> failure(String buildUrl) {
+                asked.add(buildUrl.substring(buildUrl.lastIndexOf("/botmaker-") + 1));
+                return buildUrl.contains("botmaker-shared/") ? Optional.of("No build artifacts found") : Optional.empty();
+            }
+        };
+
+        assertEquals(Optional.of("botmaker-shared v0.2.4: No build artifacts found"),
+                Waits.failedUpstream(Module.SDK, releasing, sharedFailed));
+        assertEquals(Optional.empty(), Waits.failedUpstream(Module.SHARED, releasing, sharedFailed),
+                "shared's own upstreams are not in this release");
+        asked.clear();
+        Waits.failedUpstream(Module.SESSION, Map.of(Module.SESSION, Version.parse("0.2.2").orElseThrow()),
+                sharedFailed);
+        assertEquals(List.of(), asked, "an upstream outside the run is PinsResolveGate's, not asked here");
     }
 
     @Test

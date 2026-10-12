@@ -297,6 +297,16 @@ public final class Release {
         // rewrite, so conditioning this on hasChangelog() would have tagged the bump without committing it.
         String message = module.commitsOnRelease()
                 ? "release: " + module.shortName() + " " + version.tag() : "";
+        if (!wait && !runner.dryRun()) {
+            // A waiting run already stopped at a failed upstream's wait; this is the same stop, asked once.
+            at.accept("upstream builds");
+            Optional<String> failed = Waits.failedUpstream(module, releasing, Jitpack.Probe.real());
+            if (failed.isPresent()) {
+                throw new ReleaseRefusal("JitPack failed to build " + failed.get() + "\n     "
+                        + module.directory() + " resolves it, so it was not tagged and the release stopped here."
+                        + " A new tag of the upstream repairs it.");
+            }
+        }
         try {
             prepare(runner, umbrella, module, version, releasing, at);
             at.accept("commit and tag");

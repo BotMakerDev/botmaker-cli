@@ -42,10 +42,18 @@ public final class SdkGates {
             return GateVerdict.skipped("  sdk: mvn not on PATH — pointer gate skipped");
         }
         Path pom = umbrella.resolve(Module.SDK.directory()).resolve("pom.xml");
-        Proc.Result run = Proc.run(umbrella, "mvn", "-B", "-q", "-f", pom.toString(), "test",
-                "-Dtest=ApiPointersTest", "-DfailIfNoTests=false");
+        return pointers(version, Proc.run(umbrella, "mvn", "-B", "-q", "-f", pom.toString(), "test",
+                "-Dtest=ApiPointersTest", "-DfailIfNoTests=false"), force);
+    }
+
+    /** The reading of the pointer test's run, split out so its arms are tested without forking Maven. */
+    static GateVerdict pointers(Version version, Proc.Result run, boolean force) {
         if (run.ok()) {
             return GateVerdict.ok("  sdk: @ReplacedBy pointers complete for v" + version + " — ok");
+        }
+        Optional<MissingSnapshot> snapshot = MissingSnapshot.in(run.out());
+        if (snapshot.isPresent()) {
+            return snapshot.get().skipped("sdk", "the redirect pointers were not checked", Module.SDK);
         }
         if (force) {
             return GateVerdict.forced("  sdk: pointer gate failed — FORCED");
@@ -90,6 +98,10 @@ public final class SdkGates {
         Proc.Result build = Proc.run(umbrella, "mvn", "-B", "-q",
                 "-pl", Module.CLI.directory(), "-am", "package", "-DskipTests");
         if (!build.ok()) {
+            Optional<MissingSnapshot> snapshot = MissingSnapshot.in(build.out());
+            if (snapshot.isPresent()) {
+                return snapshot.get().skipped("sdk", "botmaker-cli was not built for the plugin gate", Module.CLI);
+            }
             if (force) {
                 return GateVerdict.forced("  sdk: botmaker-cli would not build — plugin gate FORCED");
             }
@@ -111,10 +123,21 @@ public final class SdkGates {
         // `plugin validate`, not `validate`: the noun-first tree landed 2026-09-05 and the bare verb is a
         // hidden MovedCommand that prints its replacement and exits 2. A gate spelling it the old way would
         // refuse every SDK release, with a message about a command line rather than about the SDK.
-        Proc.Result validate = Proc.run(umbrella, "java", "-jar", jar.get().toString(), "plugin", "validate",
-                umbrella.resolve(Module.SDK.directory()).toString());
+        return validated(Proc.run(umbrella, "java", "-jar", jar.get().toString(), "plugin", "validate",
+                umbrella.resolve(Module.SDK.directory()).toString()), force);
+    }
+
+    /**
+     * The reading of {@code botmaker plugin validate} over the SDK. The validator resolves the SDK's classpath
+     * through Maven, so a contract {@code -SNAPSHOT} this machine never installed fails it like the build.
+     */
+    static GateVerdict validated(Proc.Result validate, boolean force) {
         if (validate.ok()) {
             return GateVerdict.ok("  sdk: botmaker plugin validate passes — ok");
+        }
+        Optional<MissingSnapshot> snapshot = MissingSnapshot.in(validate.out());
+        if (snapshot.isPresent()) {
+            return snapshot.get().skipped("sdk", "botmaker plugin validate could not resolve the SDK", Module.SDK);
         }
         if (force) {
             return GateVerdict.forced("  sdk: botmaker plugin validate failed — FORCED");

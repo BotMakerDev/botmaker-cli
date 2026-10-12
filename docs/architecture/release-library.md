@@ -86,6 +86,18 @@ upstreams' flags; a snapshot missing from `~/.m2` is the machine's, so `SKIPPED`
 costs about a minute for the SDK and Studio together; a module whose upstreams are all in the release is not
 built. Refusing whenever an upstream had unreleased commits was the cheaper option, and a guess.
 
+**A missing snapshot is the machine's, in every Maven gate (2026-10-12).** `MissingSnapshot` reads a failed
+Maven run for the `-SNAPSHOT` it could not find (Maven 3.6's "Could not find artifact" and 3.9's "could not be
+resolved", never the "for project" coordinate the line names first). `BuildsAtPinsGate`, both `SdkGates` and
+`TemplateGate` read their failure through it first and say `SKIPPED (environment)` with the `mvn -pl <m> -am
+install -DskipTests` that fixes it, instead of refusing a module that is fine; the redirect-pointer and plugin
+gates had refused a sound SDK that way. `--force` does not lift it: the gate did not run.
+
+**A run that does not wait still stops on a failed upstream (2026-10-12).** A waiting run stops at an owed wait
+JitPack answers `Error` (`Release.AfterTag`). Under `--no-wait-jitpack`, before tagging a module that resolves
+its upstreams from JitPack, `Waits.failedUpstream` asks JitPack once, without waiting, about each upstream this
+run tagged; one that already failed stops the run with that module untagged. One still building passes.
+
 **Three orders exist and none is a preference.** `Module`'s declaration order is the order `--help` lists the
 flags; `Order.DECIDE` is dependency order, which it must be because each forced flag reads the versions
 decided *so far*; `Order.TAG` puts the two longest CI jobs first (pilot, then studio) so they run while the

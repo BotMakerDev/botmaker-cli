@@ -23,8 +23,8 @@ import java.util.Optional;
  * {@code -SNAPSHOT}: its tag does not exist yet, and its snapshot in {@code ~/.m2} is the nearest thing. A
  * module whose upstreams are all in this release is not built here.
  *
- * <p>No {@code mvn} on {@code PATH}, or an upstream snapshot missing from {@code ~/.m2} — the machine, not the
- * module — is {@link GateVerdict.Status#SKIPPED}, with the command that fixes it. {@code --force} overrides a
+ * <p>No {@code mvn} on {@code PATH}, or an upstream snapshot missing from {@code ~/.m2} ({@link MissingSnapshot})
+ * — the machine, not the module — is {@link GateVerdict.Status#SKIPPED}, with the command that fixes it. {@code --force} overrides a
  * module that does not compile.
  */
 public final class BuildsAtPinsGate {
@@ -126,10 +126,9 @@ public final class BuildsAtPinsGate {
         if (run.ok()) {
             return GateVerdict.ok("  " + name + ": compiles at its pins (" + build.said() + ") — ok");
         }
-        Optional<String> snapshot = missingSnapshot(run.out());
+        Optional<MissingSnapshot> snapshot = MissingSnapshot.in(run.out());
         if (snapshot.isPresent()) {
-            return GateVerdict.skipped("  " + name + ": " + snapshot.get() + " is not in ~/.m2, so it was not built at "
-                    + "its pins — run `mvn -pl " + build.module().directory() + " -am install -DskipTests` first");
+            return snapshot.get().skipped(name, "it was not built at its pins", build.module());
         }
         if (force) {
             return GateVerdict.forced("  " + name + ": does not compile at its pins (" + build.said() + ") — FORCED");
@@ -140,17 +139,6 @@ public final class BuildsAtPinsGate {
                 + "     CI built it against those modules' main, which has what it needs; the tag would not.\n"
                 + "     Release the upstream it needs with it — " + String.join(" ", flags) + " — or --force.\n\n"
                 + errors(run));
-    }
-
-    /** The {@code -SNAPSHOT} artifact Maven could not find locally, when that is why the build failed. */
-    static Optional<String> missingSnapshot(String output) {
-        return output.lines()
-                .filter(line -> line.contains("Could not find artifact") || line.contains("Could not resolve"))
-                .map(line -> java.util.regex.Pattern.compile("(com\\.github\\.[\\w.]+:[\\w-]+:[\\w]+:[\\w.]+-SNAPSHOT)")
-                        .matcher(line))
-                .filter(java.util.regex.Matcher::find)
-                .map(m -> m.group(1))
-                .findFirst();
     }
 
     private static String errors(Proc.Result run) {

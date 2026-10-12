@@ -2,6 +2,8 @@ package com.botmaker.cli.release;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Which modules of a release are owed a JitPack wait — the question {@link Jitpack} exists to answer for,
@@ -52,6 +54,36 @@ public final class Waits {
         return tagOrder.subList(at + 1, tagOrder.size()).stream()
                 .filter(Module::resolvesFromJitpack)
                 .anyMatch(consumer -> consumer.upstreams().contains(module));
+    }
+
+    /**
+     * The upstream tagged earlier in this run whose JitPack build has already failed, asked once and without
+     * waiting — what a run under {@code --no-wait-jitpack} checks before tagging a module that resolves it.
+     *
+     * <p>A waiting run stops at the failed wait itself ({@link Jitpack.Build#FAILED}); a run that does not wait
+     * tagged on regardless until 2026-10-12, so a build that failed in its first minute (Maven Central's 429)
+     * still had dependents tagged on top of it, each a tag JitPack would never build. Asking also nudges a build
+     * nobody requested yet. An upstream still building passes: not waiting for it is what the flag asked.
+     *
+     * @return the upstream and JitPack's message, e.g. {@code botmaker-shared v0.2.4: No build artifacts found…}
+     */
+    static Optional<String> failedUpstream(Module module, Map<Module, Version> releasing, Jitpack.Probe probe) {
+        if (!module.resolvesFromJitpack()) {
+            return Optional.empty();
+        }
+        List<Module> tagOrder = Order.toTag(releasing.keySet());
+        List<Module> before = tagOrder.subList(0, Math.max(0, tagOrder.indexOf(module)));
+        for (Module upstream : module.upstreams()) {
+            if (!before.contains(upstream) || !upstream.onJitpack()) {
+                continue;
+            }
+            Version version = releasing.get(upstream);
+            Optional<String> failure = probe.failure(Jitpack.buildUrl(upstream, version));
+            if (failure.isPresent()) {
+                return Optional.of(upstream.directory() + " " + version.tag() + ": " + failure.get());
+            }
+        }
+        return Optional.empty();
     }
 
     /** The sentence a skipped wait prints, so a shorter release is a fact in the log rather than a mystery. */

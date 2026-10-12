@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Does the project a user copies still compile — asked of every template this repository ships.
@@ -88,6 +89,13 @@ public final class TemplateGate {
     static GateVerdict verdict(String directory, Proc.Result run, boolean force) {
         if (run.ok()) {
             return GateVerdict.ok("  " + directory + ": compiles at its own pin — ok");
+        }
+        Optional<MissingSnapshot> snapshot = MissingSnapshot.in(run.out());
+        if (snapshot.isPresent()) {
+            // A template resolves its pin as a published artifact, so the snapshot is the pin itself (a -Ptemplates
+            // build left it there); installing the module it names is the fix.
+            return snapshot.get().skipped(directory, "the template was not compiled",
+                    snapshot.get().module().orElse(Module.SDK));
         }
         if (force) {
             return GateVerdict.forced("  " + directory + ": will not compile — FORCED");
