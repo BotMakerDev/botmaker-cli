@@ -498,7 +498,8 @@ public final class PluginValidator {
      * Why a bot's author could not be offered {@code replacement} for {@code declared}'s values, or {@code null}
      * when they can. The declaration step refuses the first two already, but a hand-written {@code PluginType}
      * skips the step: the type is marked {@link Deprecated} and the replacement is not; the old values can be
-     * taken apart into what a {@code @Migrate} method maps (a call's parts, or an enum's constants); and the
+     * taken apart into what a {@code @Migrate} method maps (a call's parts, or an enum's constants), and the
+     * replacement is of the same kind (a call for a call, an enum for an enum: what Studio pairs); and the
      * replacement is a type some plugin on the classpath lists in {@code types()}, compared by name, so the
      * author can pick it and the host can write the migrated values.
      */
@@ -515,6 +516,11 @@ public final class PluginValidator {
         if (!(declared instanceof ComponentType<?>) && !type.isEnum()) {
             return "is replaced but neither written as a call nor an enum, so its values have no parts a"
                     + " migration could map";
+        }
+        if (type.isEnum() != replacement.isEnum()) {
+            return "is replaced by " + replacement.getName() + ", but " + (type.isEnum() ? "an enum's constants"
+                    + " migrate only to another enum" : "a call's values migrate only to another call, never an enum")
+                    + "; Studio would not offer it";
         }
         if (!pickable.contains(replacement.getName())) {
             return "is replaced by " + replacement.getName() + ", which no plugin on the classpath lists in"

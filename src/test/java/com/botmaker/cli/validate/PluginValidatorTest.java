@@ -602,6 +602,11 @@ class PluginValidatorTest {
                 replaced(true, "java.util.Observable.class"), GOOD_API)), Check.TYPES);
         assertEquals(Status.FAIL, retiring.status());
         assertTrue(retiring.detail().getFirst().contains("deprecated too"), retiring.detail()::toString);
+
+        CheckResult enumFor = result(PluginValidator.validate(subject(dir.resolve("d"), GOOD_POM,
+                replaced(true, "java.time.DayOfWeek.class"), GOOD_API)), Check.TYPES);
+        assertEquals(Status.FAIL, enumFor.status());
+        assertTrue(enumFor.detail().getFirst().contains("never an enum"), enumFor.detail()::toString);
     }
 
     /** A deprecated type with no pointer passes, said back: the author can still migrate to any type. */
