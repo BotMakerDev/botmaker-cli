@@ -5,6 +5,28 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **`JitpackScriptGate`**: a release refuses a JitPack module whose `.jitpack/build.sh` or `statx.c` differs
+  from the umbrella's `tools/jitpack/` or is not committed, or whose `jitpack.yml`'s install does not start
+  with it (`--force` overrides).
+- **A JitPack failure names a rate limit.** When the build log shows Maven Central's `429 Too Many Requests`,
+  the release's error says so: a rate limit on JitPack's builders, not the module.
+
+### Changed
+
+- `GatePlan.JITPACK_MAVEN` is 3.9.9, the Maven every JitPack build now runs, so `JitpackPluginsGate` holds
+  plugin prerequisites to it, falling back to JitPack's own 3.6.1 for a module whose script gate was forced or
+  skipped.
+
+### Build
+
+- **JitPack builds with `.jitpack/build.sh`**, the umbrella's `tools/jitpack/build.sh`: Maven 3.9.9 and every
+  dependency from Google's mirror of Maven Central first, with backoff and Maven's 429 retry, so Central's
+  `429 Too Many Requests` no longer loses a tag. The statx shim comes with it.
+
 ## [0.3.2] — 2026-10-12
 
 ### Added

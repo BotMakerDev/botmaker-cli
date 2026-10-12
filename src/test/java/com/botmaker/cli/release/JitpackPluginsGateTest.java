@@ -31,14 +31,16 @@ class JitpackPluginsGateTest {
     }
 
     @Test
-    void theThreePinsThatBurnedAReleaseChainAreRefused() {
+    void aPinNeedingANewerMavenThanJitpacksIsRefused() {
+        // Three release chains burned on this when the ceiling was JitPack's own 3.6.1 (flatten 1.6.0 needed
+        // 3.6.3); since 2026-10-12 every build runs tools/jitpack/build.sh's 3.9.9, and Maven 4 is above it.
         GateVerdict verdict = JitpackPluginsGate.verdict(Module.CLI,
-                List.of(needing("1.6.0", "3.6.3")), false);
+                List.of(needing("9.0.0", "4.0.0")), false);
 
         assertTrue(verdict.stops());
         assertTrue(verdict.refusal().startsWith(
-                "botmaker-cli: a pinned Maven plugin cannot run on JitPack's Maven 3.6.1."));
-        assertTrue(verdict.refusal().contains("     flatten-maven-plugin:1.6.0 requires Maven 3.6.3"));
+                "botmaker-cli: a pinned Maven plugin cannot run on JitPack's Maven 3.9.9."));
+        assertTrue(verdict.refusal().contains("     flatten-maven-plugin:9.0.0 requires Maven 4.0.0"));
         // The sentence that says why it is invisible locally, which is the whole trap.
         assertTrue(verdict.refusal().contains("It builds locally because your Maven is newer."));
     }
@@ -53,13 +55,13 @@ class JitpackPluginsGateTest {
 
         assertEquals(GateVerdict.Status.OK, verdict.status());
         assertTrue(verdict.line().contains("1 plugin(s) with no readable prerequisite — not checked"));
-        assertTrue(verdict.line().endsWith("every pinned Maven plugin runs on JitPack's Maven 3.6.1 — ok"));
+        assertTrue(verdict.line().endsWith("every pinned Maven plugin runs on JitPack's Maven 3.9.9 — ok"));
     }
 
     @Test
     void forceDowngradesItToALineThatStillSaysItFailed() {
         GateVerdict verdict = JitpackPluginsGate.verdict(Module.CLI,
-                List.of(needing("1.6.0", "3.6.3")), true);
+                List.of(needing("9.0.0", "4.0.0")), true);
 
         assertEquals(GateVerdict.Status.FORCED, verdict.status());
         assertEquals("  cli: plugin too new for JitPack's Maven — FORCED", verdict.line());
@@ -85,7 +87,7 @@ class JitpackPluginsGateTest {
         Files.createDirectories(pom);
         Files.writeString(pom.resolve("maven-shade-plugin-3.5.2.pom"), """
                 <project>
-                  <properties><mavenVersion>3.6.3</mavenVersion></properties>
+                  <properties><mavenVersion>4.0.0</mavenVersion></properties>
                   <prerequisites><maven>${mavenVersion}</maven></prerequisites>
                 </project>
                 """);
@@ -98,15 +100,15 @@ class JitpackPluginsGateTest {
         List<MavenPrerequisite.Pin> pins = MavenPrerequisite.read(module, repo);
 
         assertEquals(1, pins.size());
-        assertEquals(Optional.of("3.6.3"), pins.get(0).needs());
+        assertEquals(Optional.of("4.0.0"), pins.get(0).needs());
         assertTrue(JitpackPluginsGate.verdict(Module.CLI, pins, false).stops());
     }
 
     @Test
     void studioAndThePilotAreNotBuiltByJitpackAndSoAreNotGated(@TempDir Path umbrella) {
         assertEquals(GateVerdict.Status.OK,
-                JitpackPluginsGate.check(umbrella, Module.STUDIO, false, umbrella).status());
+                JitpackPluginsGate.check(umbrella, Module.STUDIO, false, GatePlan.JITPACK_MAVEN, umbrella).status());
         assertEquals(GateVerdict.Status.OK,
-                JitpackPluginsGate.check(umbrella, Module.PILOT, false, umbrella).status());
+                JitpackPluginsGate.check(umbrella, Module.PILOT, false, GatePlan.JITPACK_MAVEN, umbrella).status());
     }
 }

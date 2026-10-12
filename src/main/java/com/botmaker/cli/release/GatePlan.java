@@ -33,8 +33,19 @@ import java.util.Set;
  */
 public final class GatePlan {
 
-    /** The Maven JitPack's builder runs, and therefore the ceiling on every plugin prerequisite. */
-    public static final String JITPACK_MAVEN = "3.6.1";
+    /**
+     * The Maven every JitPack build runs — the one {@code tools/jitpack/build.sh} brings, which
+     * {@link JitpackScriptGate} holds every module to — and therefore the ceiling on every plugin
+     * prerequisite. JitPack's own builder runs 3.6.1, which no module uses since 2026-10-12.
+     */
+    public static final String JITPACK_MAVEN = "3.9.9";
+
+    /**
+     * The Maven JitPack's own builder runs — the ceiling for a module whose build does not run the script
+     * ({@link JitpackScriptGate} forced or skipped), since its {@code jitpack.yml} may still be a plain
+     * {@code mvn install}.
+     */
+    public static final String JITPACK_OWN_MAVEN = "3.6.1";
 
     private GatePlan() {
     }

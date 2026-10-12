@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * dependent that is <i>not</i> being released to the new snapshot, so no {@code main} pins a version nobody
  * builds; a dependent being released later in the run gets it from its own back-to-snapshot commit.
  *
- * <p><b>It runs on the operator's machine, never on JitPack</b>, so JitPack's Maven 3.6.1 ceiling does not
+ * <p><b>It runs on the operator's machine, never on JitPack</b>, so JitPack's Maven ceiling does not
  * bind {@link #PLUGIN}'s version. Every call goes through {@link Runner}: a dry run echoes the Maven lines.
  */
 public final class PomVersions {

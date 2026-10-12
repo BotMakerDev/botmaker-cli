@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -93,5 +94,25 @@ class JitpackTest {
         assertEquals(Optional.empty(), Jitpack.failureIn("{\"status\":\"none\"}"));
         assertEquals(Optional.empty(), Jitpack.failureIn("<html>"));
         assertEquals(Optional.of("the build failed"), Jitpack.failureIn("{\"status\":\"Error\"}"));
+    }
+
+    @Test
+    void aRateLimitInTheLogIsNamedAsTheCause() {
+        String message = "No build artifacts found. See the log: com/github/BotMakerDev/botmaker-shared/v0.2.4/build.log";
+        assertEquals(Optional.of("com/github/BotMakerDev/botmaker-shared/v0.2.4/build.log"), Jitpack.logPath(message));
+        assertEquals(Optional.empty(), Jitpack.logPath("the build failed"));
+
+        String named = Jitpack.withCause(message,
+                Optional.of("curl: (22) The requested URL returned error: 429 Too Many Requests\n"));
+        assertTrue(named.startsWith(message + " — the log shows Maven Central's 429 Too Many Requests"));
+        assertFalse(named.contains("\n"));
+        // Maven 3.9's resolver and curl over HTTP/2 word it differently, and the build now runs both.
+        assertTrue(Jitpack.withCause(message, Optional.of("[ERROR] … status code: 429, reason phrase: "
+                + "Too Many Requests (429)")).contains("rate limit"));
+        assertTrue(Jitpack.withCause(message, Optional.of("curl: (22) The requested URL returned error: 429"))
+                .contains("rate limit"));
+        assertEquals(message, Jitpack.withCause(message, Optional.of("downloaded 4290 kB")));
+        assertEquals(message, Jitpack.withCause(message, Optional.of("[ERROR] COMPILATION ERROR")));
+        assertEquals(message, Jitpack.withCause(message, Optional.empty()));
     }
 }

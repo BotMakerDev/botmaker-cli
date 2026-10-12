@@ -11,6 +11,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Nudging JitPack and waiting for a tag to build — {@code release.sh}'s {@code wait_for_jitpack}.
@@ -93,7 +95,8 @@ public final class Jitpack {
 
                 @Override
                 public Optional<String> failure(String buildUrl) {
-                    return body(buildUrl).flatMap(Jitpack::failureIn);
+                    return body(buildUrl).flatMap(Jitpack::failureIn)
+                            .map(message -> withCause(message, logPath(message).flatMap(path -> body(SITE + path))));
                 }
             };
         }
@@ -162,6 +165,24 @@ public final class Jitpack {
         }
     }
 
+    /** The build log a failure message names ({@code See the log: com/github/…/build.log}), relative to the site. */
+    static Optional<String> logPath(String message) {
+        Matcher log = LOG_PATH.matcher(message);
+        return log.find() ? Optional.of(log.group(1)) : Optional.empty();
+    }
+
+    /**
+     * The failure message, with the cause said when the log shows one the operator would otherwise misread:
+     * Maven Central's rate limit, which is nothing in the module (shared v0.2.4, studio-api v0.4.1).
+     */
+    static String withCause(String message, Optional<String> log) {
+        return log.filter(text -> RATE_LIMIT.matcher(text).find()).isPresent()
+                // One line: the dashboard's board reads the wait's output line by line.
+                ? message + " — the log shows Maven Central's " + RATE_LIMITED + ": a rate limit on JitPack's "
+                        + "builders, not this module. A new patch of it repairs the tag."
+                : message;
+    }
+
     /** How the wait passes time; the real one sleeps, a test's does not. */
     @FunctionalInterface
     public interface Sleeper {
@@ -197,6 +218,16 @@ public final class Jitpack {
     }
 
     private static final Duration SLICE = Duration.ofMillis(500);
+    private static final String SITE = "https://jitpack.io/";
+    private static final String RATE_LIMITED = "429 Too Many Requests";
+    /**
+     * Each way a build log words a 429: Maven 3.6's wagon ({@code 429 Too Many Requests}), Maven 3.9's resolver
+     * ({@code status code: 429, reason phrase: Too Many Requests (429)}), curl over HTTP/2 ({@code returned
+     * error: 429}, no reason phrase).
+     */
+    private static final Pattern RATE_LIMIT =
+            Pattern.compile("429 Too Many Requests|status code: 429|Too Many Requests \\(429\\)|error: 429\\b");
+    private static final Pattern LOG_PATH = Pattern.compile("See the log: (\\S+/build\\.log)");
 
     private static Optional<String> body(String url) {
         try (HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build()) {

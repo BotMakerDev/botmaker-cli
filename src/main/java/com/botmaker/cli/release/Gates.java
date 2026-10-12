@@ -49,7 +49,10 @@ public final class Gates {
             record(runner, refusals, VersionsGate.check(umbrella, module, force));
         }
         for (Module module : GatePlan.jitpackPlugins(modules)) {
-            record(runner, refusals, JitpackPluginsGate.check(umbrella, module, force));
+            GateVerdict script = JitpackScriptGate.check(umbrella, module, force);
+            record(runner, refusals, script);
+            record(runner, refusals,
+                    JitpackPluginsGate.check(umbrella, module, force, JitpackScriptGate.ceiling(script)));
         }
         if (GatePlan.sdkGates(modules)) {
             record(runner, refusals, SdkGates.apiPointers(umbrella, releasing.get(Module.SDK), force));

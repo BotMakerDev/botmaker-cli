@@ -9,7 +9,9 @@ import java.util.List;
  * Every module JitPack builds must pin only Maven plugins JitPack's Maven can execute —
  * {@code release.sh}'s {@code check_jitpack_plugins}.
  *
- * <p><b>JitPack's builder runs Apache Maven {@value GatePlan#JITPACK_MAVEN}, and that is a hard ceiling.</b>
+ * <p><b>Every JitPack build runs Apache Maven {@value GatePlan#JITPACK_MAVEN} ({@link JitpackScriptGate}), and
+ * that is a hard ceiling.</b> Until 2026-10-12 it was JitPack's own 3.6.1, which is where the history below
+ * comes from.
  * Maven refuses to <i>execute</i> a plugin whose {@code <prerequisites><maven>} exceeds its own version —
  * before the plugin's configuration is read and before anything is published — so the tag is pushed,
  * permanent, and resolves to nothing. **It is invisible locally, because a developer's Maven is newer.**
@@ -26,11 +28,15 @@ public final class JitpackPluginsGate {
     private JitpackPluginsGate() {
     }
 
-    public static GateVerdict check(Path umbrella, Module module, boolean force) {
-        return check(umbrella, module, force, MavenPrerequisite.localRepository());
+    /**
+     * @param ceiling the Maven the module's JitPack build runs — {@link JitpackScriptGate#ceiling}, which is
+     *                JitPack's own when the module's script did not pass
+     */
+    public static GateVerdict check(Path umbrella, Module module, boolean force, String ceiling) {
+        return check(umbrella, module, force, ceiling, MavenPrerequisite.localRepository());
     }
 
-    static GateVerdict check(Path umbrella, Module module, boolean force, Path localRepository) {
+    static GateVerdict check(Path umbrella, Module module, boolean force, String ceiling, Path localRepository) {
         // Studio and remote-server ship from their own CI and the two apps are APKs: JitPack builds none
         // of them, so their plugin pins are bounded by nothing but their own CI.
         if (!module.onJitpack()) {
@@ -47,14 +53,18 @@ public final class JitpackPluginsGate {
             return GateVerdict.skipped("  " + module.shortName()
                     + ": pom.xml could not be read — JitPack plugin gate skipped");
         }
-        return verdict(module, MavenPrerequisite.read(text, localRepository), force);
+        return verdict(module, MavenPrerequisite.read(text, localRepository), force, ceiling);
+    }
+
+    static GateVerdict verdict(Module module, List<MavenPrerequisite.Pin> pins, boolean force) {
+        return verdict(module, pins, force, GatePlan.JITPACK_MAVEN);
     }
 
     /** The rule over the pins already read — pure, so the FAIL/UNKNOWN arms need no network. */
-    static GateVerdict verdict(Module module, List<MavenPrerequisite.Pin> pins, boolean force) {
+    static GateVerdict verdict(Module module, List<MavenPrerequisite.Pin> pins, boolean force, String ceiling) {
         List<MavenPrerequisite.Pin> bad = pins.stream()
                 .filter(pin -> pin.needs().isPresent())
-                .filter(pin -> MavenPrerequisite.exceeds(pin.needs().get(), GatePlan.JITPACK_MAVEN))
+                .filter(pin -> MavenPrerequisite.exceeds(pin.needs().get(), ceiling))
                 .toList();
         List<MavenPrerequisite.Pin> unknown = pins.stream()
                 .filter(pin -> !pin.unknown().isEmpty())
@@ -62,7 +72,7 @@ public final class JitpackPluginsGate {
 
         if (bad.isEmpty()) {
             String ok = "  " + module.shortName() + ": every pinned Maven plugin runs on JitPack's Maven "
-                    + GatePlan.JITPACK_MAVEN + " — ok";
+                    + ceiling + " — ok";
             return unknown.isEmpty()
                     ? GateVerdict.ok(ok)
                     // The script prints the unknown count as its own line before the verdict; here it leads
@@ -75,7 +85,7 @@ public final class JitpackPluginsGate {
                     + ": plugin too new for JitPack's Maven — FORCED");
         }
         StringBuilder refusal = new StringBuilder(module.directory()
-                + ": a pinned Maven plugin cannot run on JitPack's Maven " + GatePlan.JITPACK_MAVEN + ".\n\n");
+                + ": a pinned Maven plugin cannot run on JitPack's Maven " + ceiling + ".\n\n");
         for (MavenPrerequisite.Pin pin : bad) {
             refusal.append("     ").append(pin.failure()).append('\n');
         }
