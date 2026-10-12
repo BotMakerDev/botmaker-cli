@@ -14,8 +14,9 @@ import java.util.Set;
  * operator who is asking why a module they did not name is in the plan. So an edge carries its own sentence
  * and {@link #forcedBy} hands it back.
  *
- * <p><b>The set of edges is transcribed exactly, comment for comment.</b> Adding or dropping one here is a
- * release that differs from the script's, which is what the slice diff exists to catch.
+ * <p><b>The set of edges was transcribed exactly, comment for comment</b>, and is this library's own since the
+ * cutover: <b>every pin is an edge</b>, which {@code OrderTest} derives from {@link Module#upstreams()} rather
+ * than trusting this list (2026-10-12: the dashboard's shared pin had none).
  *
  * <p>Two modules are forced by <b>nothing</b> and it is deliberate in both cases. {@code botmaker-shared}
  * and {@code botmaker-studio-api} sit at the top of the graph and pin nothing of ours; and
@@ -125,7 +126,13 @@ public record Forcing(Module upstream, Module downstream, String reason) {
             new Forcing(Module.CLI, Module.DASHBOARD,
                     "the dashboard's Release tab calls this release library in-process, so an installed "
                             + "dashboard decides by the cli it was built with — without a dashboard release, "
-                            + "its previews follow the previous rules"));
+                            + "its previews follow the previous rules"),
+
+            // Missing until 2026-10-12, when dashboard v0.3.1 was cut pinning a shared tag JitPack never built
+            // and the repair release, cutting shared, left the dashboard out. Every pin is an edge now, and
+            // OrderTest derives that from Module.upstreams() rather than trusting this list.
+            new Forcing(Module.SHARED, Module.DASHBOARD, "the dashboard's pom pins shared at a released "
+                    + "version, which this release moves, and its rpm and deb jobs build against that tag"));
 
     /** Every reason this module is dragged in by what is already being cut. Empty means it is not forced. */
     public static List<Forcing> forcedBy(Module downstream, Set<Module> cutting) {

@@ -218,7 +218,8 @@ public final class Jitpack {
     }
 
     private static final Duration SLICE = Duration.ofMillis(500);
-    private static final String SITE = "https://jitpack.io/";
+    /** JitPack's front page: what {@link PinsResolveGate} asks to tell "not served" from "not reachable". */
+    static final String SITE = "https://jitpack.io/";
     private static final String RATE_LIMITED = "429 Too Many Requests";
     /**
      * Each way a build log words a 429: Maven 3.6's wagon ({@code 429 Too Many Requests}), Maven 3.9's resolver

@@ -5,6 +5,19 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- **A release refuses a tag that would pin a release JitPack never built.** `PinsResolveGate` asks JitPack for
+  every pin a cut module's tag carries on an upstream outside the release, and names the flag to add. On
+  2026-10-12 SDK v1.4.3, Studio v1.4.3 and dashboard v0.3.1 were cut pinning botmaker-shared v0.2.4, which never
+  built, and all three were broken for good.
+- **Releasing shared forces the dashboard**, which pins it; every pin is a forcing edge now, which a test derives
+  from the modules' pins.
+- **A module whose tag would pin a newer upstream is released when named**, not skipped as "only docs": its
+  published pom differs (`ChangeKind.pinsMove`).
+
 ## [0.3.3] — 2026-10-12
 
 ### Added

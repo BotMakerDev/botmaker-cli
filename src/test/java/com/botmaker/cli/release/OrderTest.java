@@ -57,9 +57,9 @@ class OrderTest {
         assertTrue(Module.DASHBOARD.hasChangelog());
         assertTrue(Module.DASHBOARD.mavenBuild());
         assertFalse(Module.DASHBOARD.onJitpack());
-        // Forced by the cli alone, because the Release tab calls the cli's release library in-process: an
-        // installed dashboard decides by the rules it was built with.
-        assertEquals(Set.of(Module.CLI), upstreamsOf(Module.DASHBOARD));
+        // Forced by the cli, because the Release tab calls the cli's release library in-process (an installed
+        // dashboard decides by the rules it was built with), and by shared, which its pom pins (2026-10-12).
+        assertEquals(Set.of(Module.SHARED, Module.CLI), upstreamsOf(Module.DASHBOARD));
         assertTrue(Forcing.EDGES.stream().noneMatch(edge -> edge.upstream() == Module.DASHBOARD));
     }
 
@@ -101,6 +101,22 @@ class OrderTest {
         for (Forcing edge : Forcing.EDGES) {
             assertTrue(Order.DECIDE.indexOf(edge.upstream()) < Order.DECIDE.indexOf(edge.downstream()),
                     edge.upstream() + " must be decided before " + edge.downstream());
+        }
+    }
+
+    /**
+     * Every pin a pom carries forces its module when the pinned upstream is cut: a release moves that pin, and
+     * JitPack (or a package job) rebuilds only on a new tag. Derived from {@link Module#upstreams()} so a pin
+     * added later is covered; the dashboard's shared pin had no edge until 2026-10-12, and a shared release left
+     * dashboard v0.3.1 pinning a shared tag JitPack never built.
+     */
+    @Test
+    void everyPinIsAForcingEdge() {
+        for (Module module : Module.values()) {
+            for (Module upstream : module.upstreams()) {
+                assertTrue(upstreamsOf(module).contains(upstream),
+                        module.directory() + " pins " + upstream.directory() + " but no edge forces it");
+            }
         }
     }
 

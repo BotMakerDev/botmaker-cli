@@ -66,7 +66,16 @@ one of those reasons records a bug that shipped — JitPack's per-tag build cach
 flatten, a gate compiled against a different loader than Studio's — and a comment cannot be printed to the
 operator asking why a module they never named is in the plan. So `Forcing` is a list of
 `(upstream, downstream, reason)` and `forcedBy` returns every reason rather than one arbitrary winner. **The
-edge set itself is transcribed exactly**; adding or dropping one is a release that differs from the script's.
+edge set was transcribed exactly**, and since the cutover it is this library's own: **every pin is an edge**
+(`OrderTest.everyPinIsAForcingEdge`, derived from `Module.upstreams()`). The dashboard's shared pin had none
+until 2026-10-12, so a shared release left dashboard v0.3.1 pinning a shared tag JitPack never built.
+
+**A tag pins only what JitPack serves (2026-10-12).** `PinsResolveGate` asks JitPack for the pom of every pin
+a cut module's tag will carry on an upstream *outside* the release (one inside it is the run's own wait), and
+refuses one it does not serve, naming the flag to add. botmaker-shared v0.2.4 never built (Central's 429), and
+the `--studio-api 0.9.0` release cut SDK v1.4.3, Studio v1.4.3 and dashboard v0.3.1 pinning it. **A moved pin
+is a real change**: `ChangeKind.pinsMove` counts a module `REAL` when its tag would pin an upstream at another
+release than its last tag did, whatever its commits are, so the repair of such a module is a plain flag.
 
 **Three orders exist and none is a preference.** `Module`'s declaration order is the order `--help` lists the
 flags; `Order.DECIDE` is dependency order, which it must be because each forced flag reads the versions

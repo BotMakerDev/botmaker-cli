@@ -33,8 +33,8 @@ from `release.sh`.
   `PluginValidator`, as a `Check` (`two-artifacts.md`).
 - **picocli stays `optional`**, so a consumer of the main artifact resolves no parser.
 - **Every release side effect goes through `Runner`**; a direct write on a write path ignores `--dry-run`. The
-  forcing edge set and the three orders (`Module`, `Order.DECIDE`, `Order.TAG`) are transcribed exactly
-  (`release-library.md`).
+  three orders (`Module`, `Order.DECIDE`, `Order.TAG`) are transcribed exactly, and every pin
+  (`Module.upstreams()`) is a forcing edge (`release-library.md`).
 - **`ChangelogGate` invokes the module's own `tools/changelog-section.sh`**; never port it.
 - **A gate's `SKIPPED` never stops a release, and `--force` overrides a gate that failed, never one that could
   not run.**

@@ -38,6 +38,9 @@ public final class Gates {
         for (Module module : GatePlan.ci(modules)) {
             record(runner, refusals, CiGate.check(module, force));
         }
+        // Beside CI and as cheap: a request per pin. A tag pinning a release JitPack never built is as broken
+        // as one cut from a red main, and the fix is a flag (2026-10-12, shared v0.2.4).
+        record(runner, refusals, PinsResolveGate.check(umbrella, releasing, force));
         if (GatePlan.fallbackVersions(modules)) {
             record(runner, refusals, FallbackVersionsGate.check(umbrella, releasing, force));
         }

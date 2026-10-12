@@ -3,6 +3,8 @@ package com.botmaker.cli.release;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,6 +42,24 @@ class ChangeKindTest {
                 ChangeKind.classify(List.of("CHANGELOG.md", "README.md", "src/main/java/A.java")));
         assertEquals(ChangeKind.DOCS, ChangeKind.classify(List.of("CHANGELOG.md", "ROADMAP.md")));
         assertEquals(ChangeKind.NONE, ChangeKind.classify(List.of()));
+    }
+
+    /**
+     * Dashboard v0.3.1 pinned shared v0.2.4, a tag JitPack never built; after shared v0.2.5 its only commit was a
+     * changelog, and it was skipped as identical (2026-10-12). Its next tag pins v0.2.5: another artifact.
+     */
+    @Test
+    void aPinThatWouldMoveIsARealChangeWhateverTheCommitsAre() {
+        Map<Module, Optional<Version>> tagged = Map.of(
+                Module.SHARED, Version.parse("v0.2.4"), Module.CLI, Version.parse("v0.3.3"));
+        assertTrue(ChangeKind.pinsMove(tagged, Map.of(
+                Module.SHARED, Version.parse("v0.2.5"), Module.CLI, Version.parse("0.3.3"))));
+        assertFalse(ChangeKind.pinsMove(tagged, Map.of(
+                Module.SHARED, Version.parse("0.2.4"), Module.CLI, Version.parse("v0.3.3"))),
+                "the same release spelled with or without its v is the same pin");
+        assertFalse(ChangeKind.pinsMove(Map.of(Module.SHARED, Optional.empty()),
+                Map.of(Module.SHARED, Version.parse("v0.2.5"))), "a pin that is no version moves nothing");
+        assertFalse(ChangeKind.pinsMove(tagged, Map.of()), "an upstream never released moves nothing");
     }
 
     @Test

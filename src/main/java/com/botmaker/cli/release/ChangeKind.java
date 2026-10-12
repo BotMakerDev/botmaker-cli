@@ -1,7 +1,9 @@
 package com.botmaker.cli.release;
 
 import java.nio.file.Path;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -11,7 +13,8 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>{@link #REAL} — something publishable moved, or the module has never been released. Cut a tag.</li>
- *   <li>{@link #DOCS} — commits exist, but every file in them is {@link Relevance#irrelevant}. The tag would
+ *   <li>{@link #DOCS} — commits exist, but every file in them is {@link Relevance#irrelevant}, and no pin would
+ *       move ({@link #pinsMove}). The tag would
  *       publish a byte-identical artifact, so it is skipped <b>and the reason is said</b>: "no changes"
  *       would be a lie about a module that visibly has commits in it.</li>
  *   <li>{@link #NONE} — HEAD is the tag.</li>
@@ -44,7 +47,51 @@ public enum ChangeKind {
         if (!diff.ok()) {
             return REAL;                                    // same rule: unreadable is not unchanged
         }
-        return classify(withoutVersionOnlyPom(umbrella.resolve(module.directory()), ref.get(), diff.lines()));
+        ChangeKind kind = classify(withoutVersionOnlyPom(umbrella.resolve(module.directory()), ref.get(),
+                diff.lines()));
+        return kind != REAL && pinsMove(umbrella, module, ref.get()) ? REAL : kind;
+    }
+
+    /**
+     * Whether a tag cut now would pin an upstream at another release than the tag {@code ref} did — an upstream
+     * released since, outside this run (one inside it forces the module anyway, {@link Forcing}).
+     *
+     * <p><b>A moved pin is a different artifact</b>, whatever the commits say: the published pom names
+     * another upstream, and a Studio or dashboard package job builds against it. Until 2026-10-12 a module
+     * with only docs since its tag was skipped as identical, and dashboard v0.3.1, pinning a shared tag
+     * JitPack never built, could not be repaired by naming {@code --dashboard} after shared v0.2.5 was cut.
+     *
+     * <p>Unreadable answers true, as everything here does: the harmless direction is a duplicate artifact.
+     */
+    static boolean pinsMove(Path umbrella, Module module, String ref) {
+        if (module.upstreams().isEmpty()) {
+            return false;
+        }
+        Optional<String> pom = Git.capture(umbrella.resolve(module.directory()), "show", ref + ":pom.xml");
+        if (pom.isEmpty()) {
+            return true;
+        }
+        Map<Module, Optional<Version>> tagged = new EnumMap<>(Module.class);
+        Map<Module, Optional<Version>> released = new EnumMap<>(Module.class);
+        for (Module upstream : module.upstreams()) {
+            tagged.put(upstream, PomVersions.property(pom.get(), upstream).flatMap(Version::parse));
+            released.put(upstream, Tags.latest(umbrella, upstream));
+        }
+        return pinsMove(tagged, released);
+    }
+
+    /**
+     * The rule over facts already read: some upstream the old tag pinned at one release has a newer one. A pin
+     * that is not a version (a {@code -SNAPSHOT} on a hand-made tag) or an upstream never released moves nothing
+     * here: neither is a release this tag could pin instead.
+     *
+     * @param tagged   each upstream as the old tag's pom pinned it
+     * @param released each upstream's newest release now
+     */
+    static boolean pinsMove(Map<Module, Optional<Version>> tagged, Map<Module, Optional<Version>> released) {
+        return tagged.entrySet().stream().anyMatch(pin -> pin.getValue().isPresent()
+                && released.getOrDefault(pin.getKey(), Optional.empty())
+                        .filter(newest -> !newest.equals(pin.getValue().get())).isPresent());
     }
 
     /**
