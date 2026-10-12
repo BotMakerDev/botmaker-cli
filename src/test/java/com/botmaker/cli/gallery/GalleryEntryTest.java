@@ -77,12 +77,15 @@ class GalleryEntryTest {
         assertEquals(List.of("heroic"), migrated.launchTargets(), "migration must not drop Studio's field");
     }
 
+    /** An entry written before 2026-10-12 carries {@code requires}: read past, and gone from what is written. */
     @Test
-    void requires_round_trips() throws Exception {
-        GalleryEntry entry = new GalleryEntry("Bot", "o", "r", "", List.of())
-                .withRequires(List.of(new GalleryEntry.Requirement("com.botmaker.sdk", "v1.1.7")));
+    void an_old_entrys_requires_is_read_past_and_not_written_back() throws Exception {
+        GalleryEntry old = Registry.mapper().readValue("""
+                {"schemaVersion": 2, "name": "GameBot", "owner": "BotMakerDev", "repo": "botmaker-gamebot",
+                 "tags": ["template"], "requires": [{"id": "com.botmaker.sdk", "version": "1.2.3"}]}""",
+                GalleryEntry.class);
 
-        String json = Registry.mapper().writeValueAsString(entry);
-        assertEquals(entry, Registry.mapper().readValue(json, GalleryEntry.class));
+        assertEquals(new GalleryEntry("GameBot", "BotMakerDev", "botmaker-gamebot", "", List.of("template")), old);
+        assertFalse(Registry.mapper().writeValueAsString(old).contains("requires"));
     }
 }

@@ -4,12 +4,10 @@ import com.botmaker.cli.gallery.GalleryEntry;
 import com.botmaker.cli.gallery.GalleryFacts;
 import com.botmaker.cli.gallery.GalleryGate;
 import com.botmaker.cli.gallery.ListingPolicy;
-import com.botmaker.cli.gallery.Requirements;
 import com.botmaker.cli.gallery.Templates;
 import com.botmaker.cli.gallery.Tier;
 import com.botmaker.cli.project.Poms;
 import com.botmaker.cli.registry.Registry;
-import com.botmaker.cli.registry.RegistryEntry;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -174,16 +172,7 @@ final class BotPublishCommand implements Callable<Integer> {
             // renames, so a template with none, or with two unrelated ones, cannot be started from.
             Templates.packageOf(dir);
         }
-        GalleryEntry entry = new GalleryEntry(name, target[0], target[1], description, entryTags);
-        // What the bot needs, by registry id. An unreachable registry composes none rather than failing the
-        // publish: the entry is still correct, only less informative.
-        Optional<List<RegistryEntry>> registry = facts.registry();
-        if (registry.isEmpty()) {
-            parent.main().console().warn("the plugin registry could not be read, so the entry names no required"
-                    + " plugins.");
-            return entry;
-        }
-        return entry.withRequires(Requirements.of(Poms.dependencies(pom), Poms.properties(pom), registry.get()));
+        return new GalleryEntry(name, target[0], target[1], description, entryTags);
     }
 
     /**

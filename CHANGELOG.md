@@ -5,6 +5,20 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- **`--gamebot` pins the SDK's newest tag**, or the SDK the run cuts, and is released when its tag pins an older
+  one. Its gate compiles it at that tag and names `--sdk` when its `main` needs SDK code no release has.
+
+### Removed
+
+- **A gallery entry has no `requires`.** `bot publish` no longer writes the plugins a bot's pom declares, and the
+  gallery gate no longer checks them: the copy went stale at the repository's next release (gamebot's said SDK
+  1.2.3 while v0.2.7 pinned 1.4.4). Studio reads them off the release's pom. An old entry's `requires` is read
+  past and dropped from the catalog.
+
 ## [0.3.4] — 2026-10-12
 
 ### Fixed
@@ -27,8 +41,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   reads a miss Maven cached ("was not found in … during a previous attempt").
 - **`--no-wait-jitpack` stops before tagging on top of an upstream JitPack already failed to build**, asked once
   per upstream this run tagged.
-- **`--gamebot` pins the SDK's newest tag**, or the SDK the run cuts, and is released when its tag pins an older
-  one. Its gate compiles it at that tag and names `--sdk` when its `main` needs SDK code no release has.
 
 ## [0.3.3] — 2026-10-12
 

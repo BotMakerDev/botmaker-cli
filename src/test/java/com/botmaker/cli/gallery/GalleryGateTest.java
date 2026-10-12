@@ -1,6 +1,5 @@
 package com.botmaker.cli.gallery;
 
-import com.botmaker.cli.registry.RegistryEntry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -30,9 +29,6 @@ class GalleryGateTest {
     private static final class Fake implements GalleryFacts {
         Optional<String> tag = Optional.of("v1");
         boolean archive = true;
-        Optional<List<RegistryEntry>> registry = Optional.of(List.of(new RegistryEntry("com.botmaker.sdk", "SDK",
-                "com.github.BotMakerDev:botmaker-sdk", "LiQiyeDev/botmaker-sdk", "", List.of(), "", List.of(),
-                "v1.1.7", "")));
         boolean offline;
 
         @Override
@@ -46,11 +42,6 @@ class GalleryGateTest {
         @Override
         public boolean archiveExists(String owner, String repo, String tag) {
             return archive;
-        }
-
-        @Override
-        public Optional<List<RegistryEntry>> registry() {
-            return registry;
         }
 
         @Override
@@ -177,19 +168,6 @@ class GalleryGateTest {
         facts.archive = true;
         facts.offline = true;
         assertEquals(1, errors(check("alice", false, "bots/alice-farm.json")), "unreachable is not a pass");
-    }
-
-    @Test
-    void requiring_an_unregistered_plugin_is_a_warning_and_an_unreadable_registry_says_nothing() throws Exception {
-        write(head, "bots/alice-farm.json", """
-                {"schemaVersion": 2, "name": "Bot", "owner": "alice", "repo": "farm",
-                 "requires": [{"id": "com.botmaker.sdk", "version": "v1"}, {"id": "com.nobody.plugin"}]}""");
-        List<GalleryGate.Finding> findings = check("alice", false, "bots/alice-farm.json");
-        assertEquals(0, errors(findings));
-        assertEquals(1, warnings(findings));
-
-        facts.registry = Optional.empty();
-        assertEquals(List.of(), check("alice", false, "bots/alice-farm.json"));
     }
 
     @Test

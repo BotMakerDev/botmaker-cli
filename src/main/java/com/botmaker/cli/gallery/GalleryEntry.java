@@ -29,13 +29,18 @@ import java.util.List;
  * meeting a number above it knows it is the one that lags, which is how the gate refuses an entry it does not
  * understand instead of silently dropping fields from it.
  *
+ * <p><b>The entry is the repository, not what its release declares (2026-10-12).</b> It held {@code requires},
+ * the pom's registry plugins at publish time, until that copy told Studio's New Project gamebot needs SDK
+ * 1.2.3 while the release it copies pinned 1.4.4: nothing republishes an entry when its repository cuts a
+ * release. Studio reads the plugins off the installed release's pom instead; an old file's {@code requires} is
+ * an unknown field, read past and not written back.
+ *
  * <p>Field order is fixed so a pull request adding an entry is one block rather than a reshuffle, and empty
  * values are omitted so an entry with no tags carries no line saying so.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-@JsonPropertyOrder({"schemaVersion", "name", "owner", "repo", "description", "tags", "launchTargets",
-        "requires"})
+@JsonPropertyOrder({"schemaVersion", "name", "owner", "repo", "description", "tags", "launchTargets"})
 public record GalleryEntry(
         /** {@code 1} for a file that does not say — see the class note. */
         int schemaVersion,
@@ -46,9 +51,7 @@ public record GalleryEntry(
         String description,
         List<String> tags,
         /** Studio's launch-kind wire ids, carried verbatim. */
-        List<String> launchTargets,
-        /** The plugins the bot's pom declares, by registry id — so a browser can say what it needs. */
-        List<Requirement> requires) {
+        List<String> launchTargets) {
 
     /** The schema a writer stamps today. */
     public static final int CURRENT_SCHEMA = 2;
@@ -68,21 +71,6 @@ public record GalleryEntry(
     /** Where one entry lives in the gallery repository. The filename is the bot's identity. */
     public static final String ENTRIES_DIRECTORY = "bots";
 
-    /**
-     * One plugin a bot needs: the registry id and the version the bot's pom pins.
-     *
-     * <p>The id rather than the coordinate because the id is what a user reads and what the registry is keyed
-     * by; the version because "needs the SDK" and "needs SDK 1.1.7" are different promises to somebody deciding
-     * whether their Studio can open it.
-     */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
-    public record Requirement(String id, String version) {
-        public Requirement {
-            id = id == null ? "" : id.trim();
-            version = version == null ? "" : version.trim();
-        }
-    }
-
     public GalleryEntry {
         schemaVersion = schemaVersion <= 0 ? LEGACY_SCHEMA : schemaVersion;
         name = name == null ? "" : name.trim();
@@ -91,23 +79,17 @@ public record GalleryEntry(
         description = description == null ? "" : description;
         tags = tags == null ? List.of() : List.copyOf(tags);
         launchTargets = launchTargets == null ? List.of() : List.copyOf(launchTargets);
-        requires = requires == null ? List.of() : List.copyOf(requires);
     }
 
     /** A freshly composed entry: current schema, nothing declared beyond the five fields. */
     public GalleryEntry(String name, String owner, String repo, String description, List<String> tags) {
-        this(CURRENT_SCHEMA, name, owner, repo, description, tags, List.of(), List.of());
-    }
-
-    /** This entry with {@code requires} replaced. */
-    public GalleryEntry withRequires(List<Requirement> newRequires) {
-        return new GalleryEntry(schemaVersion, name, owner, repo, description, tags, launchTargets, newRequires);
+        this(CURRENT_SCHEMA, name, owner, repo, description, tags, List.of());
     }
 
     /** This entry read as the current schema. Version 2 only added fields, so only the number moves. */
     public GalleryEntry migrated() {
         return schemaVersion >= CURRENT_SCHEMA ? this
-                : new GalleryEntry(CURRENT_SCHEMA, name, owner, repo, description, tags, launchTargets, requires);
+                : new GalleryEntry(CURRENT_SCHEMA, name, owner, repo, description, tags, launchTargets);
     }
 
     /** {@code bots/<owner>-<repo>.json} — {@code GitHubConfig.entryPath} in Studio, and it must match. */

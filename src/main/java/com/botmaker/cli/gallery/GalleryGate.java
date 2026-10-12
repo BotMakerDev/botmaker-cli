@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The gallery's gate: the check that decides whether a pull request on {@code botmaker-gallery} may be listed.
@@ -33,8 +32,7 @@ import java.util.Set;
  *
  * <p>A <em>new</em> entry for a repository the pull request's author does not own is a warning, not a refusal:
  * an organisation's bot is legitimate and simply cannot be proven from a login, so {@link ListingPolicy} hands
- * it to a maintainer instead of merging it. {@code requires} naming a plugin the registry does not list is a
- * warning too — the bot may well work, and the registry is not the only place a plugin can come from.
+ * it to a maintainer instead of merging it.
  *
  * <p>Same shape as {@code registry/RegistryGate}, and in this module for the same reason: it must be the code
  * {@code botmaker bot publish} already ran. No command-line library, and changed paths may arrive as
@@ -195,17 +193,6 @@ public final class GalleryGate {
             findings.add(Finding.warning(path, author + " is not " + entry.owner() + ", so ownership cannot be"
                     + " proven from the login alone and a maintainer will list it by hand."));
         }
-        for (GalleryEntry.Requirement requirement : entry.requires()) {
-            if (requirement.id().isEmpty()) {
-                findings.add(Finding.error(path, "requires holds an entry with no plugin id."));
-            }
-        }
-        Optional<Set<String>> known = facts.pluginIds();
-        known.ifPresent(ids -> entry.requires().stream()
-                .map(GalleryEntry.Requirement::id)
-                .filter(id -> !id.isEmpty() && !ids.contains(id))
-                .forEach(id -> findings.add(Finding.warning(path, "requires " + id + ", which the plugin"
-                        + " registry does not list — a reader will not be able to install it from Studio."))));
         findings.addAll(releaseFindings(path, entry.owner(), entry.repo(), facts));
         return findings;
     }

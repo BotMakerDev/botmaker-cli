@@ -1,7 +1,6 @@
 package com.botmaker.cli.gallery;
 
 import com.botmaker.cli.registry.Registry;
-import com.botmaker.cli.registry.RegistryEntry;
 
 import java.io.IOException;
 import java.net.URI;
@@ -9,10 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * What {@link GalleryGate} has to ask the network, as an interface so the rules can be tested without it.
@@ -28,26 +24,10 @@ public interface GalleryFacts {
     /** Whether the archive an install fetches for {@code tag} downloads. */
     boolean archiveExists(String owner, String repo, String tag) throws IOException;
 
-    /**
-     * Every entry the plugin registry lists, or empty when the registry could not be read — in which case
-     * nothing about {@code requires} is reported or composed, because an unreachable registry is not the
-     * author's fault.
-     */
-    Optional<List<RegistryEntry>> registry();
-
     /** The gallery's own copy of the entry at {@code path} today, or empty when it holds none. */
     Optional<GalleryEntry> listedEntry(String path) throws IOException;
 
-    /** The registry's plugin ids — {@link #registry()} reduced to what {@code requires} names. */
-    default Optional<Set<String>> pluginIds() {
-        return registry().map(entries -> {
-            Set<String> ids = new LinkedHashSet<>();
-            entries.forEach(entry -> ids.add(entry.id()));
-            return ids;
-        });
-    }
-
-    /** The real network: GitHub's API through {@link Templates}, and the two raw-CDN files. */
+    /** The real network: GitHub's API through {@link Templates}, and the gallery's raw-CDN file. */
     static GalleryFacts github() {
         return new GalleryFacts() {
             @Override
@@ -58,23 +38,6 @@ public interface GalleryFacts {
             @Override
             public boolean archiveExists(String owner, String repo, String tag) throws IOException {
                 return Templates.archiveExists(owner, repo, tag);
-            }
-
-            @Override
-            public Optional<List<RegistryEntry>> registry() {
-                try {
-                    return raw("https://raw.githubusercontent.com/BotMakerDev/botmaker-plugin-registry/main/"
-                            + Registry.INDEX)
-                            .map(body -> {
-                                try {
-                                    return List.of(Registry.mapper().readValue(body, RegistryEntry[].class));
-                                } catch (IOException e) {
-                                    return null;
-                                }
-                            });
-                } catch (IOException e) {
-                    return Optional.empty();
-                }
             }
 
             @Override
