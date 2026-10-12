@@ -29,9 +29,11 @@ import java.util.stream.Collectors;
  *       and is recorded, with the tagged modules' pointers, before the exception leaves
  *       ({@link #tagChain}).</li>
  *   <li><b>Verify, then record the pointers and push the branches</b>, umbrella last.</li>
- *   <li><b>Open the registry's pull requests</b> moving each released plugin's {@code verifiedVersion}
- *       ({@link RegistryPin}).</li>
  * </ol>
+ *
+ * <p>It opened the plugin registry's pull requests moving each released plugin's {@code verifiedVersion} until
+ * 2026-10-12, when the ones for SDK v1.4.3 and v1.4.4 failed the registry's gate and sat unmerged: Studio now
+ * installs a plugin at JitPack's newest build, so the registry's pin moves nothing.
  */
 public final class Release {
 
@@ -39,8 +41,7 @@ public final class Release {
      * @param plan      what was decided
      * @param refusals  the gates that said no; non-empty means nothing was tagged
      * @param log       the release log written, when one was
-     * @param pushesOk  whether every branch push succeeded, the registry's pull requests included ({@link
-     *                  RegistryPin}) — reported, never fatal
+     * @param pushesOk  whether every branch push succeeded — reported, never fatal
      */
     public record Outcome(Plan plan, List<GateVerdict> refusals, Optional<Path> log, boolean pushesOk) {
 
@@ -126,19 +127,11 @@ public final class Release {
 
         String pointers = Umbrella.recordPointers(runner, umbrella, releasing, followed, log != null);
         boolean pushed = Umbrella.pushBranches(runner, umbrella);
-        // After the verify pass, so the registry's gate resolves a tag JitPack has already built.
-        pushed &= RegistryPin.bump(runner, tagged(chain.rows()), when.toLocalDate());
 
         runner.say("Done. " + (runner.dryRun() ? "(dry run) " : "") + "Released: " + pointers);
         return new Outcome(plan, List.of(), Optional.ofNullable(log), pushed);
     }
 
-    /** The modules the chain tagged, with their versions. */
-    static Map<Module, Version> tagged(List<ReleaseLog.Row> rows) {
-        Map<Module, Version> tagged = new java.util.EnumMap<>(Module.class);
-        rows.stream().filter(row -> row.stage().tagged()).forEach(row -> tagged.put(row.module(), row.version()));
-        return tagged;
-    }
 
     /** What the tag chain left: the log it kept (null on a dry run) and every row's final stage. */
     record Chain(Path log, List<ReleaseLog.Row> rows) {

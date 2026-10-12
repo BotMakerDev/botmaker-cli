@@ -106,6 +106,12 @@ was v0.1.1, so New Project copied v0.1.1 and its SDK 1.2.3. `TemplateRelease.pub
 <tag> --verify-tag` right after the push; a failure is a warning naming the command, since the tag is on origin
 and the template is tagged last.
 
+**No registry pull request (2026-10-12).** `RegistryPin` opened one per released plugin moving its
+`verifiedVersion` in `botmaker-plugin-registry`, after the branches were pushed. The ones for SDK v1.4.3 and
+v1.4.4 failed the registry's gate (its CI pinned cli v0.3.0, whose contract lacked members 1.4.4 links) and sat
+unmerged, so Studio kept installing v1.4.2. Studio installs a plugin at JitPack's newest build since, and the
+release leaves the registry alone.
+
 **A run that does not wait still stops on a failed upstream (2026-10-12).** A waiting run stops at an owed wait
 JitPack answers `Error` (`Release.AfterTag`). Under `--no-wait-jitpack`, before tagging a module that resolves
 its upstreams from JitPack, `Waits.failedUpstream` asks JitPack once, without waiting, about each upstream this

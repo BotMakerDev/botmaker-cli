@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **`--gamebot` makes its tag a GitHub Release**, which is what New Project copies. Tags alone left the
   template's latest release at v0.1.1 (SDK 1.2.3) through v0.2.7.
 
+### Removed
+
+- **A release opens no plugin-registry pull request.** Moving a released plugin's `verifiedVersion` waited on the
+  registry's gate, and the ones for SDK v1.4.3 and v1.4.4 failed it and sat unmerged. Studio installs a plugin
+  at JitPack's newest build instead.
+
 ## [0.3.5] — 2026-10-12
 
 ### Fixed
