@@ -87,15 +87,24 @@ class TemplatePinTest {
     }
 
     @Test
-    void aRunCuttingNoSdkTouchesNothing(@TempDir Path umbrella) throws IOException {
-        Path pom = template(umbrella);
+    void aTemplateCutWithoutTheSdkPinsItsNewestTag(@TempDir Path umbrella) throws IOException {
+        // 2026-10-12: the gamebot pinned SDK 1.4.2 with 1.4.4 released, and its main needed 1.4.4.
+        Path sdk = umbrella.resolve(Module.SDK.directory());
+        Files.createDirectories(sdk);
+        for (String[] git : new String[][] {{"init", "-q"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit",
+                "-q", "--allow-empty", "-m", "x"}, {"tag", "v1.4.2"}, {"tag", "v1.4.4"}, {"tag", "demo-2026"}}) {
+            List<String> argv = new ArrayList<>(List.of("git", "-C", sdk.toString()));
+            argv.addAll(List.of(git));
+            assertTrue(Proc.run(umbrella, argv.toArray(String[]::new)).ok(), String.join(" ", argv));
+        }
 
-        // A template may be cut on its own — its own code changed, no SDK in the run — and then there is
-        // no pin to move. Doing nothing is the answer, not refusing.
-        TemplatePin.bump(real(new ArrayList<>()), umbrella, Module.GAMEBOT,
-                Map.of(Module.STUDIO, new Version(1, 2, 0)));
-
-        assertEquals(POM, Files.readString(pom));
+        assertEquals(Map.of(Module.SDK, new Version(1, 4, 4)),
+                TemplatePin.targets(umbrella, Map.of(Module.GAMEBOT, new Version(0, 2, 7))));
+        assertEquals(Map.of(Module.SDK, new Version(1, 5, 0)), TemplatePin.targets(umbrella,
+                Map.of(Module.GAMEBOT, new Version(0, 2, 7), Module.SDK, new Version(1, 5, 0))),
+                "the SDK this run cuts wins over its newest tag");
+        assertEquals(Map.of(), TemplatePin.targets(umbrella.resolve("elsewhere"), Map.of()),
+                "an SDK never tagged leaves the pin alone");
     }
 
     @Test

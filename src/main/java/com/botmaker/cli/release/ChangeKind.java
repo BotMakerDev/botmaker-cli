@@ -64,7 +64,10 @@ public enum ChangeKind {
      * <p>Unreadable answers true, as everything here does: the harmless direction is a duplicate artifact.
      */
     static boolean pinsMove(Path umbrella, Module module, String ref) {
-        if (module.upstreams().isEmpty()) {
+        // A template's SDK pin moves to the SDK's newest tag on its release (TemplatePin.targets), so a template
+        // whose tag pins an older SDK is a real change too: gamebot v0.2.6 pinned SDK 1.4.2 with 1.4.4 out.
+        List<Module> pinned = module.template() ? List.copyOf(TemplatePin.PINS.keySet()) : module.upstreams();
+        if (pinned.isEmpty()) {
             return false;
         }
         Optional<String> pom = Git.capture(umbrella.resolve(module.directory()), "show", ref + ":pom.xml");
@@ -73,7 +76,7 @@ public enum ChangeKind {
         }
         Map<Module, Optional<Version>> tagged = new EnumMap<>(Module.class);
         Map<Module, Optional<Version>> released = new EnumMap<>(Module.class);
-        for (Module upstream : module.upstreams()) {
+        for (Module upstream : pinned) {
             tagged.put(upstream, PomVersions.property(pom.get(), upstream).flatMap(Version::parse));
             released.put(upstream, Tags.latest(umbrella, upstream));
         }

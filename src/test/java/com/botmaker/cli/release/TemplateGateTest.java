@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -97,5 +98,19 @@ class TemplateGateTest {
         TemplateGate.afterBump(new Runner(true, said::add), umbrella, Module.GAMEBOT, new Version(1, 1, 15));
 
         assertTrue(said.isEmpty(), said.toString());
+    }
+
+    @Test
+    void aTemplateCutWithoutTheSdkThatNeedsUnreleasedSdkCodeNamesTheFlag() {
+        // Compiled at the newest SDK tag its tag will pin: main calling SDK code no release has is a refusal
+        // that says to cut the SDK with it.
+        Optional<Version> sdk = Optional.of(new Version(1, 4, 4));
+        GateVerdict refused = TemplateGate.verdict("botmaker-gamebot",
+                new Proc.Result(1, "[ERROR] /x/Flows.java:[12,9] cannot find symbol"), false, sdk);
+        assertEquals(GateVerdict.Status.REFUSED, refused.status());
+        assertTrue(refused.refusal().contains("does not compile at SDK v1.4.4"), refused.refusal());
+        assertTrue(refused.refusal().contains("(--sdk)"));
+        assertTrue(TemplateGate.verdict("botmaker-gamebot", new Proc.Result(0, ""), false, sdk).line()
+                .contains("compiles at SDK v1.4.4, the pin its tag gets"));
     }
 }

@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -70,9 +71,14 @@ public final class Gates {
         // After the SDK gates, because the SDK is what a template pins: asking whether the templates still
         // compile is worth more once the thing they compile against has answered for itself.
         for (String directory : GatePlan.templates(modules)) {
+            // A template cut without the SDK is compiled at the SDK tag its own tag will pin, not at the pin it
+            // replaces (TemplatePin.targets); one cut with the SDK waits for that SDK's tag (afterBump).
+            boolean cut = modules.stream().anyMatch(m -> m.template() && m.directory().equals(directory));
             record(runner, refusals, GatePlan.pinMoves(directory, modules)
                     ? TemplateGate.deferred(directory)
-                    : TemplateGate.check(umbrella, directory, force));
+                    : TemplateGate.check(umbrella, directory, force, cut
+                            ? Optional.ofNullable(TemplatePin.targets(umbrella, releasing).get(Module.SDK))
+                            : Optional.empty()));
         }
         return List.copyOf(refusals);
     }

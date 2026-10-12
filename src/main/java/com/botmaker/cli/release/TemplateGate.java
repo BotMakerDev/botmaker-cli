@@ -65,6 +65,15 @@ public final class TemplateGate {
      * not a template that fails it.
      */
     public static GateVerdict check(Path umbrella, String directory, boolean force) {
+        return check(umbrella, directory, force, Optional.empty());
+    }
+
+    /**
+     * @param sdk the SDK tag this template's release will pin ({@link TemplatePin#targets}) when the release
+     *            cuts the template without the SDK: the compile is at that tag, since 2026-10-12, rather than at
+     *            the pin the release replaces. Empty compiles at the pom's own pin
+     */
+    public static GateVerdict check(Path umbrella, String directory, boolean force, Optional<Version> sdk) {
         Path pom = umbrella.resolve(directory).resolve("pom.xml");
         if (!Files.isRegularFile(pom)) {
             return GateVerdict.skipped("  " + directory + ": no pom.xml in this checkout — template gate"
@@ -73,7 +82,7 @@ public final class TemplateGate {
         if (!Proc.onPath("mvn")) {
             return GateVerdict.skipped("  " + directory + ": mvn not on PATH — template gate skipped");
         }
-        return verdict(directory, compile(umbrella, pom), force);
+        return verdict(directory, compile(umbrella, pom, sdk), force, sdk);
     }
 
     /**
@@ -87,8 +96,13 @@ public final class TemplateGate {
 
     /** The reading of one compile, split out so the refusal's wording is tested without forking Maven. */
     static GateVerdict verdict(String directory, Proc.Result run, boolean force) {
+        return verdict(directory, run, force, Optional.empty());
+    }
+
+    static GateVerdict verdict(String directory, Proc.Result run, boolean force, Optional<Version> sdk) {
         if (run.ok()) {
-            return GateVerdict.ok("  " + directory + ": compiles at its own pin — ok");
+            return GateVerdict.ok("  " + directory + sdk.map(v -> ": compiles at SDK " + v.tag() + ", the pin its tag"
+                    + " gets — ok").orElse(": compiles at its own pin — ok"));
         }
         Optional<MissingSnapshot> snapshot = MissingSnapshot.in(run.out());
         if (snapshot.isPresent()) {
@@ -99,6 +113,13 @@ public final class TemplateGate {
         }
         if (force) {
             return GateVerdict.forced("  " + directory + ": will not compile — FORCED");
+        }
+        if (sdk.isPresent()) {
+            return GateVerdict.refused(directory + ": the template does not compile at SDK " + sdk.get().tag()
+                    + ", the newest SDK tag, which its tag would pin.\n"
+                    + "     Its main needs SDK code no release has yet: release the SDK with it (--sdk), or"
+                    + " --force.\n\n"
+                    + errors(run));
         }
         return GateVerdict.refused(directory + ": the template does not compile at the version it pins.\n"
                 + "     This is the project a user copies, so a template that will not build is a new"
@@ -125,15 +146,15 @@ public final class TemplateGate {
             runner.say("    " + module.directory() + ": mvn not on PATH — the bumped pin is not compiled");
             return;
         }
-        Proc.Result run = compile(umbrella, pom);
+        Proc.Result run = compile(umbrella, pom, Optional.empty());
         if (run.ok()) {
             runner.say("    " + module.directory() + " compiles against " + sdk.tag() + " — ok");
             return;
         }
-        throw new ReleaseRefusal(module.directory() + ": the template does not compile against the SDK"
-                + " this release just cut (" + sdk.tag() + ").\n"
-                + "     The pin was moved and nothing is tagged for it yet. Fix the template, or release it"
-                + " without the SDK.\n\n"
+        throw new ReleaseRefusal(module.directory() + ": the template does not compile against SDK "
+                + sdk.tag() + ", the pin this release just wrote.\n"
+                + "     The pin was moved and nothing is tagged for it yet. Fix the template, then release"
+                + " again.\n\n"
                 + errors(run));
     }
 
@@ -144,8 +165,10 @@ public final class TemplateGate {
      * not a module of the umbrella's aggregator and resolves its SDK as a published artifact, which is
      * exactly what a user's copy does. Building it from the reactor would test a bot nobody has.
      */
-    private static Proc.Result compile(Path umbrella, Path pom) {
-        return Proc.run(umbrella, "mvn", "-B", "-q", "-f", pom.toString(), "compile");
+    private static Proc.Result compile(Path umbrella, Path pom, Optional<Version> sdk) {
+        List<String> argv = new ArrayList<>(List.of("mvn", "-B", "-q", "-f", pom.toString(), "compile"));
+        sdk.ifPresent(v -> argv.add("-D" + TemplatePin.PINS.get(Module.SDK) + "=" + v));
+        return Proc.run(umbrella, argv.toArray(String[]::new));
     }
 
     /**

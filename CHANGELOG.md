@@ -27,6 +27,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   reads a miss Maven cached ("was not found in … during a previous attempt").
 - **`--no-wait-jitpack` stops before tagging on top of an upstream JitPack already failed to build**, asked once
   per upstream this run tagged.
+- **`--gamebot` pins the SDK's newest tag**, or the SDK the run cuts, and is released when its tag pins an older
+  one. Its gate compiles it at that tag and names `--sdk` when its `main` needs SDK code no release has.
 
 ## [0.3.3] — 2026-10-12
 

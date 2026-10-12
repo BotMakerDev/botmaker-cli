@@ -371,8 +371,9 @@ public final class Release {
             // The other path into a project: what a bot copied FROM A TEMPLATE pins, which is the template's
             // own pom. Same sentence as the line above, about the other door.
             at.accept("template pins");
-            TemplatePin.bump(runner, umbrella, module, releasing);
-            Version sdk = releasing.get(Module.SDK);
+            Map<Module, Version> pins = TemplatePin.targets(umbrella, releasing);
+            TemplatePin.bump(runner, umbrella, module, pins);
+            Version sdk = pins.get(Module.SDK);
             if (sdk != null) {
                 // The pin moved, so the thing the decide pass compiled is not the thing about to be tagged.
                 // This is the last moment a refusal costs nothing: Order.TAG puts the templates last.

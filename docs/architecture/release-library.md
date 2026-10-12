@@ -93,6 +93,13 @@ resolved", never the "for project" coordinate the line names first). `BuildsAtPi
 install -DskipTests` that fixes it, instead of refusing a module that is fine; the redirect-pointer and plugin
 gates had refused a sound SDK that way. `--force` does not lift it: the gate did not run.
 
+**A template's release pins the SDK's newest tag (2026-10-12).** `TemplatePin.targets` is the SDK this run cuts,
+or the SDK's newest tag when it cuts none; a template whose tag pins an older SDK is a real change
+(`ChangeKind.pinsMove` reads `TemplatePin.PINS` for a template). `TemplateGate` compiles a template cut without
+the SDK at that tag (`-Dbotmaker.sdk.version`), and a template whose `main` needs SDK code no release has is
+refused with `--sdk` to add. Until then only an SDK in the same run moved the pin: gamebot v0.2.6 pinned SDK
+1.4.2, its `main` needed 1.4.4, and `--gamebot` alone was skipped as unchanged.
+
 **A run that does not wait still stops on a failed upstream (2026-10-12).** A waiting run stops at an owed wait
 JitPack answers `Error` (`Release.AfterTag`). Under `--no-wait-jitpack`, before tagging a module that resolves
 its upstreams from JitPack, `Waits.failedUpstream` asks JitPack once, without waiting, about each upstream this

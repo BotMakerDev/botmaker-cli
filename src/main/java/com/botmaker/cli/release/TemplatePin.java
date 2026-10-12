@@ -3,6 +3,7 @@ package com.botmaker.cli.release;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -63,7 +64,24 @@ public final class TemplatePin {
     }
 
     /**
-     * Rewrites every pin naming a module this release is cutting.
+     * What a template's release pins each {@link #PINS} module at: the version this release cuts, or that
+     * module's newest tag when the release does not cut it.
+     *
+     * <p><b>The newest tag, since 2026-10-12</b>, as every other module's tag pins an upstream outside its
+     * release ({@link PomVersions}). Until then only a run cutting the SDK moved the pin, so the gamebot sat at
+     * SDK 1.4.2 while its {@code main} called 1.4.4's API: red in the IDE, refused by its own gate, and installed
+     * by Studio at a release older still.
+     */
+    public static Map<Module, Version> targets(Path umbrella, Map<Module, Version> releasing) {
+        Map<Module, Version> targets = new EnumMap<>(Module.class);
+        PINS.keySet().forEach(pinned -> Optional.ofNullable(releasing.get(pinned))
+                .or(() -> Tags.latest(umbrella, pinned))
+                .ifPresent(version -> targets.put(pinned, version)));
+        return targets;
+    }
+
+    /**
+     * Rewrites every pin to its {@link #targets}.
      *
      * <p>Called from a template's own release and only from there. A run that cuts the SDK without the
      * template never reaches this and is not refused for it — a template is forced by nothing, on purpose,
@@ -74,10 +92,10 @@ public final class TemplatePin {
      * template's pom already uses. JitPack resolves a coordinate to the tag either way; what matters is that
      * one spelling is written every time, rather than the file drifting between two.
      */
-    public static void bump(Runner runner, Path umbrella, Module module, Map<Module, Version> releasing) {
+    public static void bump(Runner runner, Path umbrella, Module module, Map<Module, Version> targets) {
         Path pom = umbrella.resolve(module.directory()).resolve("pom.xml");
         PINS.forEach((pinned, property) -> {
-            Version version = releasing.get(pinned);
+            Version version = targets.get(pinned);
             if (version != null) {
                 runner.replace(pom, declaration(property), "$1" + version + "$2");
             }
