@@ -339,6 +339,10 @@ public final class Release {
                     + " git -C " + module.directory() + " push origin HEAD " + version.tag() + ".\n"
                     + "     Every module after it pins that tag, so the release stops here.");
         }
+        if (module.template()) {
+            at.accept("github release");
+            TemplateRelease.publish(runner, module, version);
+        }
         at.accept("dependents' pins");
         followed.addAll(PomVersions.follow(runner, umbrella, module, version, releasing.keySet()));
         if (module == Module.STUDIO) {

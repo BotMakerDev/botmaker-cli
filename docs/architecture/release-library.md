@@ -100,6 +100,12 @@ the SDK at that tag (`-Dbotmaker.sdk.version`), and a template whose `main` need
 refused with `--sdk` to add. Until then only an SDK in the same run moved the pin: gamebot v0.2.6 pinned SDK
 1.4.2, its `main` needed 1.4.4, and `--gamebot` alone was skipped as unchanged.
 
+**A template's tag is made a GitHub Release (2026-10-12).** Studio copies a template's `/releases/latest`, not
+its newest tag, and the template has no workflow to make one: gamebot had tags to v0.2.7 and its latest release
+was v0.1.1, so New Project copied v0.1.1 and its SDK 1.2.3. `TemplateRelease.publish` runs `gh release create
+<tag> --verify-tag` right after the push; a failure is a warning naming the command, since the tag is on origin
+and the template is tagged last.
+
 **A run that does not wait still stops on a failed upstream (2026-10-12).** A waiting run stops at an owed wait
 JitPack answers `Error` (`Release.AfterTag`). Under `--no-wait-jitpack`, before tagging a module that resolves
 its upstreams from JitPack, `Waits.failedUpstream` asks JitPack once, without waiting, about each upstream this
