@@ -5,6 +5,17 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **`botmaker mcp-bridge`: Studio's MCP tools over stdio, across Studio's restarts.** An MCP client configured
+  with Studio's HTTP endpoint marked it failed each time Studio stopped, until the user reconnected it by hand.
+  The bridge is the client's server for its whole session: it reads Studio's port and token from Studio's
+  `mcp.json`, forwards each call while Studio runs, answers that Studio is not running while it does not, and
+  sends `notifications/tools/list_changed` when Studio comes back or restarts. Claude Code:
+  `claude mcp add botmaker-studio -- botmaker mcp-bridge`.
+
 ## [0.3.6] — 2026-10-12
 
 ### Fixed
