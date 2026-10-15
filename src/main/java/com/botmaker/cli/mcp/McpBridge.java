@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,8 +19,14 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -45,13 +53,37 @@ public final class McpBridge {
     /** Where Studio listens and the token it wants; {@link #fromStudioConfig} reads them. */
     public record Upstream(URI url, String token) {}
 
+    /**
+     * How start_studio starts Studio: {@code command} run in {@code dir}, and {@code projectArg} the argument it takes
+     * for a project to open, {@code %s} standing for the project's name; what it prints goes to {@code log}.
+     */
+    public record Launch(List<String> command, Path dir, String projectArg, Path log) {
+        public Launch {
+            command = List.copyOf(command);
+        }
+
+        /** {@code command} with its output in Studio's cache folder, beside its {@code mcp.json}. */
+        public static Launch of(List<String> command, Path dir, String projectArg) {
+            return new Launch(command, dir, projectArg, cacheRoot().resolve("studio-run.log"));
+        }
+    }
+
+    /** The bridge's own tool, listed beside Studio's: it answers while Studio is down. */
+    static final String START = "start_studio";
+    /** How long start_studio waits for Studio's endpoint; a dev Studio compiles first. */
+    private static final Duration STARTING = Duration.ofMinutes(3);
+
     /** What the client was told while Studio is down. */
-    static final String DOWN = "BotMaker Studio is not running, or its MCP endpoint is off. Start Studio: its "
-            + "tools come back by themselves.";
+    static final String DOWN = "BotMaker Studio is not running, or its MCP endpoint is off. start_studio starts "
+            + "it; its tools come back by themselves.";
     private static final String SESSION = "Mcp-Session-Id";
+    /** Studio's {@code McpEndpoint.HELLO}. */
+    static final String HELLO = "/mcp-hello";
+    private static final SecureRandom RANDOM = new SecureRandom();
     private static final String FALLBACK_PROTOCOL = "2025-06-18";
 
     private final Supplier<Optional<Upstream>> upstream;
+    private final Optional<Launch> launch;
     private final InputStream in;
     private final OutputStream out;
     private final Duration poll;
@@ -79,9 +111,14 @@ public final class McpBridge {
         }
     }
 
-    /** @param poll how often Studio is looked for while it is down, and checked while it is up */
-    public McpBridge(Supplier<Optional<Upstream>> upstream, InputStream in, OutputStream out, Duration poll) {
+    /**
+     * @param launch how start_studio starts Studio; empty, it says how to tell the bridge
+     * @param poll how often Studio is looked for while it is down, and checked while it is up
+     */
+    public McpBridge(Supplier<Optional<Upstream>> upstream, Optional<Launch> launch, InputStream in, OutputStream out,
+            Duration poll) {
         this.upstream = upstream;
+        this.launch = launch;
         this.in = in;
         this.out = out;
         this.poll = poll;
@@ -156,6 +193,8 @@ public final class McpBridge {
                 reply(message, now != null ? announced(now.init()) : localInit());
             } else if (method.equals("ping")) {
                 reply(message, json.createObjectNode());
+            } else if (method.equals("tools/call") && START.equals(message.path("params").path("name").asText())) {
+                reply(message, start(message.path("params").path("arguments").path("project").asText("")));
             } else {
                 forward(message);
             }
@@ -177,7 +216,8 @@ public final class McpBridge {
                 // The first page only: a later one would stand in for the whole list.
                 if (message.path("method").asText().equals("tools/list") && !message.path("params").has("cursor")
                         && answer.path("result").path("tools") instanceof ArrayNode listed) {
-                    tools = listed;
+                    tools = listed.deepCopy();
+                    listed.add(startTool());
                 }
                 write(answer);
                 return;
@@ -196,13 +236,8 @@ public final class McpBridge {
     /** What a request gets while Studio is down. */
     private void down(ObjectNode message) throws IOException {
         switch (message.path("method").asText()) {
-            case "tools/list" -> reply(message, json.createObjectNode().set("tools", tools));
-            case "tools/call" -> {
-                ObjectNode result = json.createObjectNode();
-                result.putArray("content").addObject().put("type", "text").put("text", DOWN);
-                result.put("isError", true);
-                reply(message, result);
-            }
+            case "tools/list" -> reply(message, json.createObjectNode().set("tools", tools.deepCopy().add(startTool())));
+            case "tools/call" -> reply(message, toolText(DOWN, true));
             default -> error(message, DOWN);
         }
     }
@@ -212,7 +247,8 @@ public final class McpBridge {
         result.put("protocolVersion", clientInit.path("protocolVersion").asText(FALLBACK_PROTOCOL));
         result.putObject("capabilities").putObject("tools").put("listChanged", true);
         result.putObject("serverInfo").put("name", "botmaker-studio").put("version", "bridge");
-        result.put("instructions", "BotMaker Studio is not running yet. Its tools appear here once it starts.");
+        result.put("instructions", "BotMaker Studio is not running yet. start_studio starts it; its tools appear "
+                + "here once it runs.");
         return result;
     }
 
@@ -220,6 +256,67 @@ public final class McpBridge {
     private ObjectNode announced(JsonNode init) {
         ObjectNode result = init.deepCopy();
         result.withObjectProperty("capabilities").withObjectProperty("tools").put("listChanged", true);
+        return result;
+    }
+
+    // --- start_studio ---
+
+    /** start_studio as the client lists it. */
+    private ObjectNode startTool() {
+        ObjectNode tool = json.createObjectNode().put("name", START).put("description", "Start BotMaker Studio on "
+                + "this computer and wait until its tools answer; quit_studio closes it. Says so when it runs already.");
+        ObjectNode schema = tool.putObject("inputSchema").put("type", "object");
+        schema.putObject("properties").putObject("project").put("type", "string")
+                .put("description", "a project under ~/BotMakerProjects to open; left out, Studio opens as it would");
+        return tool;
+    }
+
+    /** start_studio: Studio started, or found running, and its tools listed again once its endpoint answers. */
+    private ObjectNode start(String project) {
+        if (connect() != null) return toolText("Studio runs already.", false);
+        if (launch.isEmpty()) {
+            return toolText("The bridge was not told how to start Studio: give mcp-bridge --umbrella <checkout> (a "
+                    + "dev Studio, through javafx:run) or --studio <command>, or set BOTMAKER_UMBRELLA or "
+                    + "BOTMAKER_STUDIO.", true);
+        }
+        Launch how = launch.get();
+        List<String> argv = new ArrayList<>(how.command());
+        if (!project.isBlank()) argv.add(how.projectArg().formatted(project.strip()));
+        Path log = how.log();
+        Process process;
+        try {
+            Files.createDirectories(log.getParent());
+            // Never this process's stdout: that is the protocol.
+            process = new ProcessBuilder(argv).directory(how.dir() == null ? null : how.dir().toFile())
+                    .redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        } catch (IOException failed) {
+            return toolText("Studio did not start: " + failed.getMessage(), true);
+        }
+        long until = System.nanoTime() + STARTING.toNanos();
+        while (System.nanoTime() < until) {
+            if (connect() != null) {
+                toolsChanged();
+                return toolText("Studio runs; its tools are listed again.", false);
+            }
+            if (!process.isAlive()) {
+                return toolText("Studio stopped as it started (exit " + process.exitValue() + "); what it printed "
+                        + "is in " + log + ".", true);
+            }
+            try {
+                Thread.sleep(poll);
+            } catch (InterruptedException stopped) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return toolText("Studio started, but its endpoint has not answered yet; what it printed is in " + log
+                + ". Its tools come back by themselves once it does.", true);
+    }
+
+    private ObjectNode toolText(String text, boolean error) {
+        ObjectNode result = json.createObjectNode();
+        result.putArray("content").addObject().put("type", "text").put("text", text);
+        if (error) result.put("isError", true);
         return result;
     }
 
@@ -299,8 +396,44 @@ public final class McpBridge {
         }
     }
 
+    /**
+     * Refuses unless what answers on {@code to}'s port proves it holds the token: Studio's {@code /mcp-hello} signs a
+     * fresh nonce with it. Asked before each request, so a process that took the port while Studio was down is
+     * never handed the token.
+     */
+    private void provenStudio(Upstream to) throws IOException {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        String nonce = HexFormat.of().formatHex(bytes);
+        HttpRequest hello = HttpRequest.newBuilder(to.url().resolve(HELLO + "?nonce=" + nonce)).timeout(QUICK).GET()
+                .build();
+        try {
+            HttpResponse<String> answer = http.send(hello, HttpResponse.BodyHandlers.ofString());
+            byte[] expected = proof(to.token(), nonce).getBytes(StandardCharsets.UTF_8);
+            if (answer.statusCode() != 200
+                    || !MessageDigest.isEqual(expected, answer.body().strip().getBytes(StandardCharsets.UTF_8))) {
+                throw new IOException("What answers on " + to.url().getPort() + " is not this computer's Studio");
+            }
+        } catch (InterruptedException stopped) {
+            Thread.currentThread().interrupt();
+            throw new IOException("stopped");
+        }
+    }
+
+    /** HMAC-SHA256 of {@code nonce} under {@code token}, in hex, as Studio's {@code McpEndpoint.proof} makes it. */
+    static String proof(String token, String nonce) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(token.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return HexFormat.of().formatHex(mac.doFinal(nonce.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HmacSHA256 is missing from this Java", e);
+        }
+    }
+
     private HttpRequest post(Upstream to, String session, String protocol, JsonNode body, Duration timeout)
             throws IOException {
+        provenStudio(to);
         HttpRequest.Builder request = HttpRequest.newBuilder(to.url())
                 .header("Authorization", "Bearer " + to.token())
                 .header("Content-Type", "application/json")
@@ -357,6 +490,7 @@ public final class McpBridge {
         if (now.session() != null) request.header(SESSION, now.session());
         while (connection == now) {
             try {
+                provenStudio(now.upstream());
                 HttpResponse<Stream<String>> response = http.send(request.build(),
                         HttpResponse.BodyHandlers.ofLines());
                 if (response.statusCode() != 200) {

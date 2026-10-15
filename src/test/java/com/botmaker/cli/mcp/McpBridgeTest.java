@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -15,7 +16,9 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -64,18 +67,54 @@ class McpBridgeTest {
         studio = new FakeStudio(port, "a");
         assertNotNull(notice(), "Studio up: the client is told the tools changed");
         send("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/list\"}");
-        assertEquals("open", answer(3).at("/result/tools/0/name").asText(), "listed by Studio, over its stream");
+        JsonNode up = answer(3);
+        assertEquals("open", up.at("/result/tools/0/name").asText(), "listed by Studio, over its stream");
+        assertEquals(McpBridge.START, up.at("/result/tools/1/name").asText(), "the bridge's own beside Studio's");
 
         studio.stop();
         send("{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/list\"}");
-        assertEquals("open", answer(4).at("/result/tools/0/name").asText(), "Studio down: its last list");
+        JsonNode cached = answer(4);
+        assertEquals("open", cached.at("/result/tools/0/name").asText(), "Studio down: its last list");
+        assertEquals(McpBridge.START, cached.at("/result/tools/1/name").asText());
+        assertEquals(2, cached.at("/result/tools").size(), "start_studio once, not once more per listing");
 
         studio = new FakeStudio(port, "b");
         send("{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"open\"}}");
         assertEquals("opened by b", answer(5).at("/result/content/0/text").asText(), "a new session, the call made");
+
+        send("{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"start_studio\"}}");
+        assertEquals("Studio runs already.", answer(6).at("/result/content/0/text").asText());
+    }
+
+    @Test
+    void startStudioSaysWhenStudioStopsAsItStarts(@TempDir Path dir) throws Exception {
+        int port;
+        try (ServerSocket free = new ServerSocket(0)) {
+            port = free.getLocalPort();
+        }
+        start(port, Optional.of(new McpBridge.Launch(List.of("false"), null, "%s", dir.resolve("studio-run.log"))));
+        send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"start_studio\"}}");
+        JsonNode stopped = answer(1);
+        assertTrue(stopped.at("/result/isError").asBoolean());
+        assertTrue(stopped.at("/result/content/0/text").asText().startsWith("Studio stopped as it started (exit 1)"));
+    }
+
+    @Test
+    void startStudioUntoldSaysHowToTellIt() throws Exception {
+        int port;
+        try (ServerSocket free = new ServerSocket(0)) {
+            port = free.getLocalPort();
+        }
+        start(port);
+        send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"start_studio\"}}");
+        assertTrue(answer(1).at("/result/content/0/text").asText().contains("--umbrella"));
     }
 
     private void start(int port) throws IOException {
+        start(port, Optional.empty());
+    }
+
+    private void start(int port, Optional<McpBridge.Launch> launch) throws IOException {
         PipedInputStream in = new PipedInputStream(1 << 16);
         toBridge = new PipedOutputStream(in);
         OutputStream out = new OutputStream() {
@@ -98,7 +137,7 @@ class McpBridgeTest {
         McpBridge.Upstream at = new McpBridge.Upstream(URI.create("http://127.0.0.1:" + port + "/mcp"), "t");
         bridge = Thread.ofVirtual().start(() -> {
             try {
-                new McpBridge(() -> Optional.of(at), in, out, Duration.ofMillis(50)).run();
+                new McpBridge(() -> Optional.of(at), launch, in, out, Duration.ofMillis(50)).run();
             } catch (IOException ended) {
                 // stdin closed by the test
             }
@@ -137,6 +176,10 @@ class McpBridgeTest {
             this.session = session;
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
             server.createContext("/mcp", this::handle);
+            server.createContext(McpBridge.HELLO, exchange -> {
+                String nonce = exchange.getRequestURI().getQuery().substring("nonce=".length());
+                reply(exchange, 200, "text/plain", McpBridge.proof("t", nonce));
+            });
             server.start();
         }
 

@@ -15,6 +15,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   `mcp.json`, forwards each call while Studio runs, answers that Studio is not running while it does not, and
   sends `notifications/tools/list_changed` when Studio comes back or restarts. Claude Code:
   `claude mcp add botmaker-studio -- botmaker mcp-bridge`.
+- **The bridge checks it talks to Studio before it sends the token.** A process that took Studio's port while
+  Studio was down is asked for `/mcp-hello`'s proof first and gets no token.
+- **start_studio** starts Studio from the bridge while it is down: `--studio <command>` (`$BOTMAKER_STUDIO`), or
+  `--umbrella <dir>` (`$BOTMAKER_UMBRELLA`) for a dev Studio run by Maven. Its output goes to Studio's cache,
+  `studio-run.log`. The tool is listed whether Studio runs or not.
 
 ## [0.3.6] — 2026-10-12
 
