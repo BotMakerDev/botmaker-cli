@@ -39,18 +39,10 @@ class MissingSnapshotTest {
     }
 
     @Test
-    void theSdkGatesSkipWithTheInstallEvenWhenForced() {
-        Version version = Version.parse("1.4.5").orElseThrow();
+    void theSdkGateSkipsWithTheInstallEvenWhenForced() {
         for (boolean force : new boolean[] {false, true}) {
-            GateVerdict pointers = SdkGates.pointers(version, MISSING, force);
-            assertEquals(GateVerdict.Status.SKIPPED, pointers.status());
-            assertTrue(pointers.line().contains("botmaker-studio-api:jar:0.9.1-SNAPSHOT is not in ~/.m2"),
-                    pointers.line());
-            assertTrue(pointers.line().contains("mvn -pl botmaker-sdk -am install -DskipTests"));
             assertEquals(GateVerdict.Status.SKIPPED, SdkGates.validated(MISSING, force).status());
         }
-        assertEquals(GateVerdict.Status.REFUSED,
-                SdkGates.pointers(version, new Proc.Result(1, "[ERROR] ApiPointersTest failed"), false).status());
         assertEquals(GateVerdict.Status.REFUSED,
                 SdkGates.validated(new Proc.Result(1, "FAIL pom-scopes"), false).status());
     }

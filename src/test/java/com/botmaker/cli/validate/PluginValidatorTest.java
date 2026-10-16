@@ -573,51 +573,6 @@ class PluginValidatorTest {
         assertTrue(types.detail().getFirst().contains("is not public static"), types.detail()::toString);
     }
 
-    /** {@code Greeting}, deprecated when {@code deprecated}, its type answering {@code replacedBy()} as {@code body}. */
-    private static String replaced(boolean deprecated, String body) {
-        String plugin = GOOD_PLUGIN.replace(
-                "@Override public Class<Greeting> type() { return Greeting.class; }",
-                "@Override public Class<Greeting> type() { return Greeting.class; }"
-                        + " @Override public Class<?> replacedBy() { return " + body + "; }");
-        return deprecated ? plugin.replace("public static final class Greeting {",
-                "@Deprecated(forRemoval = true) public static final class Greeting {") : plugin;
-    }
-
-    /** A pointer on a type its class does not deprecate, or to a type nobody declares, is refused (2026-10-12). */
-    @Test
-    void a_replacement_needs_a_deprecated_type_and_a_declared_target(@TempDir Path dir) throws IOException {
-        CheckResult undeprecated = result(PluginValidator.validate(subject(dir.resolve("a"), GOOD_POM,
-                replaced(false, "String.class"), GOOD_API)), Check.TYPES);
-        assertEquals(Status.FAIL, undeprecated.status());
-        assertTrue(undeprecated.detail().getFirst().contains("not marked @Deprecated"),
-                undeprecated.detail()::toString);
-
-        CheckResult undeclared = result(PluginValidator.validate(subject(dir.resolve("b"), GOOD_POM,
-                replaced(true, "String.class"), GOOD_API)), Check.TYPES);
-        assertEquals(Status.FAIL, undeclared.status());
-        assertTrue(undeclared.detail().getFirst().contains("which no plugin on the classpath lists"),
-                undeclared.detail()::toString);
-
-        CheckResult retiring = result(PluginValidator.validate(subject(dir.resolve("c"), GOOD_POM,
-                replaced(true, "java.util.Observable.class"), GOOD_API)), Check.TYPES);
-        assertEquals(Status.FAIL, retiring.status());
-        assertTrue(retiring.detail().getFirst().contains("deprecated too"), retiring.detail()::toString);
-
-        CheckResult enumFor = result(PluginValidator.validate(subject(dir.resolve("d"), GOOD_POM,
-                replaced(true, "java.time.DayOfWeek.class"), GOOD_API)), Check.TYPES);
-        assertEquals(Status.FAIL, enumFor.status());
-        assertTrue(enumFor.detail().getFirst().contains("never an enum"), enumFor.detail()::toString);
-    }
-
-    /** A deprecated type with no pointer passes, said back: the author can still migrate to any type. */
-    @Test
-    void a_deprecated_type_without_a_replacement_passes_with_a_note(@TempDir Path dir) throws IOException {
-        CheckResult types = result(PluginValidator.validate(subject(dir, GOOD_POM, replaced(true, "null"), GOOD_API)),
-                Check.TYPES);
-        assertEquals(Status.PASS, types.status(), types::toString);
-        assertTrue(types.detail().getLast().contains("deprecated with no replacedBy"), types.detail()::toString);
-    }
-
     @Test
     void a_fresh_call_with_arguments_or_another_type_is_named() throws NoSuchMethodException {
         assertEquals("takes parameters; the host writes the call with no arguments",

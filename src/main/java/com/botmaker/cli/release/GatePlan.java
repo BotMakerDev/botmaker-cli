@@ -25,8 +25,7 @@ import java.util.Set;
  *       {@link Module#onJitpack} already, nobody resolving a template as an artifact. What it does take is
  *       the template gate, which is the one question worth asking a project a user copies: does it
  *       compile.</li>
- *   <li>The SDK-only gates are SDK-only because their subject is: {@code check_api_pointers} runs
- *       {@code ApiPointersTest} against the version being cut, and {@code check_sdk_plugin} runs the plugin
+ *   <li>The SDK-only gate is SDK-only because its subject is: {@code check_sdk_plugin} runs the plugin
  *       registry's own validator over the SDK, which is Studio's plugin #1 with no exemption — a rule the
  *       host's own plugin breaks is a rule the gate cannot enforce on anybody else.</li>
  * </ul>

@@ -30,6 +30,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Removed
 
+- **The `@ReplacedBy` pointer gate and the validator's `replacedBy` check.** The contract no longer has the
+  pointer (studio-api 0.10.0): a bot's author writes `@Migrate` rules instead, so an SDK release no longer runs
+  `ApiPointersTest`, and `plugin validate` no longer asks a deprecated type for its replacement.
 - **A release opens no plugin-registry pull request.** Moving a released plugin's `verifiedVersion` waited on the
   registry's gate, and the ones for SDK v1.4.3 and v1.4.4 failed it and sat unmerged. Studio installs a plugin
   at JitPack's newest build instead.

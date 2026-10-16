@@ -68,9 +68,8 @@
  *       "an {@code --sdk} release forces Studio" in this project was documentation. It was already false
  *       in production when it was noticed. Both were written into {@code release.sh} in the same commit,
  *       word for word, so the cutover diff stays empty.</li>
- *   <li>{@link com.botmaker.cli.release.SdkGates} — {@code check_api_pointers} and
- *       {@code check_sdk_plugin}, both invocations: Maven runs one test, and the CLI's own shaded jar
- *       validates the SDK, because <i>this gate and {@code botmaker plugin validate} in an author's
+ *   <li>{@link com.botmaker.cli.release.SdkGates} — {@code check_sdk_plugin}, an invocation: the CLI's own
+ *       shaded jar validates the SDK, because <i>this gate and {@code botmaker plugin validate} in an author's
  *       terminal are one program</i>.</li>
  *   <li>{@link com.botmaker.cli.release.JitpackPluginsGate} and
  *       {@link com.botmaker.cli.release.MavenPrerequisite} — {@code check_jitpack_plugins}, the one gate

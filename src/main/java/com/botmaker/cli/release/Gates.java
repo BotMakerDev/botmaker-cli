@@ -65,7 +65,6 @@ public final class Gates {
                     JitpackPluginsGate.check(umbrella, module, force, JitpackScriptGate.ceiling(script)));
         }
         if (GatePlan.sdkGates(modules)) {
-            record(runner, refusals, SdkGates.apiPointers(umbrella, releasing.get(Module.SDK), force));
             record(runner, refusals, SdkGates.sdkPlugin(umbrella, force));
         }
         // After the SDK gates, because the SDK is what a template pins: asking whether the templates still

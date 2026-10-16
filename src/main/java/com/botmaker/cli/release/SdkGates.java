@@ -10,13 +10,13 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * The two gates that only run when the SDK is being cut — {@code release.sh}'s {@code check_api_pointers}
- * and {@code check_sdk_plugin}.
+ * The gate that only runs when the SDK is being cut — {@code release.sh}'s {@code check_sdk_plugin}. Its twin,
+ * {@code check_api_pointers}, went on 2026-10-16 with {@code @ReplacedBy}, the pointers it checked.
  *
- * <p>Both are <b>invocations</b>: Maven runs one test, and the CLI's own shaded jar validates the SDK. What
- * is ported is where they run, what they refuse, and how they degrade — not what they check.
+ * <p>It is an <b>invocation</b>: the CLI's own shaded jar validates the SDK. What is ported is where it runs,
+ * what it refuses, and how it degrades — not what it checks.
  *
- * <p><b>Both skip with a line when {@code mvn} is absent, and that is deliberate rather than lenient.</b> A
+ * <p><b>It skips with a line when {@code mvn} is absent, and that is deliberate rather than lenient.</b> A
  * gate that cannot run must say so; passing silently is the failure mode that let three releases report
  * {@code UNVERIFIED} while six of eight published modules were unresolvable.
  */
@@ -26,43 +26,6 @@ public final class SdkGates {
     private static final int QUOTED = 20;
 
     private SdkGates() {
-    }
-
-    /**
-     * {@code check_api_pointers}: the SDK's own {@code ApiPointersTest}, run against the version being cut.
-     *
-     * <p>It asks only whether a redirect somebody <b>declared</b> is complete — never whether a break was
-     * covered, which is a supported outcome. The version reaches only the message: this pass passed it as
-     * {@code -Dbotmaker.api.maxVersion} until 2026-08-27, when the {@code @Replaces} back edge it bounded
-     * was deleted and nothing was left to read it. Adding it back here would be a flag that changes
-     * nothing today and refuses something surprising the day somebody reads the property again.
-     */
-    public static GateVerdict apiPointers(Path umbrella, Version version, boolean force) {
-        if (!Proc.onPath("mvn")) {
-            return GateVerdict.skipped("  sdk: mvn not on PATH — pointer gate skipped");
-        }
-        Path pom = umbrella.resolve(Module.SDK.directory()).resolve("pom.xml");
-        return pointers(version, Proc.run(umbrella, "mvn", "-B", "-q", "-f", pom.toString(), "test",
-                "-Dtest=ApiPointersTest", "-DfailIfNoTests=false"), force);
-    }
-
-    /** The reading of the pointer test's run, split out so its arms are tested without forking Maven. */
-    static GateVerdict pointers(Version version, Proc.Result run, boolean force) {
-        if (run.ok()) {
-            return GateVerdict.ok("  sdk: @ReplacedBy pointers complete for v" + version + " — ok");
-        }
-        Optional<MissingSnapshot> snapshot = MissingSnapshot.in(run.out());
-        if (snapshot.isPresent()) {
-            return snapshot.get().skipped("sdk", "the redirect pointers were not checked", Module.SDK);
-        }
-        if (force) {
-            return GateVerdict.forced("  sdk: pointer gate failed — FORCED");
-        }
-        return GateVerdict.refused("sdk: the redirect pointers do not hold for v" + version + ".\n"
-                + "     A bot upgrading past this release would default + mark the calls this was meant to"
-                + " carry across.\n"
-                + "     Fix the annotations, or --force.\n\n"
-                + errors(run));
     }
 
     /**
