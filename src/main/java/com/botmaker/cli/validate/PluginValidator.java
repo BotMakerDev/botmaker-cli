@@ -704,6 +704,17 @@ public final class PluginValidator {
             } catch (RuntimeException e) {
                 // the types check reports it
             }
+            // A set of classes' field is written as a reference to it (Screens.MARKET.beerBuy), and its element,
+            // when referred to by name, as its constant (Screens.MARKET).
+            try {
+                for (ManagedValue<?> value : nonNull(plugin.managedValues())) {
+                    if (value == null || !value.isClasses()) continue;
+                    known.add(value.fieldType());
+                    if (value.isReferredByName()) known.add(value.type());
+                }
+            } catch (RuntimeException | LinkageError e) {
+                // the managed check reports it
+            }
         }
         known.removeIf(Objects::isNull);
         return List.copyOf(known);
@@ -960,6 +971,21 @@ public final class PluginValidator {
             List<Class<?>> known = new ArrayList<>();
             types.values().forEach(type -> known.add(type.type()));
             shapes.values().forEach(shape -> known.add(shape.type()));
+            if (value.isClasses()) {
+                // A set of classes is code the host writes; what it writes as a value is each class's setup.
+                Class<?> setup = value.setup().getReturnType();
+                if (setup.isArray() || !writableClass(setup, known)) {
+                    problems.add(at + "'s classes return " + setup.getName() + " from " + value.setup().getName()
+                            + "(), which no loaded plugin declares, so no host can write a class's setup");
+                }
+                // Each field's initialiser is written as a value of the field type.
+                Class<?> field = value.fieldType();
+                if (field.isArray() || !writableClass(field, known)) {
+                    problems.add(at + "'s classes hold fields of " + field.getName() + ", which no loaded plugin"
+                            + " declares, so no host can write one");
+                }
+                return problems;
+            }
             if (element.isArray() || !writableClass(element, known)) {
                 problems.add(at + " holds constants of " + element.getName() + ", which no loaded plugin"
                         + " declares, so no host can write one");

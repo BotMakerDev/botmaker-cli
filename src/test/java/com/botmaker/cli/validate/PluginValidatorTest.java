@@ -514,6 +514,32 @@ class PluginValidatorTest {
                 managed.detail()::toString);
     }
 
+    /** A sheet of nested classes ({@code ofClasses}), each returning a {@code setup} of {@code returns}. */
+    private static CheckResult classes(Path dir, String returns) throws IOException {
+        String plugin = managing(openSet("GREETINGS") + ".ofClasses(Sheet.class).fields(Object.class, GoodPlugin::cell)"
+                + ".setup(Sheet::setup).in(\"Sheets\").because(\"why\")").replace(
+                "@Override public List<PluginType<?>> types() {",
+                "public abstract static class Sheet { public abstract " + returns + " setup(); } "
+                        + "public static Object cell(String sheet, String name) { return name; } "
+                        + "@Override public List<PluginType<?>> types() {");
+        return result(PluginValidator.validate(subject(dir, GOOD_POM, plugin, GOOD_API)), Check.MANAGED);
+    }
+
+    /** A set of classes is code; what a host writes as a value is each class's setup (2026-10-16). */
+    @Test
+    void a_set_of_classes_whose_setup_is_declared_passes(@TempDir Path dir) throws IOException {
+        CheckResult managed = classes(dir, "Greeting");
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+    }
+
+    @Test
+    void a_set_of_classes_whose_setup_no_plugin_declares_fails(@TempDir Path dir) throws IOException {
+        CheckResult managed = classes(dir, "java.time.Clock");
+        assertEquals(Status.FAIL, managed.status());
+        assertTrue(managed.detail().getFirst().contains("return java.time.Clock from setup()"),
+                managed.detail()::toString);
+    }
+
     /** Opened and never created is still one method's value, not an open set (it was until 2026-10-05). */
     @Test
     void a_value_the_host_never_creates_passes(@TempDir Path dir) throws IOException {

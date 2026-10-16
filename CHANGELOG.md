@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **The validator knows a set of nested classes** (contract `ofClasses`, 2026-10-16): such a set passes when its
+  classes' setup type is one a host writes, and a part of its field type (or of its element, when referred to by
+  name) counts as writable, since the host writes it as a reference (`Screens.MARKET.beerBuy`).
 - **`botmaker mcp-bridge`: Studio's MCP tools over stdio, across Studio's restarts.** An MCP client configured
   with Studio's HTTP endpoint marked it failed each time Studio stopped, until the user reconnected it by hand.
   The bridge is the client's server for its whole session: it reads Studio's port and token from Studio's
