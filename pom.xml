@@ -48,7 +48,7 @@
         -->
         <!-- The version botmaker-studio-api itself pins. One JavaFX across the platform: this module never
              constructs a Node, but it links against the same SlotEditor the contract declares. -->
-        <javafx.version>25.0.4</javafx.version>
+        <javafx.version>27</javafx.version>
         <!--
           What the version option prints, stamped into the executable jar's manifest.
 

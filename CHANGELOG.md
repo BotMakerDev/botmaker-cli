@@ -7,6 +7,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Build
+
+- **JavaFX 27** (2026-10-18), from 25.0.4, the contract's version; compile-only, as before.
+
 ### Added
 
 - **The validator knows a set of nested classes** (contract `ofClasses`, 2026-10-16): such a set passes when its
