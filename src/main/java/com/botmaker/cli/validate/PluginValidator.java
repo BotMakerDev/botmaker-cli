@@ -7,6 +7,10 @@ import com.botmaker.plugin.api.catalog.FacadeEntry;
 import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
+import com.botmaker.plugin.api.source.ManagedClasses;
+import com.botmaker.plugin.api.source.ManagedMethod;
+import com.botmaker.plugin.api.source.ManagedOpenSet;
+import com.botmaker.plugin.api.source.ManagedParam;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
@@ -720,9 +724,9 @@ public final class PluginValidator {
             // when referred to by name, as its constant (Screens.MARKET).
             try {
                 for (ManagedValue<?> value : nonNull(plugin.managedValues())) {
-                    if (value == null || !value.isClasses()) continue;
-                    known.add(value.fieldType());
-                    if (value.isReferredByName()) known.add(value.type());
+                    if (!(value instanceof ManagedClasses<?> classes)) continue;
+                    known.add(classes.fieldType());
+                    if (classes.isReferredByName()) known.add(classes.type());
                 }
             } catch (RuntimeException | LinkageError e) {
                 // the managed check reports it
@@ -822,7 +826,7 @@ public final class PluginValidator {
     }
 
     /**
-     * The element of each grouped open set ({@code ofEnums(…).groupedAs(…)}) some loaded plugin declares — the
+     * The element of each grouped open set ({@code ofEnumGroups(…).groupedAs(…)}) some loaded plugin declares — the
      * types a {@code Class<…>} part may be written for, as a class literal of one of the bot's nested enums. Every
      * plugin, judged or not; a plugin whose values throw adds nothing, and the managed check reports it.
      */
@@ -831,7 +835,7 @@ public final class PluginValidator {
         for (StudioPlugin plugin : plugins) {
             try {
                 for (ManagedValue<?> value : nonNull(plugin.managedValues())) {
-                    if (value != null && value.isOpenSet() && value.isGrouped()) literals.add(value.type());
+                    if (value instanceof ManagedOpenSet.EnumGroups<?>) literals.add(value.type());
                 }
             } catch (RuntimeException | LinkageError e) {
                 // the managed check reports it
@@ -977,21 +981,21 @@ public final class PluginValidator {
         if (holder != null && !javaIdentifier(holder)) {
             problems.add(at + " names holder \"" + holder + "\", which is not a simple class name");
         }
-        if (value.isOpenSet()) {
+        if (value instanceof ManagedOpenSet<?>) {
             // Each constant's initialiser is written as a value of the element type, so a host must write one.
             Class<?> element = value.type();
             List<Class<?>> known = new ArrayList<>();
             types.values().forEach(type -> known.add(type.type()));
             shapes.values().forEach(shape -> known.add(shape.type()));
-            if (value.isClasses()) {
+            if (value instanceof ManagedClasses<?> classes) {
                 // A set of classes is code the host writes; what it writes as a value is each class's setup.
-                Class<?> setup = value.setup().getReturnType();
+                Class<?> setup = classes.setup().getReturnType();
                 if (setup.isArray() || !writableClass(setup, known)) {
-                    problems.add(at + "'s classes return " + setup.getName() + " from " + value.setup().getName()
+                    problems.add(at + "'s classes return " + setup.getName() + " from " + classes.setup().getName()
                             + "(), which no loaded plugin declares, so no host can write a class's setup");
                 }
                 // Each field's initialiser is written as a value of the field type.
-                Class<?> field = value.fieldType();
+                Class<?> field = classes.fieldType();
                 if (field.isArray() || !writableClass(field, known)) {
                     problems.add(at + "'s classes hold fields of " + field.getName() + ", which no loaded plugin"
                             + " declares, so no host can write one");
@@ -1008,13 +1012,13 @@ public final class PluginValidator {
             // Opened, never created: nothing here is written by a host, so there is nothing more to prove.
             return problems;
         }
-        if (value.isParam() && !(value.form() instanceof Class<?>)) {
+        if (value instanceof ManagedParam<?> param && !(param.form() instanceof Class<?>)) {
             // A generic field — Set<Class<? extends Outcome>> — is written by the host's grammar from its leaves,
             // which no single declaration here stands for; what is left to prove is that it starts as one.
-            Object first = value.initial();
+            Object first = param.initial();
             if (first != null && !value.type().isInstance(first)) {
                 problems.add(at + "'s first value is a " + first.getClass().getName() + ", not a "
-                        + value.form().getTypeName());
+                        + param.form().getTypeName());
             }
             return problems;
         }
@@ -1028,7 +1032,11 @@ public final class PluginValidator {
                     + " write the `public static " + raw.getSimpleName() + "` method holding it");
             return problems;
         }
-        Object first = value.initial();
+        Object first = switch (value) {
+            case ManagedMethod<?> method -> method.initial();
+            case ManagedParam<?> param -> param.initial();
+            case ManagedOpenSet<?> _ -> null;
+        };
         if (first == null && declared != null) {
             try {
                 first = declared.fresh();

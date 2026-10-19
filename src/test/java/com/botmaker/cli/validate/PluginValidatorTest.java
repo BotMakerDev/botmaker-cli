@@ -427,7 +427,7 @@ class PluginValidatorTest {
     }
 
     /**
-     * The same part beside a grouped open set of {@code Tag}s ({@code ofEnums(…).groupedAs(…)}): the host writes a
+     * The same part beside a grouped open set of {@code Tag}s ({@code ofEnumGroups(…).groupedAs(…)}): the host writes a
      * class literal of one of the bot's nested enums ({@code Activities.Collect.class}), so it passes (2026-10-11).
      */
     @Test
@@ -439,7 +439,7 @@ class PluginValidatorTest {
                         + "public static Loose group(String name) { return new Loose(); } "
                         + "@Override public List<com.botmaker.plugin.api.source.ManagedValue<?>> managedValues() {"
                         + " return List.of(com.botmaker.plugin.api.source.ManagedValue.openSet(GreetingValue.Id.GREETINGS)"
-                        + ".ofEnums(Tag.class, BagPlugin::tag).groupedAs(Loose.class, BagPlugin::group)"
+                        + ".ofEnumGroups(Tag.class, BagPlugin::tag).groupedAs(Loose.class, BagPlugin::group)"
                         + ".in(\"Tags\").because(\"why\")); }"
                         + " @Override public List<PluginType<?>> types() {");
         Path classes = compile(dir, plugin);
