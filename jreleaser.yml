@@ -25,7 +25,7 @@ project:
   name: botmaker-cli
   description: The botmaker command — create, validate, run and publish a BotMaker Studio plugin.
   longDescription: |
-    Four verbs around the plugin platform: `new` generates a project from the archetype, `validate` runs
+    Four verbs around the plugin platform: `new` copies and renames the example plugin, `validate` runs
     the seven checks the plugin registry runs, `run` builds a plugin into ~/.m2 and opens Studio on a
     project that uses it without any tag being pushed, and `publish` opens the registry pull request.
 

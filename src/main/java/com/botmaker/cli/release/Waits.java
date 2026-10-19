@@ -26,10 +26,10 @@ import java.util.Optional;
  * only the tag on origin; since doc 43 they resolve the released pins their tag's pom names from JitPack,
  * and are owed the wait like any JitPack build.
  *
- * <p>For a full fourteen-module release that answers: owed — studio-api, plugin-toolkit, plugin-host, cli,
- * shared, session, plugin-basics. Not owed — plugin-archetype (nothing of ours pins it) and sdk (nothing
- * tagged after it resolves it; Studio's {@code SDK_FALLBACK_VERSION} is text naming a tag, checked by
- * {@link FallbackVersionsGate} as a tag).
+ * <p>For a full fourteen-module release that answers: owed — studio-api, plugin-toolkit, plugin-host,
+ * plugin-archetype (the cli bundles its zip, since 2026-10-19), cli, shared, session, plugin-basics. Not owed
+ * — sdk (nothing tagged after it resolves it; Studio's {@code SDK_FALLBACK_VERSION} is text naming a tag,
+ * checked by {@link FallbackVersionsGate} as a tag).
  *
  * <p><b>A skipped wait is not a skipped check.</b> The clean-room verify pass still resolves all nine
  * artifacts after the chain, so a module whose build is broken is still reported — later, and without the

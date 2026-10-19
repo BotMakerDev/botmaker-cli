@@ -174,6 +174,7 @@ public enum Module {
             case STUDIO_API -> "studioapi";
             case PLUGIN_TOOLKIT -> "plugintoolkit";
             case PLUGIN_HOST -> "pluginhost";
+            case PLUGIN_ARCHETYPE -> "pluginarchetype";
             case PLUGIN_BASICS -> "pluginbasics";
             case CLI -> "cli";
             case SHARED -> "shared";
@@ -202,17 +203,18 @@ public enum Module {
      * pom to this list. <b>The empties are as deliberate as the entries.</b> Studio pins four and not six: it
      * has had no {@code botmaker-sdk} dependency since 2026-09-02, and the toolkit is a <i>plugin's</i>
      * dependency, never the host's. The dashboard pins shared and the cli's main jar, whose own pins it
-     * excludes. {@code botmaker-studio-api} and {@code botmaker-plugin-archetype} pin nothing: the first has
-     * no upstream of ours, the second ships text whose versions are generation-time properties. A template's
-     * SDK pin is a released version {@link TemplatePin} moves, not a {@code main} pin.
+     * excludes. {@code botmaker-studio-api} pins nothing: it has no upstream of ours. A template's SDK pin is a
+     * released version {@link TemplatePin} moves, not a {@code main} pin.
      */
     public List<Module> upstreams() {
         return switch (this) {
             case PLUGIN_TOOLKIT, PLUGIN_HOST -> List.of(STUDIO_API);
             // Plugin #2 pins two: the contract at `provided` and the toolkit at `compile`. Both reach the
-            // published pom, and that pom is what another plugin — the SDK — resolves.
-            case PLUGIN_BASICS -> List.of(STUDIO_API, PLUGIN_TOOLKIT);
-            case CLI -> List.of(STUDIO_API, PLUGIN_HOST);
+            // published pom, and that pom is what another plugin — the SDK — resolves. The example plugin
+            // pins the same two (2026-10-19), and its tag's pom is the one a new plugin starts from.
+            case PLUGIN_BASICS, PLUGIN_ARCHETYPE -> List.of(STUDIO_API, PLUGIN_TOOLKIT);
+            // The archetype is the example plugin's `template` zip, bundled for `botmaker plugin new`.
+            case CLI -> List.of(STUDIO_API, PLUGIN_HOST, PLUGIN_ARCHETYPE);
             case SESSION -> List.of(SHARED);
             case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS);
             case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_HOST);

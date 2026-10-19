@@ -95,10 +95,16 @@ class PomVersionsTest {
         write(umbrella, Module.STUDIO_API, "0.5.1-SNAPSHOT", "");
         write(umbrella, Module.PLUGIN_HOST, "0.4.1-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
                 + "</botmaker.studioapi.version>");
+        write(umbrella, Module.PLUGIN_TOOLKIT, "0.4.2-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
+                + "</botmaker.studioapi.version>");
+        write(umbrella, Module.PLUGIN_ARCHETYPE, "0.2.1-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
+                + "</botmaker.studioapi.version><botmaker.plugintoolkit.version>0.4.2-SNAPSHOT"
+                + "</botmaker.plugintoolkit.version>");
         write(umbrella, Module.SHARED, "0.1.3-SNAPSHOT", "");
         write(umbrella, Module.CLI, "0.2.2-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
                 + "</botmaker.studioapi.version><botmaker.pluginhost.version>0.4.1-SNAPSHOT"
-                + "</botmaker.pluginhost.version>");
+                + "</botmaker.pluginhost.version><botmaker.pluginarchetype.version>0.2.1-SNAPSHOT"
+                + "</botmaker.pluginarchetype.version>");
         write(umbrella, Module.DASHBOARD, "0.2.1-SNAPSHOT", "<botmaker.shared.version>0.1.3-SNAPSHOT"
                 + "</botmaker.shared.version><botmaker.cli.version>0.2.1-SNAPSHOT</botmaker.cli.version>");
         List<String> said = new ArrayList<>();

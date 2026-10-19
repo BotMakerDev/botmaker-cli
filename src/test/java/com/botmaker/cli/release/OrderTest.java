@@ -131,11 +131,10 @@ class OrderTest {
     @Test
     void theModulesForcedByNothingAreForcedByNothing() {
         Set<Module> everythingElse = EnumSet.complementOf(EnumSet.of(
-                Module.PILOT, Module.PLUGIN_ARCHETYPE, Module.SHARED, Module.STUDIO_API));
-        // The archetype ships text whose versions are generation-time properties; the pilot has no pom pin;
-        // shared and the contract pin nothing of ours. Nothing upstream can invalidate any of them.
+                Module.PILOT, Module.SHARED, Module.STUDIO_API));
+        // The pilot has no pom pin; shared and the contract pin nothing of ours. Nothing upstream can
+        // invalidate any of them. The archetype was the fourth until it became the example plugin (2026-10-19).
         assertFalse(Forcing.forced(Module.PILOT, everythingElse));
-        assertFalse(Forcing.forced(Module.PLUGIN_ARCHETYPE, everythingElse));
         assertFalse(Forcing.forced(Module.SHARED, everythingElse));
         assertFalse(Forcing.forced(Module.STUDIO_API, everythingElse));
     }
@@ -144,9 +143,10 @@ class OrderTest {
     void theForcedSetsAreTheScriptsExpressions() {
         assertEquals(Set.of(Module.STUDIO_API), upstreamsOf(Module.PLUGIN_TOOLKIT));
         assertEquals(Set.of(Module.STUDIO_API), upstreamsOf(Module.PLUGIN_HOST));
-        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_HOST), upstreamsOf(Module.CLI));
+        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_HOST, Module.PLUGIN_ARCHETYPE), upstreamsOf(Module.CLI));
         assertEquals(Set.of(Module.SHARED), upstreamsOf(Module.SESSION));
         assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT), upstreamsOf(Module.PLUGIN_BASICS));
+        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT), upstreamsOf(Module.PLUGIN_ARCHETYPE));
         // Plugin #2 is in the SDK's set because the SDK compiles against it as an ordinary Maven
         // dependency — a plugin depending on another plugin, which PluginLoader's single classloader makes
         // possible and which costs plugin-basics its freedom to break.

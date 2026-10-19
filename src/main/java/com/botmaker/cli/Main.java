@@ -18,8 +18,8 @@ import java.util.concurrent.Callable;
  *
  * <p>The shape of the plugin verb set is the argument for the tool existing at all: {@code new} and
  * {@code publish} are the two ends of a plugin's life, and {@code validate} and {@code run} are the loop in
- * between. Each of them is something an author can do today by hand — {@code mvn archetype:generate} with
- * eight properties, {@code mvn install} then a pom edit then a Studio launch, a hand-written
+ * between. Each of them is something an author can do today by hand — copying the example plugin and
+ * renaming it in six places, {@code mvn install} then a pom edit then a Studio launch, a hand-written
  * {@code index.json} row — and each is something they will get wrong the first time in a way that produces
  * no error until much later.
  *

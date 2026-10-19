@@ -16,7 +16,7 @@
 
     <name>BotMaker CLI</name>
     <description>
-        The `botmaker` command: create a plugin from the archetype, validate it against the same checks the
+        The `botmaker` command: create a plugin from the example plugin, validate it against the same checks the
         registry runs, install it into a project and launch Studio against the result, and open the registry
         pull request.
     </description>
@@ -61,6 +61,7 @@
         <!-- Each upstream's main version; a release commit sets the released ones (doc 43). -->
         <botmaker.studioapi.version>0.10.1-SNAPSHOT</botmaker.studioapi.version>
         <botmaker.pluginhost.version>0.6.1-SNAPSHOT</botmaker.pluginhost.version>
+        <botmaker.pluginarchetype.version>0.3.1-SNAPSHOT</botmaker.pluginarchetype.version>
     </properties>
 
     <repositories>
@@ -169,6 +170,41 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
+            </plugin>
+
+            <!--
+              The example plugin `botmaker plugin new` copies: botmaker-plugin-archetype's `template` zip, put
+              in this jar as one resource (PluginTemplate.RESOURCE). A copy, not a <dependency>: the zip is
+              text this jar reads, never a class anybody loads, and a dependency would put the example plugin's
+              services file on this module's classpath. Kept zipped because a jar's default excludes would
+              drop an unpacked .gitignore.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>plugin-template</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.github.BotMakerDev</groupId>
+                                    <artifactId>botmaker-plugin-archetype</artifactId>
+                                    <version>${botmaker.pluginarchetype.version}</version>
+                                    <type>zip</type>
+                                    <classifier>template</classifier>
+                                    <outputDirectory>${project.build.outputDirectory}/com/botmaker/cli</outputDirectory>
+                                    <destFileName>plugin-template.zip</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
             <!--

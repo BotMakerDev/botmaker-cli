@@ -11,6 +11,7 @@ import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -129,7 +130,7 @@ class CommandLineTest {
 
     /**
      * The defaults the README and {@code --help} both promise, read off the parse rather than off a run:
-     * a generated pom pinned to something other than {@code main-SNAPSHOT} because a default moved is
+     * a generated pom pinned to something other than the template's own pins because a default moved is
      * exactly the class of change that produces no error until much later.
      */
     @Test
@@ -140,9 +141,9 @@ class CommandLineTest {
         // Not matchedOptionValue: an option nobody typed is not "matched", and the question here is what
         // the command will actually USE — which is the default, applied to the field during the parse.
         assertEquals("com.example", applied(verb, "--group"));
-        assertEquals("main-SNAPSHOT", applied(verb, "--studio-api"));
-        assertEquals("main-SNAPSHOT", applied(verb, "--toolkit"));
-        assertEquals("main-SNAPSHOT", applied(verb, "--archetype-version"));
+        // No default: the template's pom keeps the pins it was released with.
+        assertNull(verb.commandSpec().findOption("--studio-api").getValue());
+        assertNull(verb.commandSpec().findOption("--toolkit").getValue());
         assertEquals("0.1.0-SNAPSHOT", applied(verb, "--plugin-version"));
     }
 

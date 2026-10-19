@@ -67,7 +67,7 @@ public final class ReleaseCommand implements Callable<Integer> {
     private String pluginHost;
 
     @Option(names = "--plugin-archetype", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
-            description = "mvn archetype:generate. " + SPEC_HELP)
+            description = "The example plugin `botmaker plugin new` copies. " + SPEC_HELP)
     private String pluginArchetype;
 
     @Option(names = "--plugin-basics", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,

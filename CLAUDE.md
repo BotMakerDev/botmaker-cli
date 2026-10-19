@@ -49,6 +49,10 @@ mvn test        # CommandLineTest, PomsTest, PluginValidatorTest, RegistryTest
 mvn install     # the library and the -all jar
 ```
 
+The build copies `botmaker-plugin-archetype`'s `template` zip into the jar (`plugin new`), from `~/.m2`: the zip
+exists only after the archetype's `package`, so `mvn -pl botmaker-cli -am test` needs the archetype **installed**
+first (`mvn -pl botmaker-plugin-archetype -am install`), or it copies a stale zip.
+
 `PluginValidatorTest` **compiles its fixtures with javac and loads them through the real `PluginLoader`**,
 against `System.getProperty("java.class.path")`. A mocked `StudioPlugin` would pass through the same code and
 prove none of it, because it would never have been loaded. Keep it that way; every failure these checks

@@ -8,11 +8,13 @@ name: CI
 # seven checks exist to catch is a failure of a real classloader over real bytecode. A mocked StudioPlugin
 # would pass through the same code and prove none of it.
 #
-# BOTH UPSTREAMS ARE BUILT FROM SOURCE, not resolved from JitPack: this repo's pom pins
-# ${botmaker.studioapi.version} and ${botmaker.pluginhost.version} at their main -SNAPSHOT — the version the
-# umbrella reactor and a local `mvn install` produce — so there is no published artifact under those
-# coordinates to download. botmaker-plugin-host declares the contract `provided`, which is why the contract
-# is installed first and separately rather than coming along as a transitive dependency.
+# EVERY UPSTREAM IS BUILT FROM SOURCE, not resolved from JitPack: this repo's pom pins
+# ${botmaker.studioapi.version}, ${botmaker.pluginhost.version} and ${botmaker.pluginarchetype.version} at their
+# main -SNAPSHOT — the version the umbrella reactor and a local `mvn install` produce — so there is no
+# published artifact under those coordinates to download. botmaker-plugin-host declares the contract
+# `provided`, which is why the contract is installed first and separately rather than coming along as a
+# transitive dependency. The archetype (the example plugin whose `template` zip this jar bundles for
+# `plugin new`) needs the toolkit, so that is installed too.
 
 on:
   push:
@@ -37,6 +39,18 @@ jobs:
           repository: BotMakerDev/botmaker-plugin-host
           path: .deps/botmaker-plugin-host
 
+      - name: Check out botmaker-plugin-toolkit
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-plugin-toolkit
+          path: .deps/botmaker-plugin-toolkit
+
+      - name: Check out botmaker-plugin-archetype
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-plugin-archetype
+          path: .deps/botmaker-plugin-archetype
+
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -46,11 +60,13 @@ jobs:
       # RETRIED — Maven Central answers 429 Too Many Requests to GitHub-hosted runners often enough to have
       # failed a release (botmaker-studio, 2026-09-02). See .github/mvn-retry.sh for why the retry cannot be
       # a Maven flag.
-      - name: Install the two upstreams (their main -SNAPSHOT)
+      - name: Install the upstreams (their main -SNAPSHOT)
         run: |
           source .github/mvn-retry.sh
           mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-plugin-archetype/pom.xml install -DskipTests
 
       - name: Build and test
         run: mvn -B verify
@@ -84,6 +100,18 @@ jobs:
           repository: BotMakerDev/botmaker-plugin-host
           path: .deps/botmaker-plugin-host
 
+      - name: Check out botmaker-plugin-toolkit
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-plugin-toolkit
+          path: .deps/botmaker-plugin-toolkit
+
+      - name: Check out botmaker-plugin-archetype
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-plugin-archetype
+          path: .deps/botmaker-plugin-archetype
+
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -110,6 +138,8 @@ jobs:
           source .github/mvn-retry.sh
           mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-plugin-archetype/pom.xml install -DskipTests
           # The tag reaches the manifest here and nowhere else, so without this `botmaker --version`
           # answers "(dev)" on a released package.
           mvn_retry mvn -B package -DskipTests "-Dbotmaker.cli.version=${GITHUB_REF_NAME#v}"

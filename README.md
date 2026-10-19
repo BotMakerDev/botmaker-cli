@@ -4,7 +4,7 @@ The **`botmaker`** command: everything a BotMaker plugin author does that is not
 under `bot`, everything a bot author does that is not writing the bot.
 
 ```bash
-botmaker plugin new discord-notifier   # generate a plugin project from the archetype
+botmaker plugin new discord-notifier   # start a plugin project from the example plugin
 cd discord-notifier
 botmaker plugin validate               # the plugin registry's checks, run locally
 botmaker plugin run --project MyBot    # build it, add it to a bot, open Studio on the result
@@ -78,9 +78,12 @@ maintainer's cross-module release, run from the umbrella checkout.
 
 ### `botmaker plugin new <artifact-id>`
 
-Runs `botmaker-plugin-archetype` with the prompts answered. It carries **no templates of its own** — the
-generated shape has exactly one source of truth, because three of the things it gets right (the dependency
-scopes) are wrong in ways that produce no compile error.
+Copies the example plugin, `botmaker-plugin-archetype`, and renames it: package and directories, plugin id and
+name, the pom's coordinates. The example is bundled in this jar as it was when this `botmaker` was released, so
+the command needs no network; its pom pins the contract and toolkit released with it (`--studio-api` and
+`--toolkit` pin others). It carries **no templates of its own**: the shape has exactly one source of truth, a
+plugin CI builds and tests, because three of the things it gets right (the dependency scopes) are wrong in ways
+that produce no compile error.
 
 ```bash
 botmaker plugin new discord-notifier --group com.example --plugin-id com.example.discord

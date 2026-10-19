@@ -26,7 +26,7 @@ import java.util.concurrent.Callable;
  */
 @Command(name = "plugin",
         header = "Create, check, try and publish a Studio plugin.",
-        description = "The loop a plugin author lives in: generate from the archetype, run the registry's "
+        description = "The loop a plugin author lives in: start from the example plugin, run the registry's "
                 + "own checks, try it inside Studio, submit it.",
         mixinStandardHelpOptions = true,
         synopsisSubcommandLabel = "<command>",

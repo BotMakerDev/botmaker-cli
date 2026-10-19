@@ -57,7 +57,7 @@ public final class Plan {
             Map.entry(Module.STUDIO_API, "  (the plugin contract)"),
             Map.entry(Module.PLUGIN_TOOLKIT, "  (the plugin widget toolkit)"),
             Map.entry(Module.PLUGIN_HOST, "  (the plugin loader)"),
-            Map.entry(Module.PLUGIN_ARCHETYPE, "  (mvn archetype:generate)"),
+            Map.entry(Module.PLUGIN_ARCHETYPE, "  (the example plugin `botmaker plugin new` copies)"),
             Map.entry(Module.PLUGIN_BASICS, "  (plugin #2: values, Settings, the store)"),
             Map.entry(Module.CLI, "  (the botmaker command + the validator)"),
             Map.entry(Module.PILOT, "  (tags -> APK GitHub Release)"),

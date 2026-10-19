@@ -55,22 +55,22 @@ class ForcingGateTest {
 
     @Test
     void aContractReleaseAloneNamesEveryDownstreamItForces() {
-        // studio-api forces the toolkit, the host, the cli, the sdk and studio — five flags, one refusal.
+        // studio-api forces the toolkit, the host, the example plugin, the cli, the sdk and studio — six flags,
+        // one refusal.
         GateVerdict verdict = ForcingGate.check(of(Module.STUDIO_API), of(Module.STUDIO_API), false);
 
         assertTrue(verdict.stops());
-        for (String flag : new String[]{"--plugin-toolkit", "--plugin-host", "--cli", "--sdk", "--studio"}) {
+        for (String flag : new String[]{"--plugin-toolkit", "--plugin-host", "--plugin-archetype", "--cli", "--sdk",
+                "--studio"}) {
             assertTrue(verdict.refusal().contains(flag), flag + " missing from: " + verdict.refusal());
         }
     }
 
     @Test
     void aModuleForcedByNothingNeverAppears() {
-        // The archetype ships text: the versions it writes are archetype requiredProperties defaulting to
-        // main-SNAPSHOT, so no upstream release can invalidate a pin it does not have.
+        // The pilot has no pom pin, so no upstream release can invalidate a pin it does not have.
         GateVerdict verdict = ForcingGate.check(of(Module.STUDIO_API), of(Module.STUDIO_API), false);
 
-        assertFalse(verdict.refusal().contains("--plugin-archetype"), verdict.refusal());
         assertFalse(verdict.refusal().contains("--pilot"), verdict.refusal());
     }
 

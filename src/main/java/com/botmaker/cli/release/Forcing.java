@@ -18,11 +18,11 @@ import java.util.Set;
  * cutover: <b>every pin is an edge</b>, which {@code OrderTest} derives from {@link Module#upstreams()} rather
  * than trusting this list (2026-10-12: the dashboard's shared pin had none).
  *
- * <p>Two modules are forced by <b>nothing</b> and it is deliberate in both cases. {@code botmaker-shared}
- * and {@code botmaker-studio-api} sit at the top of the graph and pin nothing of ours; and
- * {@code botmaker-plugin-archetype} <i>ships text</i>, whose BotMaker versions are archetype
- * {@code requiredProperties} defaulting to {@code main-SNAPSHOT} — there is no pin in it for a contract
- * release to invalidate. {@code botmaker-pilot} is likewise independent: no pom pin, no JitPack.
+ * <p>Two modules are forced by <b>nothing</b> and it is deliberate in both cases: {@code botmaker-shared}
+ * and {@code botmaker-studio-api} sit at the top of the graph and pin nothing of ours.
+ * {@code botmaker-plugin-archetype} was a third until 2026-10-19, when it stopped shipping Velocity text and
+ * became the example plugin, pinning the contract and the toolkit like any plugin. {@code botmaker-pilot} is
+ * likewise independent: no pom pin, no JitPack.
  *
  * @param upstream   the module whose release triggers this
  * @param downstream the module dragged in
@@ -63,6 +63,16 @@ public record Forcing(Module upstream, Module downstream, String reason) {
                     "the registry's CI resolves the CLI's published pom to run the validator, and a gate "
                             + "loading plugins with a different loader than Studio's admits plugins Studio "
                             + "then refuses"),
+
+            // The example plugin `botmaker plugin new` copies is a plugin like any other since 2026-10-19: it
+            // compiles against both, and its tag's pom is what a new plugin pins. The cli bundles its zip.
+            new Forcing(Module.STUDIO_API, Module.PLUGIN_ARCHETYPE,
+                    "the example plugin compiles against the contract, and a new plugin pins what its tag pins"),
+            new Forcing(Module.PLUGIN_TOOLKIT, Module.PLUGIN_ARCHETYPE,
+                    "the example plugin compiles against the toolkit, and a new plugin pins what its tag pins"),
+            new Forcing(Module.PLUGIN_ARCHETYPE, Module.CLI,
+                    "`botmaker plugin new` copies the example plugin bundled into the cli at its build, so "
+                            + "without a cli release new plugins keep starting from the previous one"),
 
             // JitPack's build cache is per-tag, so a downstream must be re-tagged to be rebuilt against the
             // new upstream at all.

@@ -9,6 +9,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **`plugin new` copies the example plugin bundled in this jar**, no longer `mvn archetype:generate`
+  (2026-10-19). `botmaker-plugin-archetype` is a plugin its CI builds and tests; its `template` zip is in this jar,
+  and `PluginTemplate` renames the copy: package and directories, plugin id and name, the pom's coordinates, and a
+  `.gitignore` at last. No network and no Maven. `--studio-api` and `--toolkit` default to the pins the example
+  was released with; `--archetype-version` is gone. A template missing one of its anchors is refused rather than
+  copied half-renamed.
+- **The release knows the archetype as a plugin**: it pins the contract and the toolkit, and the cli pins it
+  (`botmaker.pluginarchetype.version`). studio-api and the toolkit force it, it forces the cli, and the cli's tag
+  waits for its JitPack build. `ArchetypePin` is gone: the archetype's tag carries its released pins like any
+  module's.
+
 - **`plugin validate`'s `loads` says why nothing loaded, as the line to fix.** Each provider that failed is a line
   of its own, with what its constructor threw; a build with no services file names the plugin classes it holds and
   the line to write in `src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin`.

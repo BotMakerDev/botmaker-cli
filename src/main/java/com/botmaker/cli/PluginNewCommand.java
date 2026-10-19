@@ -6,43 +6,30 @@ import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
- * {@code botmaker plugin new <name>} — the archetype, with the prompts already answered.
+ * {@code botmaker plugin new <name>} — the example plugin, copied and renamed.
  *
- * <p><b>It shells to {@code botmaker-plugin-archetype} and carries no templates of its own.</b> The
- * generated shape is three dependency scopes, a services file, a palette and an editor, and every one of
- * them is wrong in a way that produces no compile error — so it must have exactly one source of truth. Two
- * copies of a skeleton drift, and they drift silently, because nothing ever compiles both.
+ * <p><b>It copies {@code botmaker-plugin-archetype} and carries no templates of its own.</b> The generated
+ * shape is three dependency scopes, a services file, a palette and an editor, and every one of them is wrong
+ * in a way that produces no compile error — so it has exactly one source of truth, a plugin its own CI builds
+ * and tests. This jar bundles that plugin's sources ({@link PluginTemplate}), so the command needs no network
+ * and no Maven.
  *
- * <p>What this adds over typing {@code mvn archetype:generate} is the part nobody remembers: the archetype's
- * own coordinate, {@code -DinteractiveMode=false}, and sane values for the four required properties derived
- * from one name.
+ * <p>What it adds over copying the repository by hand is the renaming nobody gets right twice: package and
+ * directories, plugin id and name, the pom's coordinates, and the services file.
  */
 @Command(name = "new",
-        header = "Generate a plugin project from the archetype.",
+        header = "Create a plugin project from the example plugin.",
         description = "Every value below has a default derived from the artifact id, so the id alone is a "
                 + "working command line.",
         mixinStandardHelpOptions = true)
 final class PluginNewCommand implements Callable<Integer> {
-
-    private static final String ARCHETYPE_GROUP = "com.github.BotMakerDev";
-    private static final String ARCHETYPE_ARTIFACT = "botmaker-plugin-archetype";
-
-    /**
-     * The BotMaker versions written into the generated pom.
-     *
-     * <p>{@code main-SNAPSHOT} is the archetype's own default and this passes it through rather than
-     * substituting a release. A released tag baked in here would owe an edit on every contract release and
-     * age silently between them; {@code main-SNAPSHOT} is a real JitPack coordinate that never goes stale,
-     * and it is wrong in the direction the generated README tells the author to correct.
-     */
-    private static final String DEFAULT_BOTMAKER_VERSION = "main-SNAPSHOT";
 
     @ParentCommand
     private PluginCommand parent;
@@ -58,8 +45,8 @@ final class PluginNewCommand implements Callable<Integer> {
     private String pkg;
 
     /**
-     * Deliberately not defaulted to the groupId, which is what {@code mvn archetype:generate} does. A plugin
-     * id must be unique across the registry, and a groupId is not: two plugins from one author share it.
+     * Deliberately not defaulted to the groupId. A plugin id must be unique across the registry, and a groupId
+     * is not: two plugins from one author share it.
      */
     @Option(names = "--plugin-id",
             description = "The StudioPlugin id; must be unique in the registry. Default: <group>.<name>")
@@ -72,17 +59,19 @@ final class PluginNewCommand implements Callable<Integer> {
             description = "The generated project's own version. Default: ${DEFAULT-VALUE}")
     private String pluginVersion;
 
-    @Option(names = "--studio-api", defaultValue = DEFAULT_BOTMAKER_VERSION,
-            description = "botmaker-studio-api version in the generated pom. Default: ${DEFAULT-VALUE}")
+    /**
+     * No default of its own: the template pins the contract released with this {@code botmaker}, and a
+     * version written here would owe an edit on every contract release.
+     */
+    @Option(names = "--studio-api",
+            description = "botmaker-studio-api version in the generated pom. Default: the release this "
+                    + "botmaker was built with")
     private String studioApiVersion;
 
-    @Option(names = "--toolkit", defaultValue = DEFAULT_BOTMAKER_VERSION,
-            description = "botmaker-plugin-toolkit version in the generated pom. Default: ${DEFAULT-VALUE}")
+    @Option(names = "--toolkit",
+            description = "botmaker-plugin-toolkit version in the generated pom. Default: the release this "
+                    + "botmaker was built with")
     private String toolkitVersion;
-
-    @Option(names = "--archetype-version", defaultValue = DEFAULT_BOTMAKER_VERSION,
-            description = "The archetype's own version. Default: ${DEFAULT-VALUE}")
-    private String archetypeVersion;
 
     @Option(names = "--dir", defaultValue = ".", description = "Where to generate. Default: ${DEFAULT-VALUE}")
     private String directory;
@@ -96,34 +85,32 @@ final class PluginNewCommand implements Callable<Integer> {
             console.error(target + " already exists");
             return 1;
         }
-        Files.createDirectories(parentDir);
 
         String javaPackage = pkg != null ? pkg : group + "." + name.replace("-", "").toLowerCase();
-        List<String> goals = new ArrayList<>(List.of(
-                "archetype:generate",
-                "-DinteractiveMode=false",
-                "-DarchetypeGroupId=" + ARCHETYPE_GROUP,
-                "-DarchetypeArtifactId=" + ARCHETYPE_ARTIFACT,
-                "-DarchetypeVersion=" + archetypeVersion,
-                "-DgroupId=" + group,
-                "-DartifactId=" + name,
-                "-Dversion=" + pluginVersion,
-                "-Dpackage=" + javaPackage,
-                "-DpluginId=" + (pluginId != null ? pluginId : group + "." + name),
-                "-DpluginName=" + (pluginName != null ? pluginName : title(name)),
-                "-DstudioApiVersion=" + studioApiVersion,
-                "-DtoolkitVersion=" + toolkitVersion));
-
-        Mvn.Result result = parent.main().mvn().runInteractive(parentDir, goals.toArray(String[]::new));
-        if (!result.ok()) {
-            console.error("mvn archetype:generate failed");
+        PluginTemplate.Answers answers;
+        try {
+            answers = new PluginTemplate.Answers(group, name, pluginVersion, javaPackage,
+                    pluginId != null ? pluginId : group + "." + name,
+                    pluginName != null ? pluginName : title(name),
+                    Optional.ofNullable(studioApiVersion), Optional.ofNullable(toolkitVersion));
+        } catch (IllegalArgumentException e) {
+            console.error(e.getMessage() + " (see --package and --plugin-name)");
             return 1;
         }
-        console.out("Created " + target);
+        PluginTemplate.Made made;
+        try (InputStream template = PluginTemplate.bundled()) {
+            made = PluginTemplate.write(template, target, answers);
+        }
+        console.out("Created " + target + " (contract " + made.studioApiVersion() + ", toolkit "
+                + made.toolkitVersion() + ")");
+        if (made.studioApiVersion().endsWith("-SNAPSHOT") || made.toolkitVersion().endsWith("-SNAPSHOT")) {
+            console.out("  A -SNAPSHOT pin resolves from this computer's ~/.m2 only: run `mvn install` in the "
+                    + "BotMaker umbrella first, or pass --studio-api and --toolkit a released tag.");
+        }
         console.out("");
         console.out("  cd " + name);
-        console.out("  mvn verify         # the generated tests should pass unedited");
-        console.out("  botmaker plugin validate  # the same eight checks the registry runs");
+        console.out("  mvn verify               # the example's tests pass unedited");
+        console.out("  botmaker plugin validate # the checks the plugin registry runs");
         return 0;
     }
 
