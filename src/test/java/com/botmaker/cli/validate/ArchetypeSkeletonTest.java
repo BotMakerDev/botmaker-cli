@@ -133,6 +133,10 @@ class ArchetypeSkeletonTest {
         CheckResult types = results.stream().filter(r -> r.check() == Check.TYPES).findFirst().orElseThrow();
         assertEquals(Status.PASS, types.status(), types::toString);
         assertTrue(types.detail().getFirst().contains("1 round-tripped"), types.detail()::toString);
+        // So is its one managed value, level 3 of the skeleton.
+        CheckResult managed = results.stream().filter(r -> r.check() == Check.MANAGED).findFirst().orElseThrow();
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+        assertTrue(managed.detail().getFirst().startsWith("1 managed value"), managed.detail()::toString);
     }
 
     /** Copies every {@code .java} under {@code from} to the same relative path under {@code to}. */
