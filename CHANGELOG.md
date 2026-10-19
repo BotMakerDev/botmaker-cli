@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **`plugin validate` checks `@Fills` methods** under `TYPES`: a refused method is a problem, a class filled that
+  another plugin declares is a clash, and a filled class counts as declared for every part that names it.
 - **`plugin new` copies the example plugin bundled in this jar**, no longer `mvn archetype:generate`
   (2026-10-19). `botmaker-plugin-archetype` is a plugin its CI builds and tests; its `template` zip is in this jar,
   and `PluginTemplate` renames the copy: package and directories, plugin id and name, the pom's coordinates, and a

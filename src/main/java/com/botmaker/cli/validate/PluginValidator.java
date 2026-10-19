@@ -13,6 +13,7 @@ import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Wither;
 import com.botmaker.plugin.host.ContractLinks;
+import com.botmaker.plugin.host.FilledTypes;
 import com.botmaker.plugin.host.Palettes;
 import com.botmaker.plugin.host.PluginLoader;
 import com.botmaker.plugin.host.Recordings;
@@ -425,8 +426,9 @@ public final class PluginValidator {
                     continue;
                 }
                 if (value == null) {
-                    // The contract's one exception: a type whose fresh form is a call the bot evaluates
-                    // (the SDK's MatchResult starts as Vision.lastMatch()) answers freshCall() instead.
+                    // The contract's one exception: a type whose fresh form is a call the bot evaluates answers
+                    // freshCall() instead. Declared through steps it is a @Fills method, checked below; this is
+                    // a PluginType implemented by hand.
                     Method call;
                     try {
                         call = type.freshCall();
@@ -449,10 +451,23 @@ public final class PluginValidator {
                     fresh.put(name, value);
                 }
             }
+            // A @Fills method declares its return type as the host does: after the plugin's own, which win.
+            FilledTypes.Found filled = FilledTypes.of(plugin);
+            for (FilledTypes.Filled each : filled.filled()) {
+                String name = each.type().getName();
+                String owner = owners.putIfAbsent(name, id);
+                if (owner == null) {
+                    declared.add(each.type().getSimpleName());
+                } else if (!owner.equals(id)) {
+                    problems.add(id + " fills " + name + " (@Fills " + each.call().getName() + "()), which " + owner
+                            + " already declares. A host loads the first and leaves the other plugin out");
+                }
+            }
 
             if (!judged) {
                 continue;
             }
+            for (String problem : filled.problems()) problems.add(id + ": " + problem);
             for (ComponentType<?> shape : shapes) {
                 List<String> found = shapeProblems(id, shape, fresh, known, literals);
                 if (found == null) {
@@ -693,6 +708,7 @@ public final class PluginValidator {
             } catch (RuntimeException e) {
                 // the types check reports it
             }
+            for (FilledTypes.Filled filled : FilledTypes.of(plugin).filled()) known.add(filled.type());
             try {
                 for (ComponentType<?> shape : nonNull(plugin.componentTypes())) if (shape != null) known.add(shape.type());
             } catch (LinkageError e) {
