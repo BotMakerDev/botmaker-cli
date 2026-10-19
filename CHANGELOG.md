@@ -5,6 +5,14 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- **`plugin validate`'s `loads` says why nothing loaded, as the line to fix.** Each provider that failed is a line
+  of its own, with what its constructor threw; a build with no services file names the plugin classes it holds and
+  the line to write in `src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin`.
+
 ## [0.4.0] — 2026-10-18
 
 ### Build

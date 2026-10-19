@@ -119,16 +119,12 @@ public final class PluginValidator {
         // One loader for every check that needs a loaded plugin. Opening it five times would be five
         // URLClassLoaders holding the same jars — and on Windows a held jar cannot be replaced, which is
         // the same reason PluginLoader is Closeable in the first place.
-        try (PluginLoader loaded = PluginLoader.open(subject.classpath().stream().map(Object::toString).toList())) {
+        PluginLoader.Loaded opened = PluginLoader.openReporting(
+                subject.classpath().stream().map(Object::toString).toList());
+        try (PluginLoader loaded = opened.loader()) {
             List<StudioPlugin> plugins = loaded == null ? List.of() : List.copyOf(loaded.plugins());
             if (plugins.isEmpty()) {
-                results.add(CheckResult.fail(Check.LOADS, List.of(
-                        "no StudioPlugin was found on the classpath",
-                        "PluginLoader answers `null` for all of: nothing to load, no"
-                                + " META-INF/services/com.botmaker.plugin.api.StudioPlugin, a services file naming"
-                                + " a class that is not there, and a plugin whose own dependency is missing",
-                        "check that src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin"
-                                + " exists and names your plugin's fully qualified class")));
+                results.add(CheckResult.fail(Check.LOADS, Unloaded.why(subject.classpath(), opened.failures())));
                 for (Check check : List.of(Check.ID, Check.PALETTE, Check.RECORDS, Check.TYPES, Check.MANAGED,
                         Check.EDITORS, Check.PICKERS)) {
                     results.add(CheckResult.skip(check, "nothing loaded"));

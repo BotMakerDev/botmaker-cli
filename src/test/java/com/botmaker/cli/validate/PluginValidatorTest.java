@@ -202,9 +202,24 @@ class PluginValidatorTest {
         CheckResult loads = result(results, Check.LOADS);
         assertEquals(Status.FAIL, loads.status());
         assertTrue(loads.detail().stream().anyMatch(d -> d.contains("META-INF/services")), loads::toString);
+        assertTrue(loads.detail().stream().anyMatch(d -> d.endsWith("with the line: p.GoodPlugin")),
+                "names the line to write: " + loads);
         for (Check check : List.of(Check.ID, Check.PALETTE, Check.TYPES, Check.EDITORS)) {
             assertEquals(Status.SKIP, result(results, check).status(), check::name);
         }
+    }
+
+    /** A constructor that throws is said with its own message, not as "nothing found". */
+    @Test
+    void a_plugin_whose_constructor_throws_fails_the_loads_check_with_its_cause(@TempDir Path dir) throws IOException {
+        Path classes = compile(dir, GOOD_PLUGIN.replace("public final class GoodPlugin implements StudioPlugin {",
+                "public final class GoodPlugin implements StudioPlugin {"
+                        + " public GoodPlugin() { throw new IllegalStateException(\"no editor for Greeting\"); }"),
+                GOOD_API);
+        services(classes, "p.GoodPlugin");
+        CheckResult loads = result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)), Check.LOADS);
+        assertEquals(Status.FAIL, loads.status());
+        assertTrue(loads.detail().stream().anyMatch(d -> d.contains("no editor for Greeting")), loads::toString);
     }
 
     // ------------------------------------------------------------------------------------------------
