@@ -977,10 +977,8 @@ public final class PluginValidator {
         if (value.reason() == null || value.reason().isBlank()) {
             problems.add(at + " has no reason; it is the sentence the canvas shows when it refuses an edit there");
         }
+        // A holder that is no simple class name was refused by the contract when the plugin declared it.
         String holder = value.holder();
-        if (holder != null && !javaIdentifier(holder)) {
-            problems.add(at + " names holder \"" + holder + "\", which is not a simple class name");
-        }
         if (value instanceof ManagedOpenSet<?>) {
             // Each constant's initialiser is written as a value of the element type, so a host must write one.
             Class<?> element = value.type();
@@ -1083,14 +1081,6 @@ public final class PluginValidator {
 
     private static <T> List<T> nonNull(List<T> list) {
         return list == null ? List.of() : list;
-    }
-
-    private static boolean javaIdentifier(String name) {
-        if (name.isEmpty() || !Character.isJavaIdentifierStart(name.charAt(0))) return false;
-        for (int i = 1; i < name.length(); i++) {
-            if (!Character.isJavaIdentifierPart(name.charAt(i))) return false;
-        }
-        return true;
     }
 
     // -------------------------------------------------------------------------------------------------

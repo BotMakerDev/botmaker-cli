@@ -568,7 +568,9 @@ class PluginValidatorTest {
         CheckResult managed = managed(dir, method("GREETING")
                 + ".in(\"plugins.Values\").holds(Greeting.class, null).because(\"why\")");
         assertEquals(Status.FAIL, managed.status());
-        assertTrue(managed.detail().getFirst().contains("not a simple class name"), managed.detail()::toString);
+        // The contract refuses it while the plugin declares it (2026-10-21), so the check reports the throw.
+        assertTrue(managed.detail().getFirst().contains("the holder is a class's simple name"),
+                managed.detail()::toString);
     }
 
     @Test
