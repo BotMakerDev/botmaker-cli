@@ -7,6 +7,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Removed
+
+- **The `records` check of `plugin validate`**: the contract's `@Records` went with the macro recorder.
+
 ### Changed
 
 - **`plugin validate` checks `@Fills` methods** under `TYPES`: a refused method is a problem, a class filled that
