@@ -28,13 +28,17 @@ import java.util.stream.Stream;
  * <ol>
  *   <li>The pull request changes exactly one entry path, and it is no symbolic link.</li>
  *   <li>The file's name is what its content claims, its JSON is the schema, and no other entry's path differs
- *       from it only by case (GitHub ignores case in a slug, a checkout on macOS or Windows too).</li>
- *   <li>The pull request's author controls the repository: they made the GitHub Release at {@code tag}, which
- *       needs push access. A release made by {@value #ACTIONS_BOT} falls back to "the author is the
- *       repository's owner", which an organisation releasing from CI never is.</li>
- *   <li>An existing entry changes or goes only by whoever controls the <b>base</b> copy's repository and tag, so
- *       a plugin id never moves to somebody else's repository.</li>
- *   <li>{@code tag} is a published release: not a draft, not a prerelease.</li>
+ *       from it only by case (GitHub ignores case in a slug, a checkout on macOS or Windows too). Against the
+ *       catalog's copy it is one {@link Change}: a new entry with one release, one release appended, releases
+ *       removed, or a bot's {@code detached} alone. An approved release is never edited or reordered, and an
+ *       entry's {@code repo} never changes.</li>
+ *   <li>The pull request's author controls the repository: they made the GitHub Release the change approves, which
+ *       needs push access. A release made by {@value #ACTIONS_BOT} falls back to "the author is the repository's
+ *       owner", which an organisation releasing from CI never is.</li>
+ *   <li>An existing entry changes or goes only by whoever controls the <b>base</b> copy's repository (its newest
+ *       release), so a plugin id never moves to somebody else's repository.</li>
+ *   <li>The approved release is published (not a draft, not a prerelease) and its tag points at the pinned
+ *       {@code commit} ({@link ApprovedRelease}).</li>
  * </ol>
  *
  * <p><b>An admin may change anyone's entry</b> (2026-10-23, the dashboard's edits): when the author's account id
@@ -42,9 +46,10 @@ import java.util.stream.Stream;
  * still run, so an admin lists only a published release that builds. A pull request that changes only
  * {@code publishers.json} is {@link PublishersCheck}'s.
  *
- * <p>The kind's own rules follow in {@link BotChecks} and {@link PluginChecks}. No command-line library (picocli is
- * {@code optional} here), and the changed paths may arrive as {@code @file}, since a pull request chooses its own
- * file names and a shell must never see them.
+ * <p>The kind's own rules follow in {@link BotChecks} and {@link PluginChecks}, on the approved release only:
+ * releases already approved are not rebuilt. No command-line library (picocli is {@code optional} here), and the
+ * changed paths may arrive as {@code @file}, since a pull request chooses its own file names and a shell must never
+ * see them.
  *
  * <pre>
  * java -cp … com.botmaker.cli.catalog.EntryGate &lt;head-root&gt; --author &lt;login&gt; [--author-id &lt;id&gt;]
@@ -77,6 +82,96 @@ public final class EntryGate {
             base = base == null ? Optional.empty() : base;
             changed = List.copyOf(changed);
             author = author == null ? "" : author.trim();
+        }
+    }
+
+    /** What a pull request does to one entry the catalog holds (or does not), the only changes rule 2 allows. */
+    public sealed interface Change {
+
+        /** A new entry, listing the one release it approves. */
+        record Create(ApprovedRelease release) implements Change {}
+
+        /** {@code release} approved after the ones already listed. */
+        record Append(ApprovedRelease release) implements Change {}
+
+        /** These tags no longer approved; the others kept, in order. The whole entry goes by deleting its file. */
+        record Remove(List<String> tags) implements Change {
+            public Remove {
+                tags = List.copyOf(tags);
+            }
+        }
+
+        /** A bot's {@code detached} changed, its releases kept. */
+        record Detach(boolean detached) implements Change {}
+
+        /** The release the change approves: what rules 3 and 5 and the kind's checks run on. */
+        default Optional<ApprovedRelease> approves() {
+            return switch (this) {
+                case Create create -> Optional.of(create.release());
+                case Append append -> Optional.of(append.release());
+                case Remove ignored -> Optional.empty();
+                case Detach ignored -> Optional.empty();
+            };
+        }
+
+        /**
+         * What {@code head} does to {@code base}, the catalog's copy at the same path.
+         *
+         * @throws Refused when it is none of the allowed changes, saying why
+         */
+        static Change between(Optional<? extends Entry> base, Entry head) throws Refused {
+            List<ApprovedRelease> now = head.releases();
+            if (base.isEmpty()) {
+                if (now.size() == 1) return new Create(now.getFirst());
+                throw new Refused("a new entry lists one release, the one its pull request approves; this one lists "
+                        + now.size() + ".");
+            }
+            Entry held = base.get();
+            if (!held.repo().equals(head.repo())) {
+                throw new Refused("a listed entry keeps its repository " + held.repo() + "; it cannot become "
+                        + head.repo() + ".");
+            }
+            List<ApprovedRelease> before = held.releases();
+            boolean detach = held instanceof BotEntry bot && head instanceof BotEntry next && bot.detached() != next.detached();
+            if (now.equals(before)) {
+                if (detach) return new Detach(((BotEntry) head).detached());
+                throw new Refused("changes nothing the entry holds.");
+            }
+            if (detach) {
+                throw new Refused("\"detached\" changes in a pull request of its own, with the releases kept.");
+            }
+            if (now.size() == before.size() + 1 && now.subList(0, before.size()).equals(before)) {
+                return new Append(now.getLast());
+            }
+            if (now.size() < before.size() && keepsOrder(before, now)) {
+                Set<String> kept = now.stream().map(ApprovedRelease::tag).collect(Collectors.toSet());
+                return new Remove(before.stream().map(ApprovedRelease::tag).filter(t -> !kept.contains(t)).toList());
+            }
+            for (ApprovedRelease release : now) {
+                Optional<ApprovedRelease> was = held.release(release.tag());
+                if (was.isPresent() && !was.get().equals(release)) {
+                    throw new Refused("release " + release.tag() + " was edited; an approved release is never"
+                            + " edited or reordered.");
+                }
+            }
+            throw new Refused("an approved release is never edited or reordered: a pull request appends one release"
+                    + " at the end, or removes some.");
+        }
+
+        /** Whether {@code now} is {@code before} with some releases left out, the rest in order. */
+        private static boolean keepsOrder(List<ApprovedRelease> before, List<ApprovedRelease> now) {
+            int at = 0;
+            for (ApprovedRelease release : before) {
+                if (at < now.size() && now.get(at).equals(release)) at++;
+            }
+            return at == now.size();
+        }
+    }
+
+    /** A change rule 2 does not allow; the message says why, for the author. */
+    public static final class Refused extends Exception {
+        Refused(String message) {
+            super(message);
         }
     }
 
@@ -210,8 +305,10 @@ public final class EntryGate {
             entry = read(file, named.kind());
         } catch (IOException | IllegalArgumentException e) {
             return List.of(Finding.error(path, "not an entry of this schema: "
-                    + (named.kind() == EntryPath.Kind.BOT ? "{\"repo\", \"tag\"} and an optional \"detached\""
-                    : "{\"id\", \"repo\", \"tag\"}") + ", nothing else."));
+                    + (named.kind() == EntryPath.Kind.BOT
+                    ? "{\"repo\", \"releases\": [{\"tag\", \"commit\"}, …]} and an optional \"detached\""
+                    : "{\"id\", \"repo\", \"releases\": [{\"tag\", \"commit\", \"jarSha256\", \"pomSha256\"}, …]}")
+                    + ", no tag twice, nothing else."));
         }
         if (!named.matches(entry)) {
             return List.of(Finding.error(path, "the file name is what the entry names: rename it to "
@@ -244,41 +341,78 @@ public final class EntryGate {
             findings.add(Finding.error(path, "\"repo\" is owner/name on GitHub; " + entry.repo() + " is not."));
             return findings;
         }
-        if (!TAG.matcher(entry.tag()).matches()) {
-            findings.add(Finding.error(path, "\"tag\" " + entry.tag() + " is not a release tag."));
+        for (ApprovedRelease release : entry.releases()) {
+            String refusal = pinRefusal(release);
+            if (refusal != null) {
+                findings.add(Finding.error(path, refusal));
+                return findings;
+            }
+        }
+        Change change;
+        try {
+            change = Change.between(previous, entry);
+        } catch (Refused e) {
+            findings.add(Finding.error(path, e.getMessage()));
             return findings;
         }
         previous.ifPresent(held -> {
-            if (!admin && !controls(author, held.repo(), held.tag(), facts)) {
+            if (!admin && !controls(author, held.repo(), held.newest().tag(), facts)) {
                 findings.add(Finding.error(path, "this entry belongs to whoever controls " + held.repo()
-                        + ", and only they may change it: " + author + " did not make its release " + held.tag()
-                        + ". Publish under your own entry instead."));
+                        + ", and only they may change it: " + author + " did not make its release "
+                        + held.newest().tag() + ". Publish under your own entry instead."));
             }
         });
+        Optional<ApprovedRelease> approved = change.approves();
+        if (approved.isEmpty()) return findings;
+        ApprovedRelease release = approved.get();
+        String tag = release.tag();
         Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
         if (repo.isEmpty()) {
             findings.add(Finding.error(path, entry.repo() + " is not a public repository on GitHub."));
             return findings;
         }
-        Optional<EntryFacts.Release> release = facts.release(entry.repo(), entry.tag());
-        if (release.isEmpty()) {
-            findings.add(Finding.error(path, entry.repo() + " has no GitHub Release " + entry.tag()
+        Optional<EntryFacts.Release> published = facts.release(entry.repo(), tag);
+        if (published.isEmpty()) {
+            findings.add(Finding.error(path, entry.repo() + " has no GitHub Release " + tag
                     + ". Publish one, then re-run the check."));
             return findings;
         }
-        if (release.get().draft() || release.get().prerelease()) {
-            findings.add(Finding.error(path, "release " + entry.tag() + " is a "
-                    + (release.get().draft() ? "draft" : "prerelease") + "; the catalog lists published releases."));
+        if (published.get().draft() || published.get().prerelease()) {
+            findings.add(Finding.error(path, "release " + tag + " is a "
+                    + (published.get().draft() ? "draft" : "prerelease") + "; the catalog lists published releases."));
         }
-        if (!admin && !controls(author, entry.repo(), entry.tag(), facts)) {
-            findings.add(Finding.error(path, ACTIONS_BOT.equals(release.get().authorLogin())
-                    ? "release " + entry.tag() + " was made by a GitHub Action, and " + author + " is not "
+        Optional<String> commit = facts.tagCommit(entry.repo(), tag);
+        if (!commit.equals(Optional.of(release.commit()))) {
+            findings.add(Finding.error(path, "tag " + tag + " points at " + commit.orElse("nothing") + ", not the"
+                    + " pinned commit " + release.commit() + ". Pin the release again (`botmaker plugin publish` or"
+                    + " `botmaker bot publish` does)."));
+        }
+        if (!admin && !controls(author, entry.repo(), tag, facts)) {
+            findings.add(Finding.error(path, ACTIONS_BOT.equals(published.get().authorLogin())
+                    ? "release " + tag + " was made by a GitHub Action, and " + author + " is not "
                     + repo.get().ownerLogin() + ", so who controls " + entry.repo() + " cannot be told. Make the"
                     + " release from Studio or the CLI, which makes it as you."
-                    : "release " + entry.tag() + " was made by " + release.get().authorLogin() + ", not " + author
+                    : "release " + tag + " was made by " + published.get().authorLogin() + ", not " + author
                     + ": the entry is opened by whoever made the release it lists."));
         }
         return findings;
+    }
+
+    /**
+     * Why a release's tag or pins are not what the rules allow, or {@code null}. They reach git and a URL, so the
+     * kind's checks match them again.
+     */
+    static String pinRefusal(ApprovedRelease release) {
+        if (!TAG.matcher(release.tag()).matches()) return "\"tag\" " + release.tag() + " is not a release tag.";
+        if (!ApprovedRelease.COMMIT.matcher(release.commit()).matches()) {
+            return "\"commit\" of " + release.tag() + " is not a full commit hash (40 lower-case hex digits).";
+        }
+        for (String hash : Stream.of(release.jarSha256(), release.pomSha256()).filter(h -> h != null).toList()) {
+            if (!ApprovedRelease.SHA256.matcher(hash).matches()) {
+                return "a sha256 of " + release.tag() + " is not 64 lower-case hex digits.";
+            }
+        }
+        return null;
     }
 
     /**
@@ -300,7 +434,7 @@ public final class EntryGate {
      * The catalog leaves a gone repository out anyway; the admin removes its file by hand.
      */
     private static List<Finding> removal(String path, Entry held, String author, EntryFacts facts) {
-        if (controls(author, held.repo(), held.tag(), facts)) return List.of();
+        if (controls(author, held.repo(), held.newest().tag(), facts)) return List.of();
         return List.of(Finding.error(path, "only whoever controls " + held.repo() + " may remove this entry."));
     }
 
@@ -327,27 +461,39 @@ public final class EntryGate {
     }
 
     /**
-     * The bot or plugin checks for the one entry a passing pull request adds or changes. The repo and tag are
-     * matched again here, since they reach git and a URL and {@link Part#KIND} runs without rules 2–5.
+     * The bot or plugin checks for the one release a passing pull request approves; a removal or a detach has
+     * none. The pins are matched again here, since they reach git and a URL and {@link Part#KIND} runs without
+     * rules 2–5.
      */
     private static List<Finding> kindChecks(Request request, EntryFacts facts, Console console) {
         if (isPublishers(request)) return List.of();
         String path = request.changed().getFirst();
         Path file = request.head().resolve(path);
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) return List.of();
+        if (request.base().isEmpty()) {
+            return List.of(Finding.error(path, "the kind's checks ran without --base, so which release this pull"
+                    + " request approves cannot be told."));
+        }
         try {
-            Entry entry = read(file, EntryPath.parse(path).orElseThrow().kind());
-            if (!Entry.isSlug(entry.repo()) || !TAG.matcher(entry.tag()).matches()) {
-                return List.of(Finding.error(path, "\"repo\" or \"tag\" is not what the rules allow; run the rules"
-                        + " first."));
+            EntryPath named = EntryPath.parse(path).orElseThrow();
+            Entry entry = read(file, named.kind());
+            Optional<ApprovedRelease> approved = Change.between(readIfPresent(request.base().get(), named), entry)
+                    .approves();
+            if (approved.isEmpty()) return List.of();
+            ApprovedRelease release = approved.get();
+            if (!Entry.isSlug(entry.repo()) || pinRefusal(release) != null) {
+                return List.of(Finding.error(path, "\"repo\" or the release's pins are not what the rules allow;"
+                        + " run the rules first."));
             }
             Optional<Catalog> catalog = Catalog.read(request.head().resolve(Catalog.FILE));
             Mvn mvn = new Mvn(console);
             return switch (entry) {
-                case BotEntry bot -> BotChecks.checkRelease(bot, path, pluginIds(catalog), mvn);
-                case PluginEntry plugin -> PluginChecks.check(plugin, path, facts, new Subjects(console, mvn),
-                        claimedIds(request.head(), plugin.id()));
+                case BotEntry bot -> BotChecks.checkRelease(bot.repo(), release, path, pluginIds(catalog), mvn);
+                case PluginEntry plugin -> PluginChecks.check(plugin, release, path, facts,
+                        new Subjects(console, mvn), claimedIds(request.head(), plugin.id()));
             };
+        } catch (Refused e) {
+            return List.of(Finding.error(path, e.getMessage()));
         } catch (IOException | IllegalArgumentException e) {
             return List.of(Finding.error(path, "could not run the checks: " + e.getMessage()));
         } catch (UncheckedIOException e) {

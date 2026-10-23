@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /**
- * A bot's own rules, on a clone at its tag:
+ * A bot's own rules, on a clone at the approved release's pinned commit:
  *
  * <ol start="6">
  *   <li>its {@code pom.xml} declares at least one catalog plugin, each at a released version;</li>
@@ -34,21 +34,20 @@ public final class BotChecks {
 
     private BotChecks() {}
 
-    /** Clones {@code bot} at its tag into a temporary directory, then {@link #check}. */
-    public static List<Finding> checkRelease(BotEntry bot, String path, Map<String, String> pluginIds, Mvn mvn)
-            throws IOException {
+    /** Clones {@code repo} at {@code release}'s pinned commit into a temporary directory, then {@link #check}. */
+    public static List<Finding> checkRelease(String repo, ApprovedRelease release, String path,
+                                             Map<String, String> pluginIds, Mvn mvn) throws IOException {
         Path clone = Files.createDirectories(Files.createTempDirectory("catalog-bot").resolve("bot"));
-        // No shell: the repository and the tag passed the entry's patterns, and reach git as arguments. The tag
-        // is fetched as refs/tags/<tag>: `clone --branch` prefers a branch of the same name, which would check
-        // something other than the release Studio installs.
+        // No shell: the repository and the commit passed the entry's patterns, and reach git as arguments. The
+        // commit is fetched itself, not the tag: it is what Studio installs, whatever the tag points at later.
         for (List<String> step : List.of(List.of("git", "init", "--quiet"),
-                List.of("git", "fetch", "--quiet", "--depth", "1", "https://github.com/" + bot.repo() + ".git",
-                        "refs/tags/" + bot.tag()),
+                List.of("git", "fetch", "--quiet", "--depth", "1", "https://github.com/" + repo + ".git",
+                        release.commit()),
                 List.of("git", "checkout", "--quiet", "--detach", "FETCH_HEAD"))) {
             String failure = git(clone, step);
             if (failure != null) {
-                return List.of(Finding.error(path, "could not fetch " + bot.repo() + " at tag " + bot.tag() + ": "
-                        + failure));
+                return List.of(Finding.error(path, "could not fetch " + repo + " at " + release.tag() + " ("
+                        + release.commit() + "): " + failure));
             }
         }
         return check(clone, path, pluginIds, mvn);

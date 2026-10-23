@@ -32,7 +32,7 @@ final class PluginListCommand implements Callable<Integer> {
         }
         for (Catalog.Plugin plugin : catalog.get().plugins()) {
             console.out(String.join("  ", Objects.requireNonNullElse(plugin.rank(), Rank.COMMUNITY).displayName(),
-                    plugin.id(), plugin.coordinate() + ":" + plugin.tag(),
+                    plugin.id(), plugin.coordinate() + ":" + plugin.newest().tag(),
                     Objects.requireNonNullElse(plugin.name(), "")).strip());
         }
         return 0;

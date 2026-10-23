@@ -3,6 +3,7 @@ package com.botmaker.cli.catalog;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -10,8 +11,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
@@ -62,17 +66,59 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
 
     @Override
     public boolean jitpackServes(String coordinate, String tag) {
-        int colon = coordinate.indexOf(':');
-        String group = coordinate.substring(0, colon).replace('.', '/');
-        String artifact = coordinate.substring(colon + 1);
-        String version = encode(tag);
         try {
             // JitPack builds a tag the first time it is asked for, which can take minutes.
-            return get("https://jitpack.io/" + group + "/" + artifact + "/" + version + "/" + artifact + "-"
-                    + version + ".pom", Duration.ofMinutes(10), false).statusCode() == 200;
+            return get(jitpackUrl(coordinate, tag, Artifact.POM), Duration.ofMinutes(10), false).statusCode() == 200;
         } catch (IOException e) {
             return false;
         }
+    }
+
+    @Override
+    public Optional<String> tagCommit(String repo, String tag) {
+        Optional<JsonNode> object = api(API + repo + "/git/ref/tags/" + encode(tag)).map(json -> json.path("object"));
+        // An annotated tag is a tag object naming the commit (or, rarely, another tag): peeled a few levels.
+        for (int depth = 0; depth < 4 && object.isPresent(); depth++) {
+            String type = object.get().path("type").asText();
+            String sha = object.get().path("sha").asText();
+            if (type.equals("commit")) return ApprovedRelease.COMMIT.matcher(sha).matches() ? Optional.of(sha) : Optional.empty();
+            if (!type.equals("tag")) return Optional.empty();
+            object = api(API + repo + "/git/tags/" + sha).map(json -> json.path("object"));
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<String> jitpackSha256(String coordinate, String tag, Artifact artifact) {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(jitpackUrl(coordinate, tag, artifact)))
+                .timeout(Duration.ofMinutes(10)).GET().build();
+        try {
+            HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream body = response.body()) {
+                if (response.statusCode() != 200) return Optional.empty();
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] buffer = new byte[64 * 1024];
+                for (int n; (n = body.read(buffer)) > 0; ) digest.update(buffer, 0, n);
+                return Optional.of(HexFormat.of().formatHex(digest.digest()));
+            }
+        } catch (IOException e) {
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("no SHA-256 in this JDK", e);
+        }
+    }
+
+    /** {@code coordinate}'s {@code artifact} at {@code tag} on JitPack. */
+    private static String jitpackUrl(String coordinate, String tag, Artifact artifact) {
+        int colon = coordinate.indexOf(':');
+        String group = coordinate.substring(0, colon).replace('.', '/');
+        String name = coordinate.substring(colon + 1);
+        String version = encode(tag);
+        return "https://jitpack.io/" + group + "/" + name + "/" + version + "/" + name + "-" + version + "."
+                + artifact.extension();
     }
 
     @Override

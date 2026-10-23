@@ -41,9 +41,15 @@ public record EntryPath(Kind kind, String path, String key) {
     /** The path {@code entry} lives at. */
     public static String of(Entry entry) {
         return switch (entry) {
-            case BotEntry bot -> BOTS + bot.owner() + "__" + bot.name() + JSON;
+            case BotEntry bot -> bot(bot.repo());
             case PluginEntry plugin -> PLUGINS + plugin.id() + JSON;
         };
+    }
+
+    /** The path the bot at {@code repo} ({@code owner/name}) lives at, before it has an entry. */
+    public static String bot(String repo) {
+        int slash = repo.indexOf('/');
+        return BOTS + repo.substring(0, Math.max(slash, 0)) + "__" + repo.substring(slash + 1) + JSON;
     }
 
     /** Whether {@code entry}'s content is what this path's name claims. */

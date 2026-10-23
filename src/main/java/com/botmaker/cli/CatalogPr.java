@@ -52,7 +52,7 @@ final class CatalogPr {
             }
             EntryPath path = EntryPath.parse(EntryPath.of(entry))
                     .orElseThrow(() -> new IllegalArgumentException(EntryPath.of(entry) + " is no entry path"));
-            return new Change(path, Optional.of(json), kind(path) + ": " + entry.repo() + " " + entry.tag(),
+            return new Change(path, Optional.of(json), kind(path) + ": " + entry.repo() + " " + entry.newest().tag(),
                     "Adds or updates `" + path.path() + "`.\n\nOpened by `" + command + "`. The catalog's checks run"
                             + " on it and merge it when they pass.\n\n```json\n" + json + "```");
         }
@@ -190,9 +190,10 @@ final class CatalogPr {
             return 1;
         }
         try {
-            if (!EntryGate.controls(author.get(), held.get().repo(), held.get().tag(), facts)) {
+            String newest = held.get().newest().tag();
+            if (!EntryGate.controls(author.get(), held.get().repo(), newest, facts)) {
                 console.error("only whoever controls " + held.get().repo() + " may remove this entry, and "
-                        + author.get() + " neither made its release " + held.get().tag() + " nor owns it.");
+                        + author.get() + " neither made its release " + newest + " nor owns it.");
                 return 1;
             }
         } catch (UncheckedIOException e) {

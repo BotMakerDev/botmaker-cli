@@ -2,11 +2,18 @@ package com.botmaker.cli.catalog;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * What an author writes into the catalog: the repository and the release the check verified. Everything else
- * Studio shows is derived ({@link CatalogBuilder}), so nothing written by hand can drift.
+ * What an author writes into the catalog: the repository and every release the check approved, oldest first, each
+ * pinned ({@link ApprovedRelease}). A pull request adds one release at the end or removes some, never edits one
+ * ({@link EntryGate.Change}). Everything else Studio shows is derived ({@link CatalogBuilder}), so nothing written by
+ * hand can drift.
  */
 public sealed interface Entry permits BotEntry, PluginEntry {
 
@@ -16,8 +23,29 @@ public sealed interface Entry permits BotEntry, PluginEntry {
     /** {@code owner/name} on GitHub. */
     String repo();
 
-    /** The GitHub Release the check verified; what Studio installs. */
-    String tag();
+    /** Every approved release, oldest first; never empty. */
+    List<ApprovedRelease> releases();
+
+    /** The same entry holding {@code releases} instead. */
+    Entry withReleases(List<ApprovedRelease> releases);
+
+    /** The newest approved release, what Studio offers first. */
+    @JsonIgnore
+    default ApprovedRelease newest() {
+        return releases().getLast();
+    }
+
+    /** The approved release at {@code tag}, or empty. */
+    default Optional<ApprovedRelease> release(String tag) {
+        return releases().stream().filter(r -> r.tag().equals(tag)).findFirst();
+    }
+
+    /** The same entry with {@code release} approved after the others. */
+    default Entry appended(ApprovedRelease release) {
+        List<ApprovedRelease> more = new ArrayList<>(releases());
+        more.add(release);
+        return withReleases(more);
+    }
 
     /** The owner half of {@link #repo()}. */
     @JsonIgnore
@@ -44,5 +72,24 @@ public sealed interface Entry permits BotEntry, PluginEntry {
     static String required(String value, String field) {
         if (value == null || value.isBlank()) throw new IllegalArgumentException("missing \"" + field + "\"");
         return value;
+    }
+
+    /**
+     * {@code releases} as an entry holds them: at least one, no tag twice, each with a plugin's hashes when
+     * {@code hashed} and with none when not.
+     */
+    static List<ApprovedRelease> releases(List<ApprovedRelease> releases, boolean hashed) {
+        if (releases == null || releases.isEmpty()) throw new IllegalArgumentException("missing \"releases\"");
+        Set<String> tags = new HashSet<>();
+        for (ApprovedRelease release : releases) {
+            if (release == null) throw new IllegalArgumentException("a null release");
+            if (!tags.add(release.tag())) throw new IllegalArgumentException("tag " + release.tag() + " twice");
+            boolean any = release.jarSha256() != null || release.pomSha256() != null;
+            if (hashed ? !release.hashed() : any) {
+                throw new IllegalArgumentException(hashed ? "a plugin release carries \"jarSha256\" and \"pomSha256\""
+                        : "a bot release carries no hashes");
+            }
+        }
+        return List.copyOf(releases);
     }
 }

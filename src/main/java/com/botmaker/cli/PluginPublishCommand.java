@@ -1,6 +1,6 @@
 package com.botmaker.cli;
 
-import com.botmaker.cli.catalog.CatalogJson;
+import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.GitHubFacts;
@@ -121,29 +121,39 @@ final class PluginPublishCommand implements Callable<Integer> {
 
         Poms.Dependency self = Poms.coordinate(subject.pom());
         String coordinate = self.groupId() + ":" + self.artifactId() + ":" + published;
-        PluginEntry entry = compose(subject, published);
+        String id = pluginId(subject);
 
         if (dryRun || repo == null) {
             if (repo == null) {
                 console.warn("--repo <owner/name> was not given, so this is a dry run: the catalog entry"
                         + " needs somewhere for a reader to go and look at the source.");
             }
-            // Nothing but the entry on stdout: `botmaker plugin publish --dry-run > plugins/<id>.json` is the
-            // by-hand path when `gh` is unavailable, and a blank line makes that file not-JSON.
-            console.out(CatalogJson.strict().writeValueAsString(entry));
+            console.out("would list " + id + " " + (repo == null ? "owner/name" : repo) + " " + published);
             return 0;
         }
         if (!resolves(coordinate)) {
             return 1;
         }
-        Optional<EntryPath> path = EntryPath.parse(EntryPath.of(entry));
+        Optional<EntryPath> path = EntryPath.parse(EntryPath.PLUGINS + id + ".json");
         if (path.isEmpty()) {
-            console.error("the plugin's id " + entry.id() + " cannot name a catalog file: letters, digits, '.', '-'"
+            console.error("the plugin's id " + id + " cannot name a catalog file: letters, digits, '.', '-'"
                     + " and '_', at most 128.");
             return 1;
         }
         GitHubFacts facts = GitHubFacts.anonymousOrToken();
+        Optional<ApprovedRelease> release = ApprovedRelease.pinPlugin(facts, repo, published);
+        if (release.isEmpty()) {
+            console.error("could not pin " + repo + " " + published + ": GitHub shows no such tag, or JitPack"
+                    + " serves no jar or pom for it yet. Re-run once it does.");
+            return 1;
+        }
         Optional<Entry> previous = CatalogPr.listed(facts, path.get());
+        if (previous.flatMap(e -> e.release(published)).isPresent()) {
+            console.step(id + " " + published + " is already listed in the catalog.");
+            return 0;
+        }
+        Entry entry = previous.map(e -> e.appended(release.get()))
+                .orElse(new PluginEntry(id, repo, List.of(release.get())));
         if (!CatalogPr.passes(console, entry, author.orElseThrow(), previous, facts)) {
             console.error("the catalog would refuse the entry; no pull request opened.");
             return 1;
@@ -208,8 +218,8 @@ final class PluginPublishCommand implements Callable<Integer> {
         }
     }
 
-    /** The catalog entry: the plugin's own id, the repository and the tag. Everything else is derived. */
-    private PluginEntry compose(PluginSubject subject, String published) {
+    /** The plugin's own id, which names its entry. Everything else but the repository and the release is derived. */
+    private String pluginId(PluginSubject subject) {
         Console console = parent.main().console();
         String id;
         try (PluginLoader loaded =
@@ -225,6 +235,6 @@ final class PluginPublishCommand implements Callable<Integer> {
             StudioPlugin plugin = plugins.getFirst();
             id = plugin.id();
         }
-        return new PluginEntry(id, repo == null ? "owner/name" : repo, published);
+        return id;
     }
 }

@@ -1,5 +1,6 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.BotEntry;
 import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryPath;
@@ -11,6 +12,7 @@ import picocli.CommandLine.ParentCommand;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
@@ -64,7 +66,7 @@ final class BotPublishCommand implements Callable<Integer> {
             throw new IOException("no pom.xml in " + dir + " — point `botmaker bot publish` at a bot project");
         }
         String slug = BotNewCommand.slug(repo);
-        Optional<EntryPath> path = EntryPath.parse(EntryPath.of(new BotEntry(slug, tag, false)));
+        Optional<EntryPath> path = EntryPath.parse(EntryPath.bot(slug));
         if (path.isEmpty()) {
             console.error(slug + " cannot be listed: the catalog names a bot's file after owner/name, and this one"
                     + " does not fit (letters, digits, '.', '-' and '_').");
@@ -80,9 +82,18 @@ final class BotPublishCommand implements Callable<Integer> {
         }
         GitHubFacts facts = GitHubFacts.anonymousOrToken();
         Optional<Entry> previous = CatalogPr.listed(facts, path.get());
-        // A fork that stopped following its original stays detached across releases.
-        BotEntry entry = new BotEntry(slug, tag,
-                previous.filter(BotEntry.class::isInstance).map(e -> ((BotEntry) e).detached()).orElse(false));
+        Optional<ApprovedRelease> release = ApprovedRelease.pinBot(facts, slug, tag);
+        if (release.isEmpty()) {
+            console.error("released " + tag + ", but GitHub does not show the tag's commit yet; re-run to list it.");
+            return 1;
+        }
+        if (previous.flatMap(e -> e.release(tag)).isPresent()) {
+            console.step(slug + " " + tag + " is already listed in the catalog.");
+            return 0;
+        }
+        // Appended to what the catalog holds: a fork that stopped following its original stays detached.
+        Entry entry = previous.map(e -> e.appended(release.get()))
+                .orElse(new BotEntry(slug, List.of(release.get()), false));
         if (!CatalogPr.passes(console, entry, author.get(), previous, facts)) {
             console.error("released " + tag + ", but the catalog would refuse the entry; no pull request opened.");
             return 1;

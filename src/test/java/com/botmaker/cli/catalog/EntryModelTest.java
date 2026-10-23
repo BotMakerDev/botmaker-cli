@@ -47,7 +47,8 @@ class EntryModelTest {
         EntryPath path = EntryPath.parse("bots/a-b__c__d-e.json").orElseThrow();
         assertEquals(EntryPath.Kind.BOT, path.kind());
         assertEquals("a-b/c__d-e", path.key());
-        assertEquals("bots/a-b__c__d-e.json", EntryPath.of(new BotEntry("a-b/c__d-e", "v1", false)));
+        assertEquals("bots/a-b__c__d-e.json", EntryPath.of(bot("a-b/c__d-e", false)));
+        assertEquals("bots/a-b__c__d-e.json", EntryPath.bot("a-b/c__d-e"));
     }
 
     @Test
@@ -63,24 +64,58 @@ class EntryModelTest {
     @Test
     void a_path_matches_only_the_entry_its_name_claims() {
         EntryPath bot = EntryPath.parse("bots/a__b.json").orElseThrow();
-        assertTrue(bot.matches(new BotEntry("a/b", "v1", false)));
-        assertFalse(bot.matches(new BotEntry("a/c", "v1", false)));
-        assertFalse(bot.matches(new PluginEntry("a/b", "a/b", "v1")));
-        assertTrue(EntryPath.parse("plugins/x.y.json").orElseThrow().matches(new PluginEntry("x.y", "o/r", "v1")));
+        assertTrue(bot.matches(bot("a/b", false)));
+        assertFalse(bot.matches(bot("a/c", false)));
+        assertFalse(bot.matches(plugin("a/b", "a/b")));
+        assertTrue(EntryPath.parse("plugins/x.y.json").orElseThrow().matches(plugin("x.y", "o/r")));
     }
 
     @Test
     void an_entry_file_holds_exactly_its_schema() throws IOException {
         Path bot = dir.resolve("bot.json");
-        Files.writeString(bot, "{ \"repo\": \"a/b\", \"tag\": \"v1\" }");
-        assertEquals(new BotEntry("a/b", "v1", false), BotEntry.read(bot));
-        Files.writeString(bot, "{ \"repo\": \"a/b\", \"tag\": \"v1\", \"name\": \"extra\" }");
+        String release = "{ \"tag\": \"v1\", \"commit\": \"" + FakeFacts.commitOf("v1") + "\" }";
+        Files.writeString(bot, "{ \"repo\": \"a/b\", \"releases\": [" + release + "] }");
+        assertEquals(bot("a/b", false), BotEntry.read(bot));
+        Files.writeString(bot, "{ \"repo\": \"a/b\", \"releases\": [" + release + "], \"name\": \"extra\" }");
         assertThrows(IOException.class, () -> BotEntry.read(bot));
+        Files.writeString(bot, "{ \"repo\": \"a/b\", \"tag\": \"v1\" }");
+        assertThrows(IOException.class, () -> BotEntry.read(bot), "the single tag of schema 3 is not read");
+        Files.writeString(bot, "{ \"repo\": \"a/b\", \"releases\": [] }");
+        assertThrows(IOException.class, () -> BotEntry.read(bot), "an entry approves at least one release");
+    }
+
+    @Test
+    void a_plugin_release_carries_both_hashes_and_a_bot_release_none() {
+        ApprovedRelease bare = ApprovedRelease.ofBot("v1", FakeFacts.commitOf("v1"));
+        assertThrows(IllegalArgumentException.class, () -> new PluginEntry("x.y", "o/r", List.of(bare)));
+        assertThrows(IllegalArgumentException.class, () -> new BotEntry("o/r",
+                List.of(FakeFacts.pluginRelease("v1")), false));
+        ApprovedRelease half = new ApprovedRelease("v1", FakeFacts.commitOf("v1"), FakeFacts.shaOf("jar"), null);
+        assertThrows(IllegalArgumentException.class, () -> new PluginEntry("x.y", "o/r", List.of(half)));
+    }
+
+    @Test
+    void appended_keeps_the_order_and_newest_is_the_last() {
+        BotEntry entry = new BotEntry("a/b", List.of(FakeFacts.botRelease("v1")), true);
+        Entry more = entry.appended(FakeFacts.botRelease("v2"));
+        assertEquals(List.of("v1", "v2"), more.releases().stream().map(ApprovedRelease::tag).toList());
+        assertEquals("v2", more.newest().tag());
+        assertTrue(((BotEntry) more).detached(), "detached is kept");
     }
 
     @Test
     void detached_is_written_only_when_true() throws IOException {
-        assertFalse(CatalogJson.strict().writeValueAsString(new BotEntry("a/b", "v1", false)).contains("detached"));
-        assertTrue(CatalogJson.strict().writeValueAsString(new BotEntry("a/b", "v1", true)).contains("detached"));
+        assertFalse(CatalogJson.strict().writeValueAsString(bot("a/b", false)).contains("detached"));
+        assertTrue(CatalogJson.strict().writeValueAsString(bot("a/b", true)).contains("detached"));
+        assertFalse(CatalogJson.strict().writeValueAsString(bot("a/b", false)).contains("Sha256"),
+                "a bot release writes no hashes");
+    }
+
+    private static BotEntry bot(String repo, boolean detached) {
+        return new BotEntry(repo, List.of(FakeFacts.botRelease("v1")), detached);
+    }
+
+    private static PluginEntry plugin(String id, String repo) {
+        return new PluginEntry(id, repo, List.of(FakeFacts.pluginRelease("v1")));
     }
 }

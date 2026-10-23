@@ -1,5 +1,6 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.BotEntry;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.PluginEntry;
@@ -15,8 +16,9 @@ class CatalogPrTest {
 
     @Test
     void a_bot_publish_forks_writes_its_one_file_and_opens_the_pr_from_the_fork() {
-        CatalogPr.Change change = CatalogPr.Change.put(new BotEntry("somedev/firestone", "v1.2.0", false),
-                "botmaker bot publish");
+        String commit = "0123456789abcdef0123456789abcdef01234567";
+        CatalogPr.Change change = CatalogPr.Change.put(new BotEntry("somedev/firestone",
+                List.of(ApprovedRelease.ofBot("v1.2.0", commit)), false), "botmaker bot publish");
         assertEquals("bot: somedev/firestone v1.2.0", change.title());
 
         String branch = "entry/bots/somedev__firestone.json";
@@ -26,7 +28,8 @@ class CatalogPrTest {
                 new CatalogPr.Step.Run(true, List.of("gh", "repo", "fork", "--remote=true", "--remote-name=fork")),
                 new CatalogPr.Step.Run(true, List.of("git", "checkout", "-b", branch)),
                 new CatalogPr.Step.Write("bots/somedev__firestone.json",
-                        "{\n  \"repo\" : \"somedev/firestone\",\n  \"tag\" : \"v1.2.0\"\n}\n"),
+                        "{\n  \"repo\" : \"somedev/firestone\",\n  \"releases\" : [ {\n    \"tag\" : \"v1.2.0\",\n"
+                                + "    \"commit\" : \"" + commit + "\"\n  } ]\n}\n"),
                 new CatalogPr.Step.Run(true, List.of("git", "add", "--", "bots/somedev__firestone.json")),
                 new CatalogPr.Step.Commit("bot: somedev/firestone v1.2.0"),
                 new CatalogPr.Step.Run(true, List.of("git", "push", "--force", "-u", "fork", branch)),
@@ -39,7 +42,9 @@ class CatalogPrTest {
     @Test
     void a_plugin_publish_by_someone_who_can_push_pushes_to_the_catalog_itself() {
         CatalogPr.Change change = CatalogPr.Change.put(
-                new PluginEntry("com.example.thing", "somedev/thing", "v0.3.0"), "botmaker plugin publish");
+                new PluginEntry("com.example.thing", "somedev/thing", List.of(new ApprovedRelease("v0.3.0",
+                        "0123456789abcdef0123456789abcdef01234567", "a".repeat(64), "b".repeat(64)))),
+                "botmaker plugin publish");
         assertEquals("plugin: somedev/thing v0.3.0", change.title());
         assertTrue(change.body().contains("\"id\" : \"com.example.thing\""), change.body());
 

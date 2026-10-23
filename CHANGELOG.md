@@ -5,6 +5,22 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- **A catalog entry lists every approved release, each pinned** (`catalog.json` schema 4). A plugin's entry is
+  `{id, repo, releases: [{tag, commit, jarSha256, pomSha256}]}`, a bot's `{repo, releases: [{tag, commit}],
+  detached?}`, oldest first; the single `tag` is gone and not read. A pull request creates an entry with one
+  release, appends one, removes some, or changes a bot's `detached`; an approved release is never edited or
+  reordered and an entry's `repo` never changes (`EntryGate.Change`). The check runs on the appended release only,
+  refuses a tag that no longer points at the pinned commit, and refuses a plugin whose JitPack jar or pom no longer
+  hashes to its pins; a bot is built at its pinned commit. `catalog.json` lists each entry's releases newest first
+  with their pins and facts, each pom read at its commit, and leaves out a release whose GitHub Release is gone.
+- **`plugin publish` and `bot publish` append a pinned release** to the entry the catalog holds
+  (`ApprovedRelease.pinPlugin`/`pinBot`). `plugin publish --dry-run` prints the release it would list, no longer an
+  entry file.
+
 ## [0.5.0] — 2026-10-23
 
 ### Changed

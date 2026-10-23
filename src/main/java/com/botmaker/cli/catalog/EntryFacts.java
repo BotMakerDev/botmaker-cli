@@ -40,4 +40,28 @@ public interface EntryFacts {
 
     /** Whether JitPack serves {@code coordinate} (no version) at {@code tag}. */
     boolean jitpackServes(String coordinate, String tag);
+
+    /** The commit {@code tag} points at now (an annotated tag peeled), or empty when there is no such tag. */
+    Optional<String> tagCommit(String repo, String tag);
+
+    /** The two files of a plugin release a host downloads, and what {@link ApprovedRelease} pins. */
+    enum Artifact {
+        JAR("jar"), POM("pom");
+
+        private final String extension;
+
+        Artifact(String extension) {
+            this.extension = extension;
+        }
+
+        public String extension() {
+            return extension;
+        }
+    }
+
+    /**
+     * The sha256 (lower-case hex) of {@code coordinate}'s {@code artifact} at {@code tag} as JitPack serves it now,
+     * or empty when it serves none.
+     */
+    Optional<String> jitpackSha256(String coordinate, String tag, Artifact artifact);
 }

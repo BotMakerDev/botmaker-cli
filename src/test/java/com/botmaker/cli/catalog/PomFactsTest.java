@@ -15,8 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PomFactsTest {
 
-    private static final PluginEntry THING = new PluginEntry("com.example.thing", "somedev/thing", "v1");
-    private static final BotEntry BOT = new BotEntry("somedev/firestone", "v1.2.0", false);
+    private static final PluginEntry THING = new PluginEntry("com.example.thing", "somedev/thing",
+            List.of(FakeFacts.pluginRelease("v1")));
+    private static final BotEntry BOT = new BotEntry("somedev/firestone", List.of(FakeFacts.botRelease("v1.2.0")),
+            false);
     private static final Map<String, String> IDS = Map.of(PomFacts.key("com.github.somedev", "thing"), THING.id());
 
     @TempDir
@@ -40,7 +42,7 @@ class PomFactsTest {
                   </dependencies>
                 </project>
                 """);
-        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, IDS).plugins().get(THING.id());
+        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, IDS).plugin(THING.id(), "v1");
         assertEquals("The Thing", facts.name());
         assertEquals("0.11.0", facts.minContractVersion());
         assertEquals(List.of("io.javalin:javalin:6.7.0"), facts.editorDependencies());
@@ -54,7 +56,7 @@ class PomFactsTest {
                     <version>${botmaker.studioapi.version}</version></dependency>
                 </dependencies></project>
                 """);
-        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, IDS).plugins().get(THING.id());
+        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, IDS).plugin(THING.id(), "v1");
         assertEquals("thing", facts.name());
         assertNull(facts.minContractVersion());
     }
@@ -68,7 +70,7 @@ class PomFactsTest {
                 </dependencies></project>
                 """);
         assertEquals(List.of(new DerivedFacts.Pin(THING.id(), "1.0")),
-                PomFacts.read(List.of(BOT), poms, IDS).botPlugins().get(BOT.repo()));
+                PomFacts.read(List.of(BOT), poms, IDS).bot(BOT.repo(), "v1.2.0"));
     }
 
     @Test
@@ -86,9 +88,9 @@ class PomFactsTest {
     @Test
     void the_index_writes_the_catalog_once_and_leaves_it_when_nothing_changed() throws IOException {
         Files.createDirectories(dir.resolve("plugins"));
-        Files.writeString(dir.resolve("plugins/com.example.thing.json"),
-                "{\"id\":\"com.example.thing\",\"repo\":\"somedev/thing\",\"tag\":\"v1\"}");
+        Files.writeString(dir.resolve("plugins/com.example.thing.json"), FakeFacts.json(THING));
         FakeFacts facts = new FakeFacts().repo("somedev/thing", 2, "A thing.", null)
+                .release("somedev/thing", "v1", "somedev")
                 .pom("somedev/thing", "v1", "<project><name>Thing</name></project>");
 
         assertTrue(IndexCommand.write(dir, facts, "2026-10-23T18:00:00Z"));

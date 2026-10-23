@@ -14,7 +14,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * {@link DerivedFacts} read from each entry's {@code pom.xml} at its tag, as data: no build, no entry's code.
+ * {@link DerivedFacts} read from each approved release's {@code pom.xml} at its pinned commit, as data: no build,
+ * no entry's code.
  *
  * <p>The XML parser refuses a {@code DOCTYPE} ({@link Poms}), so a pom cannot reach a file or the network through
  * an entity. A {@code ${…}} resolves from the pom's own {@code <properties>} only; a value left unresolved is that
@@ -22,40 +23,49 @@ import java.util.Optional;
  */
 public final class PomFacts {
 
-    /** A pom at a tag, fetched as text; empty when there is none. */
+    /** A pom at a ref (a release's pinned commit), fetched as text; empty when there is none. */
     @FunctionalInterface
     public interface Source {
-        Optional<String> pom(String repo, String tag);
+        Optional<String> pom(String repo, String ref);
     }
 
     private PomFacts() {}
 
     /**
-     * Every entry's facts. An entry whose pom could not be fetched or parsed has none, which the builder answers
-     * with the previous row while the tag holds.
+     * Every approved release's facts, each pom read at the release's pinned commit. A release whose pom could not
+     * be fetched or parsed has none, which the builder answers with the previous row's while the pin holds.
      *
      * @param pluginIds the catalog's plugin ids by {@code groupId:artifactId} ({@link #key})
      */
     public static DerivedFacts read(List<? extends Entry> entries, Source poms, Map<String, String> pluginIds) {
-        Map<String, DerivedFacts.PluginFacts> plugins = new HashMap<>();
-        Map<String, List<DerivedFacts.Pin>> bots = new HashMap<>();
+        Map<String, Map<String, DerivedFacts.PluginFacts>> plugins = new HashMap<>();
+        Map<String, Map<String, List<DerivedFacts.Pin>>> bots = new HashMap<>();
         for (Entry entry : entries) {
-            Optional<String> text = poms.pom(entry.repo(), entry.tag());
-            if (text.isEmpty()) continue;
-            try {
-                Path pom = Files.createTempFile("catalog-pom", ".xml");
+            for (ApprovedRelease release : entry.releases()) {
+                Optional<String> text = poms.pom(entry.repo(), release.commit());
+                if (text.isEmpty()) continue;
                 try {
-                    Files.writeString(pom, text.get());
-                    switch (entry) {
-                        case PluginEntry plugin -> plugins.put(plugin.id(), plugin(pom, plugin));
-                        case BotEntry bot -> bots.put(bot.repo(), pins(pom, pluginIds));
+                    Path pom = Files.createTempFile("catalog-pom", ".xml");
+                    try {
+                        Files.writeString(pom, text.get());
+                        // Read before the maps are touched: a pom that does not parse leaves no empty row.
+                        switch (entry) {
+                            case PluginEntry plugin -> {
+                                DerivedFacts.PluginFacts read = plugin(pom, plugin);
+                                plugins.computeIfAbsent(plugin.id(), k -> new HashMap<>()).put(release.tag(), read);
+                            }
+                            case BotEntry bot -> {
+                                List<DerivedFacts.Pin> read = pins(pom, pluginIds);
+                                bots.computeIfAbsent(bot.repo(), k -> new HashMap<>()).put(release.tag(), read);
+                            }
+                        }
+                    } finally {
+                        Files.deleteIfExists(pom);
                     }
-                } finally {
-                    Files.deleteIfExists(pom);
+                } catch (IOException e) {
+                    System.err.println("no facts for " + EntryPath.of(entry) + ": its pom at " + release.tag()
+                            + " does not parse");
                 }
-            } catch (IOException e) {
-                System.err.println("no facts for " + EntryPath.of(entry) + ": its pom at " + entry.tag()
-                        + " does not parse");
             }
         }
         return new DerivedFacts(plugins, bots);
