@@ -68,9 +68,12 @@ class ListingPolicyTest {
     void a_publishers_change_merges_without_the_daily_limit() {
         assertEquals(ListingPolicy.Kind.MERGE, decide(true,
                 List.of(new ListingPolicy.Change(Publishers.FILE, "modified")), List.of(NOW, NOW, NOW)).decision());
-        assertEquals(ListingPolicy.Kind.HOLD, ListingPolicy.decide(new ListingPolicy.Facts("somedev", true, NOW,
-                List.of(new ListingPolicy.Change(Publishers.FILE, "modified")), List.of(), false)).decision(),
-                "main's publishers.json moved after the check");
+        ListingPolicy.Decision stale = decide(List.of(new ListingPolicy.Change(Publishers.FILE, "modified")),
+                false, true);
+        assertEquals(ListingPolicy.Kind.HOLD, stale.decision(), "main's publishers.json moved since the branch");
+        assertTrue(stale.announce(), "the author is told: the check runs show green");
+        assertEquals(ListingPolicy.Kind.HOLD, decide(List.of(new ListingPolicy.Change(Publishers.FILE, "modified")),
+                true, false).decision(), "an author who is no admin on main now");
         assertEquals(ListingPolicy.Kind.HOLD, decide(false,
                 List.of(new ListingPolicy.Change(Publishers.FILE, "modified")), List.of()).decision());
         assertEquals(ListingPolicy.Kind.HOLD, decide(true, List.of(new ListingPolicy.Change(Publishers.FILE,
@@ -78,18 +81,39 @@ class ListingPolicyTest {
     }
 
     @Test
+    void an_entry_checked_against_old_ranks_merges_only_for_an_admin_of_main() {
+        ListingPolicy.Change edit = new ListingPolicy.Change("plugins/com.botmaker.sdk.json", "modified");
+        assertEquals(ListingPolicy.Kind.HOLD, decide(List.of(edit), false, false).decision(),
+                "possibly passed as an admin demoted since");
+        assertEquals(ListingPolicy.Kind.MERGE, decide(List.of(edit), false, true).decision());
+        assertEquals(ListingPolicy.Kind.MERGE, decide(List.of(edit), true, false).decision());
+    }
+
+    @Test
     void the_facts_file_reads_and_the_decision_prints_as_the_workflow_expects() throws IOException {
         ListingPolicy.Facts facts = ListingPolicy.Facts.read("""
                 {"author":"somedev","checksPassed":true,"now":"2026-10-23T18:00:00Z",
                  "changes":[{"path":"bots/somedev__firestone.json","status":"added","additions":1}],
-                 "recentNewEntries":[]}
+                 "recentNewEntries":[],"publishersCurrent":true,"authorAdmin":false}
                 """);
         String json = ListingPolicy.decide(facts).toJson();
         assertTrue(json.startsWith("{\"decision\":\"merge\""), json);
+        ListingPolicy.Facts older = ListingPolicy.Facts.read("""
+                {"author":"somedev","checksPassed":true,"changes":[{"path":"bots/somedev__firestone.json",
+                 "status":"added"}]}
+                """);
+        assertEquals(ListingPolicy.Kind.HOLD, ListingPolicy.decide(older).decision(),
+                "facts without the ranks' state hold: a stale entry-facts.sh never merges on old ranks");
     }
 
     private static ListingPolicy.Decision decide(boolean green, List<ListingPolicy.Change> changes,
                                                  List<Instant> recent) {
-        return ListingPolicy.decide(new ListingPolicy.Facts("somedev", green, NOW, changes, recent, true));
+        return ListingPolicy.decide(new ListingPolicy.Facts("somedev", green, NOW, changes, recent, true, true));
+    }
+
+    private static ListingPolicy.Decision decide(List<ListingPolicy.Change> changes, boolean publishersCurrent,
+                                                 boolean authorAdmin) {
+        return ListingPolicy.decide(new ListingPolicy.Facts("somedev", true, NOW, changes, List.of(),
+                publishersCurrent, authorAdmin));
     }
 }
