@@ -25,6 +25,9 @@ import java.util.Optional;
  *
  * <ol>
  *   <li>The check has not passed: {@link Kind#HOLD}.</li>
+ *   <li>It modifies {@code publishers.json} alone, which the check passes only for an admin
+ *       ({@link PublishersCheck}): {@link Kind#MERGE}, never limited, while {@code main}'s copy is still the one
+ *       the check read; otherwise {@link Kind#HOLD}.</li>
  *   <li>The pull request is not exactly one entry path, added, modified or removed (a rename is two): {@link Kind#HOLD},
  *       since it can never pass the check either.</li>
  *   <li>A new entry over {@value #NEW_ENTRIES_PER_DAY} in the author's last 24 hours: {@link Kind#WAIT} until the
@@ -67,9 +70,14 @@ public final class ListingPolicy {
         }
     }
 
-    /** Everything the decision reads. Instants are ISO-8601 text on the wire, what {@code gh} prints. */
+    /**
+     * Everything the decision reads. Instants are ISO-8601 text on the wire, what {@code gh} prints.
+     *
+     * @param publishersCurrent {@code publishers.json} on {@code main} is the copy at the pull request's base, the
+     *                          one the check read; missing on the wire is {@code false}
+     */
     public record Facts(String author, boolean checksPassed, Instant now, List<Change> changes,
-                        List<Instant> recentNewEntries) {
+                        List<Instant> recentNewEntries, boolean publishersCurrent) {
         public Facts {
             author = author == null ? "" : author.trim();
             changes = changes == null ? List.of() : List.copyOf(changes);
@@ -78,7 +86,7 @@ public final class ListingPolicy {
 
         @JsonIgnoreProperties(ignoreUnknown = true)
         private record Wire(String author, boolean checksPassed, String now, List<Change> changes,
-                            List<String> recentNewEntries) {}
+                            List<String> recentNewEntries, boolean publishersCurrent) {}
 
         /** Parses the facts file the workflow writes. A missing {@code now} is the current instant. */
         public static Facts read(String json) throws IOException {
@@ -87,7 +95,7 @@ public final class ListingPolicy {
                 return new Facts(wire.author(), wire.checksPassed(),
                         wire.now() == null || wire.now().isBlank() ? Instant.now() : Instant.parse(wire.now()),
                         wire.changes(), wire.recentNewEntries() == null ? List.of()
-                        : wire.recentNewEntries().stream().map(Instant::parse).toList());
+                        : wire.recentNewEntries().stream().map(Instant::parse).toList(), wire.publishersCurrent());
             } catch (DateTimeParseException e) {
                 throw new IOException("a timestamp in the facts is not ISO-8601: " + e.getMessage(), e);
             }
@@ -114,11 +122,19 @@ public final class ListingPolicy {
                     + facts.changes().size() + ".");
         }
         Change change = facts.changes().getFirst();
+        if (Publishers.FILE.equals(change.path()) && "modified".equalsIgnoreCase(change.status())) {
+            // Two rank changes on different lines merge cleanly into a file neither check saw: no admin left, an
+            // id twice, or an admin demoted since. So only one checked against main's own copy merges.
+            return facts.publishersCurrent()
+                    ? Decision.of(Kind.MERGE, "changes the ranks; the check passed it as an admin's.")
+                    : Decision.of(Kind.HOLD, "publishers.json changed on main after the check ran; update the"
+                    + " branch so the check runs against it again.");
+        }
         if (EntryPath.parse(change.path()).isEmpty() || "renamed".equalsIgnoreCase(change.status())) {
             return Decision.of(Kind.HOLD, change.path() + " is not one entry file added, changed or removed.");
         }
         if (!change.added()) {
-            return Decision.of(Kind.MERGE, "changes the author's own entry.");
+            return Decision.of(Kind.MERGE, "changes or removes a listed entry.");
         }
         Instant windowStart = facts.now().minus(WINDOW);
         List<Instant> recent = facts.recentNewEntries().stream().filter(t -> t.isAfter(windowStart)).sorted().toList();

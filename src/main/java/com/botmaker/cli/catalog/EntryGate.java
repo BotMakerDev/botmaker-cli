@@ -37,13 +37,18 @@ import java.util.stream.Stream;
  *   <li>{@code tag} is a published release: not a draft, not a prerelease.</li>
  * </ol>
  *
+ * <p><b>An admin may change anyone's entry</b> (2026-10-23, the dashboard's edits): when the author's account id
+ * is an admin in the base {@code publishers.json}, rules 3 and 4 pass. Rules 1, 2 and 5 and the kind's checks
+ * still run, so an admin lists only a published release that builds. A pull request that changes only
+ * {@code publishers.json} is {@link PublishersCheck}'s.
+ *
  * <p>The kind's own rules follow in {@link BotChecks} and {@link PluginChecks}. No command-line library (picocli is
  * {@code optional} here), and the changed paths may arrive as {@code @file}, since a pull request chooses its own
  * file names and a shell must never see them.
  *
  * <pre>
- * java -cp … com.botmaker.cli.catalog.EntryGate &lt;head-root&gt; --author &lt;login&gt; [--base &lt;base-root&gt;]
- *      [--part all|rules|kind] (@changed.txt | -- &lt;changed-path&gt;…)
+ * java -cp … com.botmaker.cli.catalog.EntryGate &lt;head-root&gt; --author &lt;login&gt; [--author-id &lt;id&gt;]
+ *      [--base &lt;base-root&gt;] [--part all|rules|kind] (@changed.txt | -- &lt;changed-path&gt;…)
  * </pre>
  *
  * <p>Exit code: {@code 0} passes, {@code 1} refused, {@code 2} bad invocation.
@@ -63,9 +68,11 @@ public final class EntryGate {
      * @param base    the tree it merges into; without it an edit cannot be told from a takeover, so every change
      *                to an existing entry is refused
      * @param changed the changed paths, as git names them
-     * @param author  the pull request author's login
+     * @param author   the pull request author's login
+     * @param authorId the author's GitHub account id, what {@code publishers.json} names; {@code 0} when unknown,
+     *                 which is never an admin
      */
-    public record Request(Path head, Optional<Path> base, List<String> changed, String author) {
+    public record Request(Path head, Optional<Path> base, List<String> changed, String author, long authorId) {
         public Request {
             base = base == null ? Optional.empty() : base;
             changed = List.copyOf(changed);
@@ -96,6 +103,7 @@ public final class EntryGate {
         Path head = null;
         Path base = null;
         String author = null;
+        long authorId = 0;
         Optional<Part> part = Optional.of(Part.ALL);
         List<String> paths = new ArrayList<>();
         boolean stray = false;
@@ -108,6 +116,7 @@ public final class EntryGate {
             }
             switch (args[i]) {
                 case "--author" -> author = i + 1 < args.length ? args[++i] : null;
+                case "--author-id" -> authorId = i + 1 < args.length ? accountId(args[++i]) : -1;
                 case "--base" -> base = i + 1 < args.length ? Path.of(args[++i]) : null;
                 case "--part" -> part = i + 1 < args.length ? Part.fromId(args[++i]) : Optional.empty();
                 default -> {
@@ -117,9 +126,10 @@ public final class EntryGate {
                 }
             }
         }
-        if (stray || head == null || author == null || author.isBlank() || paths.isEmpty() || part.isEmpty()) {
-            console.error("usage: EntryGate <head-root> --author <login> [--base <base-root>] [--part all|rules|kind]"
-                    + " (@changed.txt | -- <changed-path>...)");
+        if (stray || head == null || author == null || author.isBlank() || authorId < 0 || paths.isEmpty()
+                || part.isEmpty()) {
+            console.error("usage: EntryGate <head-root> --author <login> [--author-id <id>] [--base <base-root>]"
+                    + " [--part all|rules|kind] (@changed.txt | -- <changed-path>...)");
             return 2;
         }
         List<String> changed;
@@ -130,7 +140,7 @@ public final class EntryGate {
             return 2;
         }
         Request request = new Request(head.toAbsolutePath().normalize(),
-                Optional.ofNullable(base).map(p -> p.toAbsolutePath().normalize()), changed, author);
+                Optional.ofNullable(base).map(p -> p.toAbsolutePath().normalize()), changed, author, authorId);
         List<Finding> findings = new ArrayList<>(part.get() == Part.KIND ? oneEntry(request) : check(request, facts));
         if (!Finding.refused(findings) && part.get() != Part.RULES) {
             findings.addAll(kindChecks(request, facts, console));
@@ -157,13 +167,16 @@ public final class EntryGate {
         }
         String path = request.changed().getFirst();
         Optional<EntryPath> named = EntryPath.parse(path);
-        if (named.isEmpty()) {
+        if (named.isEmpty() && !path.equals(Publishers.FILE)) {
             return List.of(Finding.error(path, "not an entry path: a pull request changes one"
                     + " bots/<owner>__<repo>.json or plugins/<id>.json, nothing else."));
         }
         if (request.base().isEmpty()) {
             return List.of(Finding.error(path, "the check ran without --base, so whose entry this was cannot be"
                     + " told."));
+        }
+        if (named.isEmpty()) {
+            return PublishersCheck.check(request.head(), request.base().get(), request.authorId());
         }
         try {
             return checkPath(request, named.get(), facts);
@@ -183,12 +196,13 @@ public final class EntryGate {
             return List.of(Finding.error(path, "the catalog's current copy of this file does not read, so whose"
                     + " entry it is cannot be told; the admin replaces it."));
         }
+        boolean admin = isAdmin(base, request.authorId());
         Path file = request.head().resolve(path);
         if (Files.isSymbolicLink(file)) {
             return List.of(Finding.error(path, "a symbolic link; an entry is a plain JSON file."));
         }
         if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
-            return previous.map(held -> removal(path, held, request.author(), facts))
+            return previous.map(held -> admin ? List.<Finding>of() : removal(path, held, request.author(), facts))
                     .orElse(List.of(Finding.error(path, "removes a file the catalog does not hold.")));
         }
         Entry entry;
@@ -208,7 +222,7 @@ public final class EntryGate {
             return List.of(Finding.error(path, "the catalog already lists " + twin.get() + ", which differs only by"
                     + " case; GitHub reads both as one repository or one file."));
         }
-        return checkEntry(entry, path, request.author(), previous, facts);
+        return checkEntry(entry, path, request.author(), admin, previous, facts);
     }
 
     /**
@@ -219,6 +233,12 @@ public final class EntryGate {
      */
     public static List<Finding> checkEntry(Entry entry, String path, String author, Optional<? extends Entry> previous,
                                            EntryFacts facts) {
+        return checkEntry(entry, path, author, false, previous, facts);
+    }
+
+    /** {@link #checkEntry(Entry, String, String, Optional, EntryFacts)}, with rules 3 and 4 passed for an admin. */
+    static List<Finding> checkEntry(Entry entry, String path, String author, boolean admin,
+                                    Optional<? extends Entry> previous, EntryFacts facts) {
         List<Finding> findings = new ArrayList<>();
         if (!Entry.isSlug(entry.repo())) {
             findings.add(Finding.error(path, "\"repo\" is owner/name on GitHub; " + entry.repo() + " is not."));
@@ -229,7 +249,7 @@ public final class EntryGate {
             return findings;
         }
         previous.ifPresent(held -> {
-            if (!controls(author, held.repo(), held.tag(), facts)) {
+            if (!admin && !controls(author, held.repo(), held.tag(), facts)) {
                 findings.add(Finding.error(path, "this entry belongs to whoever controls " + held.repo()
                         + ", and only they may change it: " + author + " did not make its release " + held.tag()
                         + ". Publish under your own entry instead."));
@@ -250,7 +270,7 @@ public final class EntryGate {
             findings.add(Finding.error(path, "release " + entry.tag() + " is a "
                     + (release.get().draft() ? "draft" : "prerelease") + "; the catalog lists published releases."));
         }
-        if (!controls(author, entry.repo(), entry.tag(), facts)) {
+        if (!admin && !controls(author, entry.repo(), entry.tag(), facts)) {
             findings.add(Finding.error(path, ACTIONS_BOT.equals(release.get().authorLogin())
                     ? "release " + entry.tag() + " was made by a GitHub Action, and " + author + " is not "
                     + repo.get().ownerLogin() + ", so who controls " + entry.repo() + " cannot be told. Make the"
@@ -284,9 +304,22 @@ public final class EntryGate {
         return List.of(Finding.error(path, "only whoever controls " + held.repo() + " may remove this entry."));
     }
 
+    /**
+     * Whether {@code authorId} is an admin in the base tree's {@code publishers.json}. One that does not read
+     * makes nobody an admin: the exception is lost, never granted.
+     */
+    private static boolean isAdmin(Path base, long authorId) {
+        try {
+            return Publishers.read(base.resolve(Publishers.FILE)).isAdmin(authorId);
+        } catch (IOException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     /** What {@link Part#KIND} needs before it reads the entry, when rule 1 ran in another step. */
     private static List<Finding> oneEntry(Request request) {
-        if (request.changed().size() == 1 && EntryPath.parse(request.changed().getFirst()).isPresent()) {
+        if (request.changed().size() == 1 && (EntryPath.parse(request.changed().getFirst()).isPresent()
+                || isPublishers(request))) {
             return List.of();
         }
         return List.of(Finding.error(String.join(", ", request.changed()), "the kind's checks read exactly one"
@@ -298,6 +331,7 @@ public final class EntryGate {
      * matched again here, since they reach git and a URL and {@link Part#KIND} runs without rules 2–5.
      */
     private static List<Finding> kindChecks(Request request, EntryFacts facts, Console console) {
+        if (isPublishers(request)) return List.of();
         String path = request.changed().getFirst();
         Path file = request.head().resolve(path);
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) return List.of();
@@ -362,6 +396,21 @@ public final class EntryGate {
 
     private static Entry read(Path file, EntryPath.Kind kind) throws IOException {
         return kind == EntryPath.Kind.BOT ? BotEntry.read(file) : PluginEntry.read(file);
+    }
+
+    /** A pull request that changes {@code publishers.json} alone: no entry, so no kind's check. */
+    private static boolean isPublishers(Request request) {
+        return request.changed().equals(List.of(Publishers.FILE));
+    }
+
+    /** An account id as GitHub prints it, or {@code -1}, which the usage check refuses. */
+    private static long accountId(String text) {
+        try {
+            long id = Long.parseLong(text.trim());
+            return id < 0 ? -1 : id;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     private static boolean same(String a, String b) {

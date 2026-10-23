@@ -6,8 +6,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * {@code publishers.json}: the accounts the maintainer ranked, edited by an admin only (a pull request touching
- * it is never merged automatically). Everyone not listed is {@link Rank#COMMUNITY}.
+ * {@code publishers.json}: the accounts the maintainer ranked, changed only by a pull request an admin opened
+ * ({@link PublishersCheck}, 2026-10-23), which is merged like an entry. Everyone not listed is
+ * {@link Rank#COMMUNITY}.
  *
  * <p>An account is its GitHub <b>id</b>, which survives a rename; the login is there for a person reading the
  * file and is never compared.
@@ -30,6 +31,11 @@ public record Publishers(List<Publisher> admin, List<Publisher> trusted) {
         if (admin.stream().anyMatch(p -> p.id() == ownerId)) return Rank.ADMIN;
         if (trusted.stream().anyMatch(p -> p.id() == ownerId)) return Rank.TRUSTED;
         return Rank.COMMUNITY;
+    }
+
+    /** Whether the account {@code id} is an admin; {@code 0}, an unknown account, never is. */
+    public boolean isAdmin(long id) {
+        return id > 0 && admin.stream().anyMatch(p -> p.id() == id);
     }
 
     /** Reads {@code file}; a missing file ranks nobody. */

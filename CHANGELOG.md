@@ -19,6 +19,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **An admin may change anyone's catalog entry and the ranks.** `EntryGate --author-id <id>`: when the pull
+  request's author is an admin in the catalog's current `publishers.json`, by account id, the rules on who controls
+  the repository and the existing entry pass; the release must still be published and the kind's checks still run.
+  A pull request that changes `publishers.json` alone (`PublishersCheck`) passes only for an admin, keeps at least
+  one admin and lists no account twice, and `ListingPolicy` merges it with no daily limit.
 - **`com.botmaker.cli.catalog`, the model of `botmaker-catalog`** (one list of bots and plugins, replacing the
   plugin registry and the topic): entry files `bots/<owner>__<repo>.json` (`{repo, tag}`) and
   `plugins/<id>.json` (`{id, repo, tag}`), `publishers.json` ranks (`Rank`: admin, trusted, community, by owner

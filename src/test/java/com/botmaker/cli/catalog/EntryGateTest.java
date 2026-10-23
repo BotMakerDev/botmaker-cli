@@ -17,6 +17,7 @@ class EntryGateTest {
 
     private static final String SDK = "plugins/com.botmaker.sdk.json";
     private static final String BOT = "bots/somedev__firestone.json";
+    private static final long ADMIN_ID = 330995542;
 
     @TempDir
     Path head;
@@ -115,6 +116,39 @@ class EntryGateTest {
     }
 
     @Test
+    void an_admin_may_change_somebody_elses_entry() throws IOException {
+        admins();
+        facts.release("BotMakerDev/botmaker-sdk", "v2.2.0", "somebody-else");
+        write(head, SDK, "{\"id\":\"com.botmaker.sdk\",\"repo\":\"BotMakerDev/botmaker-sdk\",\"tag\":\"v2.2.0\"}");
+        assertEquals(List.of(), check("BotMakerDev", ADMIN_ID, SDK));
+        assertRefused(check("mallory", 9, SDK), "only they may change it");
+    }
+
+    @Test
+    void an_admin_may_remove_somebody_elses_entry() throws IOException {
+        admins();
+        Files.delete(head.resolve(SDK));
+        assertEquals(List.of(), check("BotMakerDev", ADMIN_ID, SDK));
+    }
+
+    @Test
+    void a_login_that_matches_an_admin_but_not_its_id_is_no_admin() throws IOException {
+        admins();
+        Files.delete(head.resolve(SDK));
+        assertRefused(check("Admin", 0, SDK), "only whoever controls");
+        assertRefused(check("Admin", 12345, SDK), "only whoever controls");
+    }
+
+    @Test
+    void an_admin_still_needs_a_published_release() throws IOException {
+        admins();
+        write(head, SDK, "{\"id\":\"com.botmaker.sdk\",\"repo\":\"BotMakerDev/botmaker-sdk\",\"tag\":\"v9\"}");
+        assertRefused(check("BotMakerDev", ADMIN_ID, SDK), "no GitHub Release v9");
+        facts.releases.put("BotMakerDev/botmaker-sdk@v9", new EntryFacts.Release("LiQiyeDev", true, false));
+        assertRefused(check("BotMakerDev", ADMIN_ID, SDK), "draft");
+    }
+
+    @Test
     void a_changed_path_is_never_read_as_a_flag() {
         assertEquals(2, EntryGate.run(new String[]{head.toString(), "--author", "somedev", "--base",
                 base.toString(), "--author", "victim", BOT}, facts), "a path outside -- or @file is refused");
@@ -154,8 +188,8 @@ class EntryGateTest {
     @Test
     void without_the_base_tree_nothing_is_decided() throws IOException {
         write(head, BOT, "{\"repo\":\"somedev/firestone\",\"tag\":\"v1.2.0\"}");
-        assertRefused(EntryGate.check(new EntryGate.Request(head, Optional.empty(), List.of(BOT), "somedev"), facts),
-                "without --base");
+        assertRefused(EntryGate.check(new EntryGate.Request(head, Optional.empty(), List.of(BOT), "somedev", 0),
+                facts), "without --base");
     }
 
     @Test
@@ -180,7 +214,17 @@ class EntryGateTest {
     }
 
     private List<Finding> check(String author, String... changed) {
-        return EntryGate.check(new EntryGate.Request(head, Optional.of(base), List.of(changed), author), facts);
+        return check(author, 0, changed);
+    }
+
+    private List<Finding> check(String author, long authorId, String... changed) {
+        return EntryGate.check(new EntryGate.Request(head, Optional.of(base), List.of(changed), author, authorId),
+                facts);
+    }
+
+    /** The catalog's current publishers.json: one admin, BotMakerDev, by id. */
+    private void admins() throws IOException {
+        write(base, Publishers.FILE, "{\"admin\":[{\"id\":" + ADMIN_ID + ",\"login\":\"Admin\"}],\"trusted\":[]}");
     }
 
     private static void assertRefused(List<Finding> findings, String expected) {

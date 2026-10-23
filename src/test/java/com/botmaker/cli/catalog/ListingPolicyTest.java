@@ -65,6 +65,19 @@ class ListingPolicyTest {
     }
 
     @Test
+    void a_publishers_change_merges_without_the_daily_limit() {
+        assertEquals(ListingPolicy.Kind.MERGE, decide(true,
+                List.of(new ListingPolicy.Change(Publishers.FILE, "modified")), List.of(NOW, NOW, NOW)).decision());
+        assertEquals(ListingPolicy.Kind.HOLD, ListingPolicy.decide(new ListingPolicy.Facts("somedev", true, NOW,
+                List.of(new ListingPolicy.Change(Publishers.FILE, "modified")), List.of(), false)).decision(),
+                "main's publishers.json moved after the check");
+        assertEquals(ListingPolicy.Kind.HOLD, decide(false,
+                List.of(new ListingPolicy.Change(Publishers.FILE, "modified")), List.of()).decision());
+        assertEquals(ListingPolicy.Kind.HOLD, decide(true, List.of(new ListingPolicy.Change(Publishers.FILE,
+                "modified"), NEW_BOT), List.of()).decision());
+    }
+
+    @Test
     void the_facts_file_reads_and_the_decision_prints_as_the_workflow_expects() throws IOException {
         ListingPolicy.Facts facts = ListingPolicy.Facts.read("""
                 {"author":"somedev","checksPassed":true,"now":"2026-10-23T18:00:00Z",
@@ -77,6 +90,6 @@ class ListingPolicyTest {
 
     private static ListingPolicy.Decision decide(boolean green, List<ListingPolicy.Change> changes,
                                                  List<Instant> recent) {
-        return ListingPolicy.decide(new ListingPolicy.Facts("somedev", green, NOW, changes, recent));
+        return ListingPolicy.decide(new ListingPolicy.Facts("somedev", green, NOW, changes, recent, true));
     }
 }
