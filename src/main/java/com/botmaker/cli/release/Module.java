@@ -14,8 +14,8 @@ import java.util.Optional;
  * that follows.
  *
  * <p><b>Not every submodule is here, and that is the distinction the dashboard reports as <i>not released
- * by release.sh</i>.</b> {@code botmaker-gallery} and {@code botmaker-plugin-registry} are data
- * repositories with no artifact. Neither has a flag, and the script answers {@code unknown arg} to one
+ * by release.sh</i>.</b> {@code botmaker-plugin-registry} is a data repository with no artifact
+ * ({@code botmaker-gallery} was the other until 2026-10-23). It has no flag, and the script answers {@code unknown arg} to one
  * invented for them. {@code botmaker-dashboard} was that case too until 2026-09-17: it is an application
  * nothing resolves, but it is an installable one now (rpm + deb from its own {@code package} job), so it
  * is tagged like Studio — last, and forced by the cli whose release rules it carries.

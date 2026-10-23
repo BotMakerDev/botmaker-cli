@@ -27,7 +27,7 @@ import java.util.Set;
  */
 public final class Umbrella {
 
-    /** {@code botmaker-gallery} is deliberately absent: data-only, never released, not a release's business. */
+    /** {@code botmaker-plugin-registry} is deliberately absent: data-only, never released, not a release's business. */
     private static final List<Module> PUSHABLE = Order.DECIDE;
 
     private Umbrella() {
