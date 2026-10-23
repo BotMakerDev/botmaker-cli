@@ -34,7 +34,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   serves the coordinate at `tag`, `plugin validate`'s checks pass on it, and the jar's plugin id is the entry's.
   `ListingPolicy` merges, waits (a fourth new entry in 24 hours) or holds, with no manual path. `IndexCommand`
   writes `catalog.json` from GitHub's facts and each pom read as data (`PomFacts`), running no entry's code.
-  `EntryGate` takes the changed paths only after `--` or from an `@file`, never as flags.
+  `EntryGate` takes the changed paths only after `--` or from an `@file`, never as flags. `--part rules` checks
+  rules 1–5 only and `--part kind` the kind's checks only, so the catalog runs an entry's code in a step that holds
+  no token.
 - **`plugin publish` writes a catalog entry**, `plugins/<id>.json` with `{id, repo, tag}`, checks it by the
   catalog's rules (a published GitHub Release at the tag, made by you) and opens its pull request on
   `botmaker-catalog`. `--name`, `--description`, `--tags` and `--min-contract-version` are gone: the catalog

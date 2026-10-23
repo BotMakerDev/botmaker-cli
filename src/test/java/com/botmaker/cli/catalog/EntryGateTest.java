@@ -161,6 +161,22 @@ class EntryGateTest {
     @Test
     void the_invocation_is_checked_before_anything_runs() {
         assertEquals(2, EntryGate.run(new String[]{head.toString()}, facts));
+        assertEquals(2, EntryGate.run(new String[]{head.toString(), "--author", "somedev", "--part", "some",
+                "--", BOT}, facts));
+    }
+
+    @Test
+    void the_rules_part_runs_no_kind_check_and_the_kind_part_still_wants_one_entry() throws IOException {
+        write(head, BOT, "{\"repo\":\"somedev/firestone\",\"tag\":\"v1.2.0\"}");
+        assertEquals(0, EntryGate.run(new String[]{head.toString(), "--author", "somedev", "--base",
+                base.toString(), "--part", "rules", "--", BOT}, facts), "no Maven build of the bot");
+        assertEquals(1, EntryGate.run(new String[]{head.toString(), "--author", "somedev", "--part", "kind",
+                "--", BOT, "README.md"}, facts));
+        assertEquals(1, EntryGate.run(new String[]{head.toString(), "--author", "somedev", "--part", "kind",
+                "--", "catalog.json"}, facts));
+        write(head, BOT, "{\"repo\":\"somedev/firestone\",\"tag\":\"--upload-pack=x\"}");
+        assertEquals(1, EntryGate.run(new String[]{head.toString(), "--author", "somedev", "--part", "kind",
+                "--", BOT}, facts), "a tag that would reach git as a flag");
     }
 
     private List<Finding> check(String author, String... changed) {

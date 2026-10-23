@@ -38,7 +38,7 @@ class ModuleTest {
         assertTrue(Module.byFlag("--gallery").isEmpty());
         assertTrue(Module.byFlag("--gamebot").isEmpty(), "templates went on 2026-10-23");
         assertEquals(Optional.of(Module.DASHBOARD), Module.byFlag("--dashboard"));
-        assertTrue(Module.byDirectory("botmaker-plugin-registry").isEmpty());
+        assertTrue(Module.byDirectory("botmaker-catalog").isEmpty());
     }
 
     @Test

@@ -43,7 +43,7 @@ import java.util.stream.Stream;
  *
  * <pre>
  * java -cp … com.botmaker.cli.catalog.EntryGate &lt;head-root&gt; --author &lt;login&gt; [--base &lt;base-root&gt;]
- *      (@changed.txt | -- &lt;changed-path&gt;…)
+ *      [--part all|rules|kind] (@changed.txt | -- &lt;changed-path&gt;…)
  * </pre>
  *
  * <p>Exit code: {@code 0} passes, {@code 1} refused, {@code 2} bad invocation.
@@ -73,6 +73,18 @@ public final class EntryGate {
         }
     }
 
+    /**
+     * Which rules one run checks. validate.yml runs {@link #RULES} with its token and {@link #KIND} in a later step
+     * without one, since a plugin's constructor runs in this JVM; the author's own run checks {@link #ALL}.
+     */
+    enum Part {
+        ALL, RULES, KIND;
+
+        static Optional<Part> fromId(String id) {
+            return Stream.of(values()).filter(p -> p.name().equalsIgnoreCase(id)).findFirst();
+        }
+    }
+
     private EntryGate() {}
 
     public static void main(String[] args) {
@@ -84,6 +96,7 @@ public final class EntryGate {
         Path head = null;
         Path base = null;
         String author = null;
+        Optional<Part> part = Optional.of(Part.ALL);
         List<String> paths = new ArrayList<>();
         boolean stray = false;
         // Changed paths are file names a pull request chose, so none is ever read as a flag: they come after
@@ -96,6 +109,7 @@ public final class EntryGate {
             switch (args[i]) {
                 case "--author" -> author = i + 1 < args.length ? args[++i] : null;
                 case "--base" -> base = i + 1 < args.length ? Path.of(args[++i]) : null;
+                case "--part" -> part = i + 1 < args.length ? Part.fromId(args[++i]) : Optional.empty();
                 default -> {
                     if (head == null) head = Path.of(args[i]);
                     else if (args[i].startsWith("@") && paths.isEmpty()) paths.add(args[i]);
@@ -103,8 +117,8 @@ public final class EntryGate {
                 }
             }
         }
-        if (stray || head == null || author == null || author.isBlank() || paths.isEmpty()) {
-            console.error("usage: EntryGate <head-root> --author <login> [--base <base-root>]"
+        if (stray || head == null || author == null || author.isBlank() || paths.isEmpty() || part.isEmpty()) {
+            console.error("usage: EntryGate <head-root> --author <login> [--base <base-root>] [--part all|rules|kind]"
                     + " (@changed.txt | -- <changed-path>...)");
             return 2;
         }
@@ -117,8 +131,8 @@ public final class EntryGate {
         }
         Request request = new Request(head.toAbsolutePath().normalize(),
                 Optional.ofNullable(base).map(p -> p.toAbsolutePath().normalize()), changed, author);
-        List<Finding> findings = new ArrayList<>(check(request, facts));
-        if (!Finding.refused(findings)) {
+        List<Finding> findings = new ArrayList<>(part.get() == Part.KIND ? oneEntry(request) : check(request, facts));
+        if (!Finding.refused(findings) && part.get() != Part.RULES) {
             findings.addAll(kindChecks(request, facts, console));
         }
         for (Finding finding : findings) {
@@ -270,13 +284,29 @@ public final class EntryGate {
         return List.of(Finding.error(path, "only whoever controls " + held.repo() + " may remove this entry."));
     }
 
-    /** The bot or plugin checks for the one entry a passing pull request adds or changes. */
+    /** What {@link Part#KIND} needs before it reads the entry, when rule 1 ran in another step. */
+    private static List<Finding> oneEntry(Request request) {
+        if (request.changed().size() == 1 && EntryPath.parse(request.changed().getFirst()).isPresent()) {
+            return List.of();
+        }
+        return List.of(Finding.error(String.join(", ", request.changed()), "the kind's checks read exactly one"
+                + " entry path; run the rules first."));
+    }
+
+    /**
+     * The bot or plugin checks for the one entry a passing pull request adds or changes. The repo and tag are
+     * matched again here, since they reach git and a URL and {@link Part#KIND} runs without rules 2–5.
+     */
     private static List<Finding> kindChecks(Request request, EntryFacts facts, Console console) {
         String path = request.changed().getFirst();
         Path file = request.head().resolve(path);
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) return List.of();
         try {
             Entry entry = read(file, EntryPath.parse(path).orElseThrow().kind());
+            if (!Entry.isSlug(entry.repo()) || !TAG.matcher(entry.tag()).matches()) {
+                return List.of(Finding.error(path, "\"repo\" or \"tag\" is not what the rules allow; run the rules"
+                        + " first."));
+            }
             Optional<Catalog> catalog = Catalog.read(request.head().resolve(Catalog.FILE));
             Mvn mvn = new Mvn(console);
             return switch (entry) {
