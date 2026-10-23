@@ -126,6 +126,37 @@ class CatalogBuilderTest {
     }
 
     @Test
+    void derived_facts_are_checked_again() throws IOException {
+        DerivedFacts bad = new DerivedFacts(Map.of("com.botmaker.sdk", new DerivedFacts.PluginFacts("BotMaker SDK",
+                "v0.11.0", List.of("com.github.BotMakerDev:botmaker-studio-api:0.11.0"))), derived.botPlugins());
+        Catalog catalog = CatalogBuilder.build(root, publishers, facts, bad, NOW);
+        assertTrue(catalog.plugins().isEmpty(), "an editor dependency a bot's pom must never declare");
+        assertTrue(catalog.bots().isEmpty());
+
+        DerivedFacts snapshot = new DerivedFacts(derived.plugins(),
+                Map.of("somedev/firestone", List.of(new DerivedFacts.Pin("com.botmaker.sdk", "2.2.0-SNAPSHOT"))));
+        assertEquals(List.of(), CatalogBuilder.build(root, publishers, facts, snapshot, NOW).bots());
+    }
+
+    @Test
+    void a_symbolic_link_is_not_read() throws IOException {
+        Path secret = Files.writeString(root.resolve("secret.txt"), "{\"repo\":\"a/b\",\"tag\":\"v1\"}");
+        Files.createSymbolicLink(root.resolve("bots/a__b.json"), secret);
+        facts.repo("a/b", 5, "", null);
+        assertTrue(CatalogBuilder.build(root, publishers, facts, derived, NOW).bots().stream()
+                .noneMatch(b -> b.repo().equals("a/b")));
+    }
+
+    @Test
+    void a_previous_row_is_reused_only_for_the_same_repository() throws IOException {
+        write(CatalogBuilder.build(root, publishers, facts, derived, NOW));
+        entry("plugins/com.botmaker.sdk.json", "{\"id\":\"com.botmaker.sdk\",\"repo\":\"BotMakerDev/other\",\"tag\":\"v2.1.0\"}");
+        facts.repo("BotMakerDev/other", 1, "", null);
+        assertTrue(CatalogBuilder.build(root, publishers, facts, new DerivedFacts(Map.of(), Map.of()), LATER)
+                .plugins().isEmpty());
+    }
+
+    @Test
     void the_json_reads_back_as_written() throws IOException {
         Catalog catalog = CatalogBuilder.build(root, publishers, facts, derived, NOW);
         write(catalog);

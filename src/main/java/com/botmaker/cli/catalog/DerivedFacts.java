@@ -7,11 +7,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * What only building or loading an entry tells: a plugin's own name and pom facts, the catalog plugins a bot's pom
- * declares. index.yml's {@code derive} job computes it with a read-only token and uploads it as
- * {@code facts.json}; its {@code publish} job, which holds the write token, only reads it — through
- * {@link CatalogJson#strict()}, so a field the schema lacks is refused rather than carried into
- * {@code catalog.json}.
+ * What an entry's pom at its tag says: a plugin's name and pom facts, the catalog plugins a bot declares. Read from
+ * the pom as data — no build, no entry's code — because the job that derives it holds the write token, and one job
+ * running every plugin's code would let one plugin write the facts of another (2026-10-23 security review).
+ * Still untrusted: the author controls the pom and can move the tag, so {@link CatalogBuilder} checks every value
+ * again.
  *
  * @param plugins    by plugin id
  * @param botPlugins by bot {@code owner/repo}
@@ -21,7 +21,7 @@ public record DerivedFacts(Map<String, PluginFacts> plugins, Map<String, List<Pi
     /**
      * A plugin as its jar and pom at the entry's tag say.
      *
-     * @param name               its {@code StudioPlugin.displayName()}
+     * @param name               its pom's {@code <name>}, else the repository name
      * @param minContractVersion the oldest contract its pom accepts
      * @param editorDependencies {@code groupId:artifactId:version} it needs on the editor's classpath and does not
      *                           bring (its {@code optional} dependencies)

@@ -3,6 +3,7 @@ package com.botmaker.cli.registry;
 import com.botmaker.cli.Console;
 import com.botmaker.cli.Mvn;
 import com.botmaker.cli.Subjects;
+import com.botmaker.cli.catalog.EditorDependencies;
 import com.botmaker.cli.validate.CheckResult;
 import com.botmaker.cli.validate.PluginSubject;
 import com.botmaker.cli.validate.PluginValidator;
@@ -225,31 +226,7 @@ public final class RegistryGate {
      * entry can, and a hand-written entry is exactly what a pull request may be.
      */
     static String editorDependenciesRefusal(List<String> editorDependencies) {
-        List<String> seen = new java.util.ArrayList<>();
-        for (String entry : editorDependencies) {
-            String[] parts = entry == null ? new String[0] : entry.trim().split(":");
-            if (parts.length != 3 || parts[0].isBlank() || parts[1].isBlank() || parts[2].isBlank()) {
-                return "editorDependencies holds \"" + entry + "\", which is not a"
-                        + " groupId:artifactId:version. Studio writes each of these into the pom of every"
-                        + " project that installs this plugin, so it has to be a coordinate Maven resolves.";
-            }
-            String coordinate = parts[0] + ":" + parts[1];
-            if (seen.contains(coordinate)) {
-                return "editorDependencies names " + coordinate + " twice. Two versions of one artifact on a"
-                        + " classpath is the least diagnosable failure this platform has.";
-            }
-            seen.add(coordinate);
-            if (PluginValidator.contractGroup(parts[0])
-                    && (PluginValidator.CONTRACT_ARTIFACT.equals(parts[1])
-                    || PluginValidator.TOOLKIT_ARTIFACT.equals(parts[1]))) {
-                return "editorDependencies names " + coordinate + ", which a bot's pom must never declare."
-                        + " The host already has the contract — a second copy makes a contract class two"
-                        + " different classes — and the toolkit is this plugin's own dependency at compile"
-                        + " scope, so it arrives with the plugin. Take it out of the entry and declare it in"
-                        + " the plugin's pom.";
-            }
-        }
-        return null;
+        return EditorDependencies.refusal(editorDependencies);
     }
 
     /**
