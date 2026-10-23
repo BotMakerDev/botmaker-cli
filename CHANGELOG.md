@@ -23,6 +23,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   account id), and `CatalogBuilder`, which derives `catalog.json` — rank, coordinate, GitHub's description, topics,
   stars and fork parent, a plugin's name and pom facts, a bot's catalog plugins. A row the build could not derive
   keeps its previous facts while its tag is unchanged; `builtAt` moves only when the content did.
+- **The catalog's check, merge policy and index** (`com.botmaker.cli.catalog`). `EntryGate` refuses a pull request
+  unless it changes exactly one entry file (no symbolic link, no name differing only by case from a listed one),
+  the file is its schema and named after its content, its author made the GitHub Release at `tag` (a release made
+  by `github-actions[bot]` passes only for the repository's owner), an existing entry is changed or removed only by
+  whoever controls its base copy, and the release is published. `BotChecks`: the pom pins a catalog plugin at a
+  released version, the bot compiles, a class holds `public static void main(String[])`. `PluginChecks`: JitPack
+  serves the coordinate at `tag`, `plugin validate`'s checks pass on it, and the jar's plugin id is the entry's.
+  `ListingPolicy` merges, waits (a fourth new entry in 24 hours) or holds, with no manual path. `IndexCommand`
+  writes `catalog.json` from GitHub's facts and each pom read as data (`PomFacts`), running no entry's code.
+  `EntryGate` takes the changed paths only after `--` or from an `@file`, never as flags.
+- **`plugin publish` writes a catalog entry**, `plugins/<id>.json` with `{id, repo, tag}`; `--name`,
+  `--description` and `--tags` are gone (the name is the pom's, the rest GitHub's).
 - **`bot unpublish --repo owner/repo`** removes the topic; the repository and its releases stay.
 - **`bot list`** lists every repository with the topic, forks included.
 
@@ -31,6 +43,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **Templates and the gallery repository.** `release --gamebot` and its template pin, gate and GitHub Release step;
   `bot publish --template` and `--dry-run`, the release archive check and the gallery pull request; the
   `com.botmaker.cli.gallery` package (`GalleryGate`, `CatalogBuilder`, `ListingPolicy`, tiers, vetting records).
+- **The plugin registry's gate**, `com.botmaker.cli.registry` (`RegistryGate`, `Registry`, `RegistryEntry`,
+  `Bundled`): the catalog's check replaces it.
 
 - **The `records` check of `plugin validate`**: the contract's `@Records` went with the macro recorder.
 

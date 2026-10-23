@@ -19,7 +19,8 @@ from `release.sh`.
 | `packaging/nfpm.yaml`, the dnf/apt repositories | `packaging.md` |
 | the `plugin`/`bot` verbs, `MovedCommand`, `doctor`, `BlankProject` | `nouns.md` |
 | `plugin publish`'s entry, `verifiedVersion` | `publish-entry.md` |
-| `RegistryGate`, `Bundled`, `Subjects`, `Console.reportAside` | `registry-gate.md` |
+| `com.botmaker.cli.catalog` (the check, the merge policy, the index) | `../docs/superpowers/specs/2026-10-23-catalog-design.md` |
+| `Subjects`, `Console.reportAside` | `registry-gate.md` (the registry's gate, removed 2026-10-23; history) |
 | the `EDITORS` check, why no JavaFX | `no-javafx.md` |
 | `validate/StubContexts` | `stub-contexts.md` |
 | `Mvn`, classpath resolution | `maven.md` |
@@ -28,7 +29,7 @@ from `release.sh`.
 ## Rules
 
 - **`com.botmaker.cli.validate` and `com.botmaker.cli.release` print nothing, spawn no UI and know no command
-  line.** A rule added to `ValidateCommand` is a rule the registry will not enforce: put it in
+  line.** A rule added to `ValidateCommand` is a rule the catalog will not enforce: put it in
   `PluginValidator`, as a `Check` (`two-artifacts.md`).
 - **picocli stays `optional`**, so a consumer of the main artifact resolves no parser.
 - **Every release side effect goes through `Runner`**; a direct write on a write path ignores `--dry-run`. The
@@ -44,7 +45,7 @@ from `release.sh`.
 ## Building
 
 ```bash
-mvn test        # CommandLineTest, PomsTest, PluginValidatorTest, RegistryTest
+mvn test        # CommandLineTest, PomsTest, PluginValidatorTest, EntryGateTest
 mvn install     # the library and the -all jar
 ```
 

@@ -49,7 +49,7 @@ final class PluginNewCommand implements Callable<Integer> {
      * is not: two plugins from one author share it.
      */
     @Option(names = "--plugin-id",
-            description = "The StudioPlugin id; must be unique in the registry. Default: <group>.<name>")
+            description = "The StudioPlugin id; must be unique in the catalog. Default: <group>.<name>")
     private String pluginId;
 
     @Option(names = "--plugin-name", description = "The name a user reads. Default: the artifact id, titled")

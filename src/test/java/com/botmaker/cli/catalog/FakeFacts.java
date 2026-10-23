@@ -7,12 +7,23 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** {@link EntryFacts} from maps the test fills. */
-final class FakeFacts implements EntryFacts {
+/** {@link EntryFacts} and poms from maps the test fills. */
+final class FakeFacts implements EntryFacts, PomFacts.Source {
 
     final Map<String, Repo> repos = new HashMap<>();
     final Map<String, Release> releases = new HashMap<>();
     final Set<String> jitpack = new HashSet<>();
+    final Map<String, String> poms = new HashMap<>();
+
+    FakeFacts pom(String slug, String tag, String xml) {
+        poms.put(slug + "@" + tag, xml);
+        return this;
+    }
+
+    @Override
+    public Optional<String> pom(String repo, String tag) {
+        return Optional.ofNullable(poms.get(repo + "@" + tag));
+    }
 
     FakeFacts repo(String slug, long ownerId, String description, String parent) {
         return repo(slug, ownerId, slug, description, parent);

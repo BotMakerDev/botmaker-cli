@@ -28,14 +28,14 @@ public final class Mvn {
     }
 
     /** What one Maven invocation produced. */
-    record Result(int exitCode, String output) {
+    public record Result(int exitCode, String output) {
 
-        boolean ok() {
+        public boolean ok() {
             return exitCode == 0;
         }
 
         /** The last few lines, for an error message that does not paste a whole build log at the user. */
-        String tail(int lines) {
+        public String tail(int lines) {
             List<String> all = output.lines().filter(line -> !line.isBlank()).toList();
             return String.join("\n", all.subList(Math.max(0, all.size() - lines), all.size()));
         }
@@ -49,7 +49,7 @@ public final class Mvn {
      * lines of downloads. {@link #runInteractive} is the other half, for the invocations whose output
      * <em>is</em> the point.
      */
-    Result run(Path dir, String... goals) throws IOException {
+    public Result run(Path dir, String... goals) throws IOException {
         List<String> command = command(dir, goals);
         console.step("$ " + String.join(" ", command));
         Process process = new ProcessBuilder(command)

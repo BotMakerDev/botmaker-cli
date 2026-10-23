@@ -18,10 +18,10 @@ import java.util.Set;
  * {@link #fromCoordinate} validates what the world can actually download — the one the registry's CI asks,
  * and the only one that catches a plugin that works locally and publishes a pom nobody can resolve.
  *
- * <p><b>Public, and only {@link #fromCoordinate} is.</b> The registry's gate
- * ({@link com.botmaker.cli.registry.RegistryGate}) resolves a published coordinate through this same class,
- * so that "the gate downloads what a bot project would download" is one implementation rather than two.
- * {@link #fromDirectory} stays package-private: a working copy is the author's question, and the registry
+ * <p><b>Public, and only {@link #fromCoordinate} is.</b> The catalog's check
+ * ({@link com.botmaker.cli.catalog.PluginChecks}) resolves a published coordinate through this same class,
+ * so that "the check downloads what a bot project would download" is one implementation rather than two.
+ * {@link #fromDirectory} stays package-private: a working copy is the author's question, and the catalog
  * has no working copy to ask about.
  */
 public final class Subjects {

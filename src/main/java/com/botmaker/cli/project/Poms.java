@@ -95,6 +95,11 @@ public final class Poms {
         return new Dependency(group, text(root, "artifactId"), version, "");
     }
 
+    /** The project's own {@code <name>}, as declared; {@code ""} when it has none. */
+    public static String name(Path pom) throws IOException {
+        return text(parse(pom).getDocumentElement(), "name");
+    }
+
     /**
      * The {@code <properties>} block, as declared. A pom with no block answers an empty map.
      *

@@ -96,8 +96,15 @@ public final class CatalogBuilder {
                 .orElse(built);
     }
 
+    /** Every entry {@link #build} reads: plugins first, then bots. */
+    static List<Entry> entries(Path root) throws IOException {
+        List<Entry> entries = new ArrayList<>(read(root, EntryPath.PLUGINS, PluginEntry::read, PluginEntry::id));
+        entries.addAll(read(root, EntryPath.BOTS, BotEntry::read, b -> b.repo().toLowerCase(Locale.ROOT)));
+        return entries;
+    }
+
     /** A released version as a pom pins it: digits and dots, an optional {@code v}, no {@code -SNAPSHOT}. */
-    private static final Pattern VERSION = Pattern.compile("v?\\d+(\\.\\d+){0,3}");
+    static final Pattern VERSION =Pattern.compile("v?\\d+(\\.\\d+){0,3}");
 
     /** At most this long, no control characters: a name Studio shows as a label. */
     private static final Pattern NAME = Pattern.compile("[^\\p{Cntrl}]{1,80}");

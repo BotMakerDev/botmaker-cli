@@ -1,5 +1,10 @@
 # The registry's gate is in this module too
 
+> **Removed 2026-10-23.** The registry became `botmaker-catalog`, and its gate became
+> `com.botmaker.cli.catalog.EntryGate` with `BotChecks` and `PluginChecks` (spec:
+> `docs/superpowers/specs/2026-10-23-catalog-design.md` in the umbrella). `Bundled` went with it: no host bundles
+> a plugin since 2026-09-02. What follows is the history.
+
 `com.botmaker.cli.registry.RegistryGate` is what `botmaker-plugin-registry`'s CI runs on a pull request. It
 lives here for the same reason the validator is a library: **it must be the code the author already ran.**
 The registry's workflow resolves this module's *main* artifact and calls the gate; everything the gate adds

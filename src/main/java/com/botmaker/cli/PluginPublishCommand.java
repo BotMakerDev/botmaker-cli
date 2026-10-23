@@ -1,9 +1,10 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.catalog.CatalogJson;
+import com.botmaker.cli.catalog.EntryPath;
+import com.botmaker.cli.catalog.PluginEntry;
 import com.botmaker.cli.project.Poms;
 import com.botmaker.cli.project.Tags;
-import com.botmaker.cli.registry.Registry;
-import com.botmaker.cli.registry.RegistryEntry;
 import com.botmaker.cli.validate.CheckResult;
 import com.botmaker.cli.validate.PluginSubject;
 import com.botmaker.cli.validate.PluginValidator;
@@ -16,7 +17,6 @@ import picocli.CommandLine.ParentCommand;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -69,15 +69,6 @@ final class PluginPublishCommand implements Callable<Integer> {
             description = "Where the plugin's source lives. Required for a real run; without it this is a "
                     + "dry run, because an entry needs somewhere for a reader to go and look.")
     private String repo;
-
-    @Option(names = "--name", description = "Overrides the plugin's own displayName.")
-    private String displayName;
-
-    @Option(names = "--description", defaultValue = "", description = "One sentence, for the index.")
-    private String description;
-
-    @Option(names = "--tags", defaultValue = "", paramLabel = "<a,b,c>", description = "Comma separated.")
-    private String tags;
 
     /**
      * <b>{@code --tag}, not {@code --version}, and the name is forced rather than chosen.</b>
@@ -146,8 +137,10 @@ final class PluginPublishCommand implements Callable<Integer> {
             return 1;
         }
 
-        RegistryEntry entry = compose(subject, published, contractVersion);
-        String json = Registry.mapper().writerWithDefaultPrettyPrinter().writeValueAsString(entry);
+        Poms.Dependency self = Poms.coordinate(subject.pom());
+        String coordinate = self.groupId() + ":" + self.artifactId() + ":" + published;
+        PluginEntry entry = compose(subject, published);
+        String json = CatalogJson.strict().writeValueAsString(entry);
 
         if (dryRun || repo == null) {
             if (repo == null) {
@@ -159,10 +152,10 @@ final class PluginPublishCommand implements Callable<Integer> {
             console.out(json);
             return 0;
         }
-        if (!resolves(entry)) {
+        if (!resolves(coordinate)) {
             return 1;
         }
-        return openPullRequest(entry, json);
+        return openPullRequest(entry, coordinate, json);
     }
 
     /**
@@ -225,9 +218,8 @@ final class PluginPublishCommand implements Callable<Integer> {
      * against this working copy, and what is being asked is only whether the world can download what the
      * entry names.
      */
-    private boolean resolves(RegistryEntry entry) {
+    private boolean resolves(String coordinate) {
         Console console = parent.main().console();
-        String coordinate = entry.coordinate() + ":" + entry.verifiedVersion();
         try {
             parent.main().subjects().fromCoordinate(coordinate, Set.of());
             return true;
@@ -337,11 +329,10 @@ final class PluginPublishCommand implements Callable<Integer> {
         return companions;
     }
 
-    private RegistryEntry compose(PluginSubject subject, String published, String contractVersion)
-            throws IOException {
+    /** The catalog entry: the plugin's own id, the repository and the tag. Everything else is derived. */
+    private PluginEntry compose(PluginSubject subject, String published) {
         Console console = parent.main().console();
-        String id = "";
-        String name = "";
+        String id;
         try (PluginLoader loaded =
                      PluginLoader.open(subject.classpath().stream().map(Object::toString).toList())) {
             // The validator has already refused an empty load, so there is at least one plugin here. The
@@ -354,26 +345,8 @@ final class PluginPublishCommand implements Callable<Integer> {
             }
             StudioPlugin plugin = plugins.getFirst();
             id = plugin.id();
-            name = plugin.displayName();
         }
-
-        Poms.Dependency self = Poms.coordinate(subject.pom());
-
-        return new RegistryEntry(
-                id,
-                displayName != null ? displayName : name,
-                self.groupId() + ":" + self.artifactId(),
-                repo,
-                description,
-                List.of(tags.split("\\s*,\\s*")).stream().filter(t -> !t.isBlank()).toList(),
-                contractVersion,
-                editorDependencies(console, Poms.dependencies(subject.pom())),
-                // The tag the world can download, which is the version the registry's gate will resolve and
-                // run the same checks against. A verifiedAt with no version beside it is a date attached to
-                // no artifact — and the pom's own <version>, which stood here until 2026-09-04, is a date
-                // attached to an artifact only JitPack's tag happens to agree with.
-                published,
-                LocalDate.now().toString());
+        return new PluginEntry(id, repo == null ? "owner/name" : repo, published);
     }
 
     /**
@@ -383,7 +356,7 @@ final class PluginPublishCommand implements Callable<Integer> {
      * because a tool that asked a plugin author for a GitHub token would be asking for the one thing this
      * program has no business holding.
      */
-    private int openPullRequest(RegistryEntry entry, String json) throws IOException {
+    private int openPullRequest(PluginEntry entry, String coordinate, String json) throws IOException {
         Console console = parent.main().console();
         Path work = Files.createTempDirectory("botmaker-publish");
         Path clone = work.resolve("registry");
@@ -407,9 +380,9 @@ final class PluginPublishCommand implements Callable<Integer> {
         if (Files.isDirectory(cloned)) {
             clone = cloned;
         }
-        Path entries = clone.resolve(Registry.ENTRIES_DIRECTORY);
+        Path entries = clone.resolve(EntryPath.PLUGINS);
         if (!Files.isDirectory(entries)) {
-            console.error("no " + Registry.ENTRIES_DIRECTORY + "/ in " + REGISTRY_REPO + " — the registry is"
+            console.error("no " + EntryPath.PLUGINS + " in " + REGISTRY_REPO + " — the catalog is"
                     + " not published yet. Re-run with --dry-run and open the pull request by hand.");
             return 1;
         }
@@ -417,18 +390,17 @@ final class PluginPublishCommand implements Callable<Integer> {
         run(clone, "git", "checkout", "-b", branch);
         // The filename is the id, so an update rewrites this author's own file and a new plugin adds one:
         // either way the diff touches nothing anybody else's submission touches.
-        String file = Registry.ENTRIES_DIRECTORY + "/" + entry.id() + ".json";
-        Files.writeString(entries.resolve(entry.id() + ".json"), json + "\n");
+        String file = EntryPath.of(entry);
+        Files.writeString(clone.resolve(file), json + "\n");
         run(clone, "git", "add", file);
-        run(clone, "git", "commit", "-m", "registry: add " + entry.id());
+        run(clone, "git", "commit", "-m", "catalog: " + entry.id() + " " + entry.tag());
         if (run(clone, "git", "push", "-u", "origin", branch) != 0) {
             console.error("could not push the branch");
             return 1;
         }
         int opened = gh(clone, "pr", "create", "--repo", REGISTRY_REPO, "--title",
-                "Add " + entry.name() + " (" + entry.id() + ")", "--body",
-                "Adds `" + Registry.ENTRIES_DIRECTORY + "/" + entry.id() + ".json` — `"
-                        + entry.coordinate() + ":" + entry.verifiedVersion() + "`.\n\n"
+                "Plugin " + entry.id() + " " + entry.tag(), "--body",
+                "Adds or updates `" + file + "` — `" + coordinate + "`.\n\n"
                         + "Composed by `botmaker plugin publish`, which runs the same checks this repository's CI"
                         + " runs.\n\n```json\n" + json + "\n```");
         return opened == 0 ? 0 : 1;
