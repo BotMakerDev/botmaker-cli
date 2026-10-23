@@ -17,6 +17,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`com.botmaker.cli.catalog`, the model of `botmaker-catalog`** (one list of bots and plugins, replacing the
+  plugin registry and the topic): entry files `bots/<owner>__<repo>.json` (`{repo, tag}`) and
+  `plugins/<id>.json` (`{id, repo, tag}`), `publishers.json` ranks (`Rank`: admin, trusted, community, by owner
+  account id), and `CatalogBuilder`, which derives `catalog.json` — rank, coordinate, GitHub's description, topics,
+  stars and fork parent, a plugin's name and pom facts, a bot's catalog plugins. A row the build could not derive
+  keeps its previous facts while its tag is unchanged; `builtAt` moves only when the content did.
 - **`bot unpublish --repo owner/repo`** removes the topic; the repository and its releases stay.
 - **`bot list`** lists every repository with the topic, forks included.
 
