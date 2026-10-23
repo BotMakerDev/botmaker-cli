@@ -2,8 +2,9 @@
 
 `botmaker-catalog` holds one file per listed bot (`bots/<owner>__<repo>.json`, `{repo, tag}`, optionally
 `detached`) and per listed plugin (`plugins/<id>.json`, `{id, repo, tag}`), plus `publishers.json` (the ranks) and
-the generated `catalog.json`. Its three workflows call `com.botmaker.cli.catalog`, resolved from JitPack at the
-pinned `tools/botmaker-cli.version`. The spec is the umbrella's `docs/superpowers/specs/2026-10-23-catalog-design.md`;
+the generated `catalog.json`. Its three workflows call `com.botmaker.cli.catalog`, resolved from JitPack at this
+module's newest GitHub Release (`tools/resolve-cli.sh`; no version is stored there since 2026-10-23, so a release
+reaches open pull requests at their next run). The spec is the umbrella's `docs/superpowers/specs/2026-10-23-catalog-design.md`;
 `registry-gate.md` is the gate this replaced.
 
 The check lives here for the reason the validator is a library: **it must be the code the author already ran.**

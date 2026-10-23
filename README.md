@@ -91,9 +91,8 @@ botmaker plugin new discord-notifier --group com.example --plugin-id com.example
 
 ### `botmaker plugin validate [dir]`
 
-The checks, in the same code the catalog's check runs on a pull request. The catalog pins a released CLI
-(`tools/botmaker-cli.version` in `botmaker-catalog`), so until that pin moves it runs that release's checks,
-which may be fewer than this list:
+The checks, in the same code the catalog's check runs on a pull request. The catalog runs the newest released
+CLI, so until this version is released it runs that release's checks, which may be fewer than this list:
 
 | check | passes when |
 |---|---|
