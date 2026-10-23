@@ -1,8 +1,10 @@
 # Two nouns, and the duplication under `bot` is deliberate
 
 > **2026-10-23: no templates, no gallery.** `bot new --from` clones a published bot linked to its author (remote
-> `original`, nothing renamed); `bot publish` is repository + release + the topic `botmaker-bot`; `bot unpublish`
-> and `bot list` are new. `GalleryEntry`, `--template` and the gallery pull request below are history.
+> `original`, nothing renamed). `GalleryEntry`, `--template` and the gallery pull request below are history.
+> **Later that day, the catalog:** `bot publish` and `plugin publish` open an entry pull request on
+> `botmaker-catalog` (`CatalogPr`), `bot`/`plugin unpublish` a removal, `bot`/`plugin list` read `catalog.json`;
+> no topic is written.
 
 **`plugin` and `bot`, each with its own verbs (2026-09-05).** The four plugin verbs were the top level until
 then — `botmaker new`, `validate`, `run`, `publish` — and meant *plugin* while saying so nowhere, because

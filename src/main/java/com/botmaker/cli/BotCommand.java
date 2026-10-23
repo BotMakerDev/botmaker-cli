@@ -13,8 +13,8 @@ import java.util.concurrent.Callable;
  * {@code publish}. Every one of them automates something that already had a Studio UI or an obvious
  * {@code mvn} incantation. What had neither is the other half — a <b>bot</b>, and in particular a bot
  * published for others to start from. Since 2026-10-23 every published bot is a starting point: a
- * repository with a release and the topic {@code botmaker-bot}, found by GitHub's search, with no gallery
- * repository and no template kind.
+ * repository with a release and an entry in the catalog ({@code BotMakerDev/botmaker-catalog}), checked by
+ * machine and merged automatically, with no template kind.
  *
  * <p>A noun rather than four more verbs because {@code new} and {@code publish} already mean something here
  * and mean it about a plugin. {@code botmaker bot new} and {@code botmaker plugin new} being different
@@ -24,7 +24,7 @@ import java.util.concurrent.Callable;
 @Command(name = "bot",
         header = "Create, publish and list bot projects.",
         description = "Start blank or from a published bot, then publish the result — repository, release and "
-                + "the botmaker-bot topic — for anybody else to start from.",
+                + "its catalog entry — for anybody else to start from.",
         mixinStandardHelpOptions = true,
         synopsisSubcommandLabel = "<command>",
         subcommands = {BotNewCommand.class, BotPublishCommand.class, BotUnpublishCommand.class,

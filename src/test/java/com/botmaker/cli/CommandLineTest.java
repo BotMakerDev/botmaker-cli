@@ -8,9 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.function.Supplier;
-import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -199,17 +197,24 @@ class CommandLineTest {
         assertEquals("v0.1.0", applied(botPublish, "--tag"));
         assertEquals("me/farmbot", parse("bot", "unpublish", "--repo", "me/farmbot")
                 .subcommand().subcommand().matchedOptionValue("--repo", ""));
-        assertEquals("100", applied(parse("bot", "list").subcommand().subcommand(), "--limit"));
+        assertEquals("list", parse("bot", "list").subcommand().subcommand().commandSpec().name());
     }
 
-    /** Studio's Browse Bots finds a bot by its topic, so the topics a publish sets are GitHub's spelling. */
+    /** The catalog's verbs for a plugin: unpublish names the entry by id, list takes nothing. */
     @Test
-    void a_publish_lists_the_bot_by_its_topic_and_its_tags() {
-        assertEquals(List.of("botmaker-bot", "idle-game", "c-bot"),
-                BotPublishCommand.topics(List.of(" Idle _ Game!! ", "", "C# bot", "botmaker-detached", "idle-game")));
-        assertEquals(50, BotPublishCommand.asTopic("a".repeat(80)).length());
-        List<String> many = IntStream.range(0, 30).mapToObj(i -> "t" + i).toList();
-        assertEquals(BotPublishCommand.MAX_TOPICS, BotPublishCommand.topics(many).size());
+    void plugin_has_unpublish_and_list() {
+        assertEquals("com.example.thing", parse("plugin", "unpublish", "--id", "com.example.thing")
+                .subcommand().subcommand().matchedOptionValue("--id", ""));
+        assertEquals("list", parse("plugin", "list").subcommand().subcommand().commandSpec().name());
+        assertEquals(CommandLine.ExitCode.USAGE, exit("plugin", "unpublish"), "--id is required");
+        assertEquals(CommandLine.ExitCode.USAGE, exit("plugin", "publish", "--min-contract-version", "0.9.0"),
+                "the catalog derives the contract version; the option is gone");
+        assertEquals(CommandLine.ExitCode.USAGE, exit("bot", "publish", "--repo", "me/farmbot", "--tags", "a"),
+                "a bot's topics are its repository's own; the option is gone");
+    }
+
+    private static int exit(String... argv) {
+        return capture(() -> Main.run(argv)).exitCode;
     }
 
     /** {@code --from} is a repository, refused in any other shape before git is asked anything. */

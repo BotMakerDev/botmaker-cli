@@ -1,5 +1,9 @@
 # What `publish` puts in an entry, and why none of it is the pom's `<version>`
 
+> **2026-10-23:** the entry is `{id, repo, tag}` in `botmaker-catalog`; `minContractVersion` and
+> `editorDependencies` are derived by the catalog from the pom at the tag (`PomFacts`), and
+> `--min-contract-version` is gone. The tag reasoning below still holds.
+
 An entry is a set of pointers, and every one of them is followed before the pull request is opened. That is
 the same argument as the validator's: **a submission that fails in the registry's CI for a reason its author
 could not have seen coming is what this command exists to prevent**, and a pointer nobody has followed is

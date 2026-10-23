@@ -10,6 +10,7 @@ import java.lang.reflect.AccessFlag;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +26,7 @@ import java.util.stream.Stream;
  * </ol>
  *
  * <p>The build runs the bot's Maven plugins, which is acceptable only because validate.yml holds no secret and a
- * read-only token.
+ * read-only token, and the build gets neither: {@link Mvn#runUntrusted} clears its environment.
  */
 public final class BotChecks {
 
@@ -78,7 +79,7 @@ public final class BotChecks {
             throws IOException {
         List<Finding> pom = checkPom(clone.resolve("pom.xml"), path, pluginIds);
         if (Finding.refused(pom)) return pom;
-        Mvn.Result compiled = mvn.run(clone, "-B", "compile", "-Dmaven.test.skip");
+        Mvn.Result compiled = mvn.runUntrusted(clone, Duration.ofMinutes(20), "compile", "-Dmaven.test.skip");
         if (!compiled.ok()) {
             return List.of(Finding.error(path, "the bot does not compile at this tag:\n" + compiled.tail(15)));
         }

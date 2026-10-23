@@ -1,5 +1,9 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.catalog.BotEntry;
+import com.botmaker.cli.catalog.Entry;
+import com.botmaker.cli.catalog.EntryPath;
+import com.botmaker.cli.catalog.GitHubFacts;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -7,16 +11,11 @@ import picocli.CommandLine.ParentCommand;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
- * {@code botmaker bot publish} — repository, release, and the topic that lists it.
+ * {@code botmaker bot publish} — repository, release, and the catalog entry that lists it.
  *
  * <h2>Three steps, in one order, each refusing before the next</h2>
  *
@@ -24,30 +23,24 @@ import java.util.concurrent.Callable;
  *   <li><b>The repository</b> — {@code gh repo create --source . --push}, or a push when the working copy's
  *       {@code origin} already is that repository. A dirty tree is refused: what gets published is a commit,
  *       and a commit that omits the file the author is looking at is the confusing kind of wrong.</li>
- *   <li><b>The release</b> — {@code gh release create}. A bot is started from its newest release, so a
- *       listed bot with none behind it is something nobody can start from.</li>
- *   <li><b>The listing</b> — the topic {@link #TOPIC} on the repository, beside the author's tags as topics,
- *       and the description. Studio's Browse Bots finds bots by that topic (2026-10-23: no gallery repository,
- *       nothing stored but the repository's own metadata) and lists one whose release's pom declares a
- *       registry plugin.</li>
+ *   <li><b>The release</b> — {@code gh release create}, made as the signed-in user, which is what the catalog
+ *       reads as control of the repository.</li>
+ *   <li><b>The listing</b> — the entry {@code bots/<owner>__<repo>.json} ({@code {repo, tag}}), checked here by
+ *       the catalog's own rules 2–5 and then opened as a pull request on {@code botmaker-catalog}
+ *       ({@link CatalogPr}), which the catalog's checks merge when they pass (2026-10-23). The description, the
+ *       topics and the stars are the repository's own, read by the catalog.</li>
  * </ol>
  *
- * <p>{@code botmaker bot unpublish} takes the topic off; the repository and its releases stay.
+ * <p>{@code botmaker bot unpublish} opens the pull request removing the entry; the repository and its releases
+ * stay.
  */
 @Command(name = "publish",
-        header = "Publish this bot: repository, release, and the botmaker-bot topic.",
-        description = "Creates the repository, pushes, cuts the release, then adds the topic botmaker-bot that "
-                + "lists it in Studio's Browse Bots. A bot is listed when its release's pom declares a plugin "
-                + "from the registry.",
+        header = "Publish this bot: repository, release, and its catalog entry.",
+        description = "Creates the repository, pushes, cuts the release, then opens the pull request that lists "
+                + "it in the catalog. The catalog's checks merge it when the release's pom declares a catalog "
+                + "plugin, the bot compiles and a class holds main.",
         mixinStandardHelpOptions = true)
 final class BotPublishCommand implements Callable<Integer> {
-
-    /** The topic Studio's Browse Bots searches for. */
-    static final String TOPIC = "botmaker-bot";
-
-    /** GitHub's own limits on a repository's topics. */
-    static final int MAX_TOPICS = 20;
-    static final int MAX_TOPIC_LENGTH = 50;
 
     @ParentCommand
     private BotCommand parent;
@@ -58,14 +51,6 @@ final class BotPublishCommand implements Callable<Integer> {
     @Option(names = "--repo", paramLabel = "<owner/name>", required = true,
             description = "Where the bot's source lives on GitHub.")
     private String repo;
-
-    @Option(names = "--description", defaultValue = "",
-            description = "One sentence, shown in Browse Bots. Empty keeps the repository's.")
-    private String description;
-
-    @Option(names = "--tags", defaultValue = "", paramLabel = "<a,b,c>",
-            description = "Comma separated; each becomes a topic.")
-    private String tags;
 
     @Option(names = "--tag", defaultValue = "v0.1.0", paramLabel = "<tag>",
             description = "The release to cut. Default: ${DEFAULT-VALUE}")
@@ -79,46 +64,34 @@ final class BotPublishCommand implements Callable<Integer> {
             throw new IOException("no pom.xml in " + dir + " — point `botmaker bot publish` at a bot project");
         }
         String slug = BotNewCommand.slug(repo);
+        Optional<EntryPath> path = EntryPath.parse(EntryPath.of(new BotEntry(slug, tag, false)));
+        if (path.isEmpty()) {
+            console.error(slug + " cannot be listed: the catalog names a bot's file after owner/name, and this one"
+                    + " does not fit (letters, digits, '.', '-' and '_').");
+            return 1;
+        }
+        Optional<String> author = CatalogPr.login();
+        if (author.isEmpty()) {
+            console.error("`gh` is not signed in; run `gh auth login` first.");
+            return 1;
+        }
         if (!publishRepository(console, dir, slug) || !cutRelease(console, dir, slug)) {
             return 1;
         }
-        List<String> args = new ArrayList<>(List.of("repo", "edit", slug));
-        for (String topic : topics(List.of(tags.split(",")))) {
-            args.addAll(List.of("--add-topic", topic));
-        }
-        if (!description.isBlank()) {
-            args.addAll(List.of("--description", description.strip()));
-        }
-        if (Shell.gh(console, dir, args.toArray(String[]::new)) != 0) {
-            console.error("released " + tag + ", but could not add the topic " + TOPIC + " to " + slug
-                    + ", so it is not listed. GitHub takes at most " + MAX_TOPICS + " topics, counting the ones the"
-                    + " repository already has; re-run once `gh` can edit it.");
+        GitHubFacts facts = GitHubFacts.anonymousOrToken();
+        Optional<Entry> previous = CatalogPr.listed(facts, path.get());
+        // A fork that stopped following its original stays detached across releases.
+        BotEntry entry = new BotEntry(slug, tag,
+                previous.filter(BotEntry.class::isInstance).map(e -> ((BotEntry) e).detached()).orElse(false));
+        if (!CatalogPr.passes(console, entry, author.get(), previous, facts)) {
+            console.error("released " + tag + ", but the catalog would refuse the entry; no pull request opened.");
             return 1;
         }
-        console.step(slug + " is listed in Browse Bots once its release's pom declares a registry plugin.");
-        return 0;
-    }
-
-    /**
-     * The topics a publish adds: {@link #TOPIC} first, then each tag as GitHub takes a topic, at most
-     * {@link #MAX_TOPICS}. A tag spelling a {@code botmaker-} topic is dropped: those are the listing's own.
-     */
-    static List<String> topics(List<String> tags) {
-        Set<String> out = new LinkedHashSet<>(List.of(TOPIC));
-        for (String tag : tags) {
-            String topic = asTopic(tag);
-            if (!topic.isEmpty() && !topic.startsWith("botmaker-") && out.size() < MAX_TOPICS) {
-                out.add(topic);
-            }
+        if (CatalogPr.open(console, CatalogPr.Change.put(entry, "botmaker bot publish"), author.get()) != 0) {
+            return 1;
         }
-        return List.copyOf(out);
-    }
-
-    /** A tag as GitHub accepts a topic: lowercase letters, digits and single dashes, at most 50 long. */
-    static String asTopic(String tag) {
-        String topic = tag.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
-        return topic.length() <= MAX_TOPIC_LENGTH ? topic
-                : topic.substring(0, MAX_TOPIC_LENGTH).replaceAll("-+$", "");
+        console.step(slug + " " + tag + " is listed once the catalog's checks pass on the pull request.");
+        return 0;
     }
 
     /**

@@ -12,8 +12,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **`bot new --from owner/repo` clones the bot, linked to its author.** It clones the newest release (or `--tag`),
   starts branch `main` there and names the remote `original`, as Studio's Browse Bots does; nothing is renamed, so
   the author's later releases merge in. `--package` is for a blank project only.
-- **`bot publish` lists the bot by a GitHub topic.** After the repository and the release it adds the topic
-  `botmaker-bot` (and each `--tags` value as a topic), which Studio's Browse Bots searches. `--repo` is required.
+- **`bot publish` lists the bot in the catalog.** After the repository and the release it runs the catalog's rules
+  on the entry `bots/<owner>__<repo>.json` (`{repo, tag}`), then opens its pull request on
+  `BotMakerDev/botmaker-catalog` with `gh` (a fork unless you can push there), which the catalog's checks merge.
+  `--repo` is required; `--description` and `--tags` are gone (the catalog reads the repository's own).
 
 ### Added
 
@@ -33,10 +35,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   `ListingPolicy` merges, waits (a fourth new entry in 24 hours) or holds, with no manual path. `IndexCommand`
   writes `catalog.json` from GitHub's facts and each pom read as data (`PomFacts`), running no entry's code.
   `EntryGate` takes the changed paths only after `--` or from an `@file`, never as flags.
-- **`plugin publish` writes a catalog entry**, `plugins/<id>.json` with `{id, repo, tag}`; `--name`,
-  `--description` and `--tags` are gone (the name is the pom's, the rest GitHub's).
-- **`bot unpublish --repo owner/repo`** removes the topic; the repository and its releases stay.
-- **`bot list`** lists every repository with the topic, forks included.
+- **`plugin publish` writes a catalog entry**, `plugins/<id>.json` with `{id, repo, tag}`, checks it by the
+  catalog's rules (a published GitHub Release at the tag, made by you) and opens its pull request on
+  `botmaker-catalog`. `--name`, `--description`, `--tags` and `--min-contract-version` are gone: the catalog
+  derives the name, the contract version and the editor dependencies from the pom at the tag, the rest from GitHub.
+- **`bot unpublish --repo owner/repo` and `plugin unpublish --id <id>`** open the pull request removing the entry,
+  after checking you control it; the repository and its releases stay.
+- **`bot list` and `plugin list`** print what `catalog.json` lists, with each row's rank (Official, Trusted,
+  Community).
+- **The catalog's bot check builds with a cleared environment** (`Mvn.runUntrusted`): the system Maven, never the
+  project's `mvnw`, only `PATH`, `JAVA_HOME`, `MAVEN_HOME`, `LANG` and `TMPDIR` plus an empty `HOME` (no `gh`
+  login, `settings.xml` or SSH key to read), at most 20 minutes, then killed with every process it started.
 
 ### Removed
 

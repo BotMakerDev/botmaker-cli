@@ -77,9 +77,14 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
 
     @Override
     public Optional<String> pom(String repo, String tag) {
+        return raw(repo, tag, "pom.xml");
+    }
+
+    /** One file of {@code repo} at {@code ref}, at most 2 MB; empty when it is absent or GitHub did not answer. */
+    public Optional<String> raw(String repo, String ref, String path) {
         try {
-            HttpResponse<byte[]> response = get("https://raw.githubusercontent.com/" + repo + "/" + encode(tag)
-                    + "/pom.xml", Duration.ofSeconds(30), false);
+            HttpResponse<byte[]> response = get("https://raw.githubusercontent.com/" + repo + "/" + encode(ref)
+                    + "/" + path, Duration.ofSeconds(30), false);
             if (response.statusCode() != 200 || response.body().length > MAX_POM_BYTES) return Optional.empty();
             return Optional.of(new String(response.body(), StandardCharsets.UTF_8));
         } catch (IOException e) {

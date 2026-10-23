@@ -25,13 +25,13 @@ import java.util.concurrent.Callable;
  * {@code --quiet} is not known until parsing is done.
  */
 @Command(name = "plugin",
-        header = "Create, check, try and publish a Studio plugin.",
-        description = "The loop a plugin author lives in: start from the example plugin, run the registry's "
-                + "own checks, try it inside Studio, submit it.",
+        header = "Create, check, try, publish and list Studio plugins.",
+        description = "The loop a plugin author lives in: start from the example plugin, run the catalog's "
+                + "own checks, try it inside Studio, list it in the catalog.",
         mixinStandardHelpOptions = true,
         synopsisSubcommandLabel = "<command>",
         subcommands = {PluginNewCommand.class, PluginValidateCommand.class, PluginRunCommand.class,
-                PluginPublishCommand.class})
+                PluginPublishCommand.class, PluginUnpublishCommand.class, PluginListCommand.class})
 final class PluginCommand implements Callable<Integer> {
 
     @ParentCommand

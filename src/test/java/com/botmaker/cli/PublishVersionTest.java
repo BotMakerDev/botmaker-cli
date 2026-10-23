@@ -51,46 +51,6 @@ class PublishVersionTest {
         assertNull(PluginPublishCommand.snapshotRefusal("1.2.0"));
     }
 
-    // ---- the contract version ---------------------------------------------------------------------------
-
-    /**
-     * The defect these hold shut, found on 2026-09-05 by publishing the SDK for real: the entry read
-     * {@code "minContractVersion" : "${botmaker.studioapi.version}"}. Every module in this project pins its
-     * BotMaker upstreams through a property, so this is the ordinary shape of a plugin's pom here — and a
-     * property name copied into a registry entry is a compatibility floor nothing can be compared against.
-     */
-    @Test
-    void an_unresolved_property_is_refused_and_the_refusal_names_the_way_out() {
-        String refusal = PluginPublishCommand.contractVersionRefusal("${botmaker.studioapi.version}");
-
-        assertNotNull(refusal, "a property name must not reach the registry as a version");
-        assertTrue(refusal.contains("${botmaker.studioapi.version}"), refusal);
-        assertTrue(refusal.contains("--min-contract-version"),
-                "the refusal must name the option that fixes it: " + refusal);
-    }
-
-    /** A committed pom on main says {@code X.Y.Z-SNAPSHOT}; only a tag's pom names a released contract. */
-    @Test
-    void a_snapshot_contract_version_is_refused_too() {
-        String refusal = PluginPublishCommand.contractVersionRefusal("0.4.3-SNAPSHOT");
-
-        assertNotNull(refusal);
-        assertTrue(refusal.contains("released botmaker-studio-api version"),
-                "the refusal must say where a module of this project finds the real answer: " + refusal);
-    }
-
-    @Test
-    void no_contract_dependency_at_all_is_refused() {
-        assertNotNull(PluginPublishCommand.contractVersionRefusal(""));
-        assertNotNull(PluginPublishCommand.contractVersionRefusal(null));
-    }
-
-    @Test
-    void a_resolved_contract_version_is_accepted() {
-        assertNull(PluginPublishCommand.contractVersionRefusal("v0.0.4"));
-        assertNull(PluginPublishCommand.contractVersionRefusal("0.0.4"));
-    }
-
     // ---- the tag ----------------------------------------------------------------------------------------
 
     /**
