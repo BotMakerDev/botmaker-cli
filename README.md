@@ -6,7 +6,7 @@ under `bot`, everything a bot author does that is not writing the bot.
 ```bash
 botmaker plugin new discord-notifier   # start a plugin project from the example plugin
 cd discord-notifier
-botmaker plugin validate               # the plugin registry's checks, run locally
+botmaker plugin validate               # the catalog's plugin checks, run locally
 botmaker plugin run --project MyBot    # build it, add it to a bot, open Studio on the result
 botmaker plugin publish --repo me/discord-notifier
 ```
@@ -15,7 +15,7 @@ botmaker plugin publish --repo me/discord-notifier
 botmaker bot new farmbot                     # a blank bot project — no plugin, no SDK
 botmaker bot new farmer --from alice/farmbot # …or somebody's published bot, linked to its author
 cd farmbot
-botmaker bot publish --repo me/farmbot --description "Harvests the farm"
+botmaker bot publish --repo me/farmbot
 ```
 
 ## Installing it
@@ -91,9 +91,9 @@ botmaker plugin new discord-notifier --group com.example --plugin-id com.example
 
 ### `botmaker plugin validate [dir]`
 
-The checks, in the same code the registry's CI runs on a pull request. The registry pins a released CLI
-(`BOTMAKER_CLI_VERSION` in its `validate.yml`), so until that pin moves it runs that release's checks, which
-may be fewer than this list:
+The checks, in the same code the catalog's check runs on a pull request. The catalog pins a released CLI
+(`tools/botmaker-cli.version` in `botmaker-catalog`), so until that pin moves it runs that release's checks,
+which may be fewer than this list:
 
 | check | passes when |
 |---|---|
@@ -114,7 +114,7 @@ may be fewer than this list:
 catches a plugin which builds on your machine and publishes a pom nobody else can resolve.
 
 **A local pass is not a promise the pull request passes.** Two of the checks ask whether an id is already
-claimed, and locally nothing is claimed — the registry's index holds those answers. The report says so.
+claimed, and locally nothing is claimed — the catalog holds those answers. The report says so.
 
 **And a pass is never a safety claim.** A plugin runs arbitrary code inside Studio's process. Every check
 here asks whether a plugin *works*.
@@ -135,23 +135,30 @@ the whole plugin set can write the file that names them — that is Studio's job
 
 ### `botmaker plugin publish`
 
-Validates, composes the registry entry from what the plugin already says about itself, and opens the pull
-request with `gh`. `--dry-run` prints the entry and opens nothing.
+Validates, composes the catalog entry `{id, repo, tag}`, and opens the pull request on `botmaker-catalog`
+with `gh`. `--dry-run` prints the entry and opens nothing. The catalog's check runs on the pull request and
+merges it when it passes; nobody reviews it.
 
 ```bash
-botmaker plugin publish --repo me/discord-notifier --description "Sends a message when a bot finishes" \
-                        --tags notifications --dry-run
+botmaker plugin publish --repo me/discord-notifier --dry-run
+botmaker plugin unpublish --id com.example.discord   # the pull request removing the entry
+botmaker plugin list                                 # what catalog.json lists, with ranks
 ```
 
-**The version in the entry is a git tag, not your pom's `<version>`.** JitPack builds a tag on demand and
-serves the artifact under that tag whatever the pom says, so the entry names the newest tag on your working
-copy; `--tag v1.2.0` overrides it. A `-SNAPSHOT` is refused here rather than in the registry's CI — a freshly
-generated plugin is `0.1.0-SNAPSHOT`, and nobody can download that. Before the pull request is opened, the
-coordinate is resolved exactly as the registry's gate will resolve it, and `--repo` is confirmed to exist.
+**The entry is three pointers; the catalog derives the rest.** The id is read from the jar. The name, the
+description, the contract version and the editor dependencies are derived from the pom and the repository at
+the tag, so nobody retypes them.
 
-The pull request adds **one file**, `plugins/<plugin-id>.json` — the registry's `index.json` is generated
-from those files by its own CI and nobody edits it. So two authors publishing on the same day open two pull
-requests with no line in common, and a second plugin cannot take an id git already holds a file for.
+**The tag is a git tag, not your pom's `<version>`.** JitPack builds a tag on demand and serves the artifact
+under that tag whatever the pom says, so the entry names the newest tag on your working copy; `--tag v1.2.0`
+overrides it. A `-SNAPSHOT` is refused here — a freshly generated plugin is `0.1.0-SNAPSHOT`, and nobody can
+download that. Before the pull request is opened, the coordinate is resolved and the catalog's rules 2–5 run
+here: the entry's name and schema, that you made the GitHub Release at the tag, that an existing entry is yours
+to change, and that the release is published.
+
+The pull request adds **one file**, `plugins/<plugin-id>.json`; `catalog.json` is generated by the catalog's own
+CI. So two authors publishing on the same day open two pull requests with no line in common, and a second
+plugin cannot take an id git already holds a file for.
 
 `--dry-run`'s stdout is the entry and nothing else, so `botmaker plugin publish --dry-run >
 plugins/<id>.json` is the by-hand path when `gh` is not installed. The validation report goes to stderr.
@@ -159,8 +166,8 @@ plugins/<id>.json` is the by-hand path when `gh` is not installed. The validatio
 ## `botmaker bot` — about a bot
 
 The verbs above are all about a plugin. This is the other half: every **published bot** is a starting point —
-a GitHub repository with a release and the topic `botmaker-bot`, which Studio's Browse Bots and New Project
-search. There is no gallery repository and no template kind (2026-10-23).
+a GitHub repository with a release and an entry in `botmaker-catalog`, which Studio's Browse Bots and New
+Project list. There is no template kind (2026-10-23).
 
 ### `botmaker bot new <name>`
 
@@ -182,16 +189,17 @@ its author's code on your computer: read it before you run it.
 ### `botmaker bot publish`, `unpublish`, `list`
 
 ```bash
-botmaker bot publish --repo me/farmbot --description "Harvests the farm" --tags farming,idle
+botmaker bot publish --repo me/farmbot --tag v1.0.0
 botmaker bot unpublish --repo me/farmbot
 botmaker bot list
 ```
 
 `publish` runs three steps, each refusing before the next: create the repository and push (a dirty tree is
 refused; a directory that is not a repository yet is initialised and committed), cut the release `--tag` names
-(default `v0.1.0`), then add the topic `botmaker-bot` — and each tag as a topic — with `gh repo edit`. Browse
-Bots lists the bot when its release's pom declares a plugin from the registry. `unpublish` takes the topic
-off and keeps everything else; `list` is `gh search repos --topic botmaker-bot`, forks included.
+(default `v0.1.0`), then open the catalog's pull request adding `bots/<owner>__<repo>.json` (`{repo, tag}`).
+The catalog's check merges it when the tag's pom declares a catalog plugin, the bot compiles and a class holds
+`main`. The description and the topics are the repository's own, read by the catalog. `unpublish` opens the
+pull request removing the entry and keeps the repository; `list` prints what `catalog.json` lists, with ranks.
 
 ## `botmaker doctor` — the tools everything else needs
 
@@ -240,8 +248,9 @@ gates.
 
 The main artifact is a **library**, and the executable jar is the `all` classifier. It holds two packages
 other repositories call: `com.botmaker.cli.validate` — the author's `botmaker plugin validate` and the
-registry's CI run the same code, so a submission never fails for a reason its author could not have seen —
-and `com.botmaker.cli.release`, which the dashboard runs in-process.
+catalog's check run the same code, so a submission never fails for a reason its author could not have seen —
+`com.botmaker.cli.catalog`, the catalog's check, merge policy and index, and `com.botmaker.cli.release`, which
+the dashboard runs in-process.
 
 ```xml
 <dependency>

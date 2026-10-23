@@ -18,8 +18,8 @@ from `release.sh`.
 | `com.botmaker.cli.release`: `Plan`, `Forcing`, `Order`, gates, `Runner`, `Actions`, `ReleaseCommand` | `release-library.md` |
 | `packaging/nfpm.yaml`, the dnf/apt repositories | `packaging.md` |
 | the `plugin`/`bot` verbs, `MovedCommand`, `doctor`, `BlankProject` | `nouns.md` |
-| `plugin publish`'s entry, `verifiedVersion` | `publish-entry.md` |
-| `com.botmaker.cli.catalog` (the check, the merge policy, the index) | `../docs/superpowers/specs/2026-10-23-catalog-design.md` |
+| `plugin publish`'s entry, its tag | `publish-entry.md` |
+| `com.botmaker.cli.catalog` (the check, the merge policy, the index), `CatalogPr` | `catalog-gate.md` |
 | `Subjects`, `Console.reportAside` | `registry-gate.md` (the registry's gate, removed 2026-10-23; history) |
 | the `EDITORS` check, why no JavaFX | `no-javafx.md` |
 | `validate/StubContexts` | `stub-contexts.md` |
