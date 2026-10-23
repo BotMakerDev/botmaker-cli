@@ -4,7 +4,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -53,7 +52,7 @@ public final class Gates {
             record(runner, refusals, VersionsGate.check(umbrella, module, force));
         }
         // A build per module whose tag pins an upstream outside this release: slower than the reads above,
-        // cheaper than the SDK's and the templates' below, and the one check of what the tag compiles against
+        // cheaper than the SDK's below, and the one check of what the tag compiles against
         // (2026-10-12: SDK v1.4.3 needed a shared method no shared release had).
         for (GateVerdict verdict : BuildsAtPinsGate.check(umbrella, releasing, force)) {
             record(runner, refusals, verdict);
@@ -66,18 +65,6 @@ public final class Gates {
         }
         if (GatePlan.sdkGates(modules)) {
             record(runner, refusals, SdkGates.sdkPlugin(umbrella, force));
-        }
-        // After the SDK gates, because the SDK is what a template pins: asking whether the templates still
-        // compile is worth more once the thing they compile against has answered for itself.
-        for (String directory : GatePlan.templates(modules)) {
-            // A template cut without the SDK is compiled at the SDK tag its own tag will pin, not at the pin it
-            // replaces (TemplatePin.targets); one cut with the SDK waits for that SDK's tag (afterBump).
-            boolean cut = modules.stream().anyMatch(m -> m.template() && m.directory().equals(directory));
-            record(runner, refusals, GatePlan.pinMoves(directory, modules)
-                    ? TemplateGate.deferred(directory)
-                    : TemplateGate.check(umbrella, directory, force, cut
-                            ? Optional.ofNullable(TemplatePin.targets(umbrella, releasing).get(Module.SDK))
-                            : Optional.empty()));
         }
         return List.copyOf(refusals);
     }

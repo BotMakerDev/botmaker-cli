@@ -4,11 +4,8 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
-- **Retire the `botmaker-gamebot` template** (the user's call, 2026-10-22: "gamebot is outdated and should be
-  removed for now"; its own plan, after the Screens audit plan). It reaches the release library (`--gamebot`,
-  `TemplatePin`, `TemplateGate`, `TemplateRelease`, `Order`), Studio's New Project template list, the gallery's
-  vetted pin, the umbrella `CLAUDE.md` (Templates, Releasing) and `tools/gate-snapshot.sh`; `botmaker-base` then stays
-  the one template, which starts with no screen in its map.
+- **`bot new --from`, `bot publish`'s topic step, `bot unpublish` and `bot list` are unexercised against GitHub**
+  (2026-10-23): their `git`/`gh` calls landed unrun.
 - **`plugin publish`'s real path is unexercised.** Its two `gh` fixes (`repo fork --remote=false` with a
   repository argument; the direct-branch arm for the registry's own maintainer) landed unrun. It reports a
   missing registry `index.json` by name — check that message first on the first real run.

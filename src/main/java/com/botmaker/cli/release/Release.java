@@ -285,9 +285,7 @@ public final class Release {
                                             java.util.function.Consumer<String> at) {
         runner.say("Releasing " + module.directory() + " " + version.tag());
         // An APK has no CHANGELOG.md and nothing else to commit, so it takes no message — as the pilot has
-        // since the stamp arrived and the other three stopped passing an empty one. The question is what a
-        // release COMMITS and not what it stamps: a template has no changelog either, and a pom pin to
-        // rewrite, so conditioning this on hasChangelog() would have tagged the bump without committing it.
+        // since the stamp arrived and the other three stopped passing an empty one.
         String message = module.commitsOnRelease()
                 ? "release: " + module.shortName() + " " + version.tag() : "";
         if (!wait && !runner.dryRun()) {
@@ -332,10 +330,6 @@ public final class Release {
                     + " git -C " + module.directory() + " push origin HEAD " + version.tag() + ".\n"
                     + "     Every module after it pins that tag, so the release stops here.");
         }
-        if (module.template()) {
-            at.accept("github release");
-            TemplateRelease.publish(runner, module, version);
-        }
         at.accept("dependents' pins");
         followed.addAll(PomVersions.follow(runner, umbrella, module, version, releasing.keySet()));
         if (module == Module.STUDIO) {
@@ -359,20 +353,7 @@ public final class Release {
             at.accept("fallback versions");
             Fallback.bump(runner, umbrella, releasing);
         }
-        if (module.template()) {
-            // The other path into a project: what a bot copied FROM A TEMPLATE pins, which is the template's
-            // own pom. Same sentence as the line above, about the other door.
-            at.accept("template pins");
-            Map<Module, Version> pins = TemplatePin.targets(umbrella, releasing);
-            TemplatePin.bump(runner, umbrella, module, pins);
-            Version sdk = pins.get(Module.SDK);
-            if (sdk != null) {
-                // The pin moved, so the thing the decide pass compiled is not the thing about to be tagged.
-                // This is the last moment a refusal costs nothing: Order.TAG puts the templates last.
-                TemplateGate.afterBump(runner, umbrella, module, sdk);
-            }
-        }
-        // Silent for every module without the property, which is nine of the eleven.
+        // Silent for every module without the property.
         at.accept("japicmp baseline");
         Japicmp.bump(runner, umbrella, module);
         at.accept("changelog stamp");

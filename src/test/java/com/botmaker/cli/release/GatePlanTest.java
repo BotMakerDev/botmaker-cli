@@ -33,35 +33,9 @@ class GatePlanTest {
     }
 
     @Test
-    void aTemplateTakesNeitherCiGate() {
-        // botmaker-gamebot has no .github/workflows at all, so a CI verdict on it is neither a pass nor a
-        // failure, and "can this module's own CI build it standalone" has no subject. It is out of the
-        // JitPack gate through onJitpack() and out of the changelog gate through hasChangelog(), both
-        // already. What it takes is the template gate: does the project a user copies compile.
-        assertFalse(GatePlan.ci(ALL).contains(Module.GAMEBOT));
-        assertFalse(GatePlan.ciDeps(ALL).contains(Module.GAMEBOT));
-        assertFalse(GatePlan.changelog(ALL).contains(Module.GAMEBOT));
-        assertFalse(GatePlan.jitpackPlugins(ALL).contains(Module.GAMEBOT));
-        // …and it is not exempt by being un-buildable: it has a pom, which is what the gate compiles.
-        assertTrue(Module.GAMEBOT.mavenBuild());
-        assertTrue(GatePlan.templates(Set.of(Module.GAMEBOT)).contains(Module.GAMEBOT.directory()));
-    }
-
-    @Test
-    void aTemplatesPinMovesOnlyWhenTheRunCutsBothItAndWhatItPins() {
-        String gamebot = Module.GAMEBOT.directory();
-        assertTrue(GatePlan.pinMoves(gamebot, Set.of(Module.SDK, Module.GAMEBOT)));
-        // The SDK alone leaves the pin where it is, so the template is compiled at it as before.
-        assertFalse(GatePlan.pinMoves(gamebot, Set.of(Module.SDK)));
-        assertFalse(GatePlan.pinMoves(gamebot, Set.of(Module.GAMEBOT)));
-        // The blank template pins nothing and is no module, so no run moves anything of it.
-        assertFalse(GatePlan.pinMoves(TemplateGate.BASE, Set.of(Module.SDK, Module.GAMEBOT)));
-    }
-
-    @Test
     void theCountsAreTheScriptsOwnLoops() {
-        // Fifteen modules: two APKs take no gate, and the template takes none of these four; Studio,
-        // remote-server and the dashboard take every gate but JitPack's.
+        // Fourteen modules: two APKs take no gate but CI's; Studio, remote-server and the dashboard take every
+        // gate but JitPack's.
         assertEquals(14, GatePlan.ci(ALL).size());
         assertEquals(12, GatePlan.changelog(ALL).size());
         assertEquals(12, GatePlan.ciDeps(ALL).size());
@@ -84,6 +58,6 @@ class GatePlanTest {
     @Test
     void gatesAreListedInDecideOrderSoTheOutputReadsAsThePlanDid() {
         assertEquals(GatePlan.ciDeps(ALL),
-                Order.DECIDE.stream().filter(Module::mavenBuild).filter(m -> !m.template()).toList());
+                Order.DECIDE.stream().filter(Module::mavenBuild).toList());
     }
 }

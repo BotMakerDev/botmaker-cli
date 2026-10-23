@@ -17,9 +17,8 @@ from `release.sh`.
 | the two artifacts, `com.botmaker.cli.validate`, picocli, the shade setup | `two-artifacts.md` |
 | `com.botmaker.cli.release`: `Plan`, `Forcing`, `Order`, gates, `Runner`, `Actions`, `ReleaseCommand` | `release-library.md` |
 | `packaging/nfpm.yaml`, the dnf/apt repositories | `packaging.md` |
-| the `plugin`/`bot` verbs, `MovedCommand`, `doctor`, `BlankProject`, `GalleryEntry` | `nouns.md` |
+| the `plugin`/`bot` verbs, `MovedCommand`, `doctor`, `BlankProject` | `nouns.md` |
 | `plugin publish`'s entry, `verifiedVersion` | `publish-entry.md` |
-| `com.botmaker.cli.gallery` (`GalleryGate`, `CatalogBuilder`, `ListingPolicy`) | `gallery-gate.md` |
 | `RegistryGate`, `Bundled`, `Subjects`, `Console.reportAside` | `registry-gate.md` |
 | the `EDITORS` check, why no JavaFX | `no-javafx.md` |
 | `validate/StubContexts` | `stub-contexts.md` |

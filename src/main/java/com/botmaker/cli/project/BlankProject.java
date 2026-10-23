@@ -7,8 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * The blank bot project {@code botmaker bot new} writes: a pom, one {@code main}, and the template
- * declaration.
+ * The blank bot project {@code botmaker bot new} writes: a pom and one {@code main}.
  *
  * <h2>It names no plugin, and that is the whole point</h2>
  *
@@ -52,8 +51,6 @@ public final class BlankProject {
         files.put("pom.xml", pomXml(name, packageName));
         files.put("src/main/java/" + packageName.replace('.', '/') + "/" + className(name) + ".java",
                 mainClass(packageName, className(name)));
-        // No template declaration: `botmaker bot publish --template` reads the package off the class holding
-        // main (2026-09-27).
         return files;
     }
 
@@ -79,7 +76,7 @@ public final class BlankProject {
      * The entry class's name: the project name in PascalCase.
      *
      * <p>{@code clicker-bot} becomes {@code ClickerBot}, matching what Studio's {@code sanitizeName} does to
-     * a repository name on install — so a project created here and one installed from the gallery are named
+     * a repository name on install — so a project created here and one installed in Studio are named
      * the same way.
      */
     public static String className(String name) {
@@ -130,8 +127,8 @@ public final class BlankProject {
      *
      * <p>Studio's {@code MavenService} writes the running feature version, and there that is right: it
      * creates a project on the machine that will build it. A project created <em>here</em> travels — it is
-     * one {@code bot publish} away from being a template somebody else downloads — so the running JVM is
-     * the one thing that must not reach the file. The first template published from this command was
+     * one {@code bot publish} away from being a bot somebody else starts from — so the running JVM is
+     * the one thing that must not reach the file. The first bot published from this command was
      * composed on a Java 27 box and would have declared {@code release 27} to every author on 25, whose
      * build answers {@code release version 27 not supported} for a project containing one
      * {@code println}.

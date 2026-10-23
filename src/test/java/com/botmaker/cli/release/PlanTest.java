@@ -13,7 +13,7 @@ class PlanTest {
     @Test
     void everyModuleHasALabelToPrintItselfWith() {
         // The plan block is `LABEL.get(module)`, so a module added to the enum and not to the map prints
-        // `null: 0.3.0 -> v0.3.0` — which is what botmaker-gamebot did on the day it was added.
+        // `null: 0.3.0 -> v0.3.0` — which is what a module added on 2026-09-21 did.
         assertEquals(EnumSet.allOf(Module.class), EnumSet.copyOf(Plan.LABEL.keySet()));
         for (Module module : Module.values()) {
             String label = Plan.LABEL.get(module);
@@ -28,8 +28,8 @@ class PlanTest {
     @Test
     void theLabelsInOneDecideGroupAreOneColumnWide() {
         // The padding is what aligns the colons in the printed block; it is per group of neighbours in
-        // Order.DECIDE rather than global, which is why this checks the group the worked bot joined.
-        assertEquals(Plan.LABEL.get(Module.DASHBOARD).length(), Plan.LABEL.get(Module.GAMEBOT).length());
+        // Order.DECIDE rather than global.
+        assertEquals(Plan.LABEL.get(Module.DASHBOARD).length(), Plan.LABEL.get(Module.REMOTE).length());
         assertEquals(Plan.LABEL.get(Module.REMOTE_SERVER).length(), Plan.LABEL.get(Module.REMOTE).length());
     }
 }

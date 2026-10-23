@@ -1,5 +1,9 @@
 # Two nouns, and the duplication under `bot` is deliberate
 
+> **2026-10-23: no templates, no gallery.** `bot new --from` clones a published bot linked to its author (remote
+> `original`, nothing renamed); `bot publish` is repository + release + the topic `botmaker-bot`; `bot unpublish`
+> and `bot list` are new. `GalleryEntry`, `--template` and the gallery pull request below are history.
+
 **`plugin` and `bot`, each with its own verbs (2026-09-05).** The four plugin verbs were the top level until
 then — `botmaker new`, `validate`, `run`, `publish` — and meant *plugin* while saying so nowhere, because
 the bot half already had to spell its noun. The most-typed verb in the program belonged to one of the two

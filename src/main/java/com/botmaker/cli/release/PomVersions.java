@@ -43,9 +43,9 @@ public final class PomVersions {
     private PomVersions() {
     }
 
-    /** Whether a release moves this module's pom version at all: a Maven build that is not a template. */
+    /** Whether a release moves this module's pom version at all: a Maven build. */
     public static boolean moves(Module module) {
-        return module.mavenBuild() && !module.template();
+        return module.mavenBuild();
     }
 
     /** {@code 0.3.4-SNAPSHOT} after {@code 0.3.3}: what {@code main} says once a release is cut. */

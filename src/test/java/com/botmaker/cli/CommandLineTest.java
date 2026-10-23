@@ -5,13 +5,17 @@ import picocli.CommandLine;
 import picocli.CommandLine.ParseResult;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -185,15 +189,47 @@ class CommandLineTest {
      */
     @Test
     void bot_has_its_own_new_and_publish() {
-        ParseResult botNew = parse("bot", "new", "gamebot").subcommand().subcommand();
-        assertEquals("gamebot", botNew.matchedPositionalValue(0, ""));
+        ParseResult botNew = parse("bot", "new", "farmbot", "--from", "alice/farmbot").subcommand().subcommand();
+        assertEquals("farmbot", botNew.matchedPositionalValue(0, ""));
+        assertEquals("alice/farmbot", botNew.matchedOptionValue("--from", ""));
         assertEquals(".", applied(botNew, "--dir"));
 
-        ParseResult botPublish = parse("bot", "publish", "--template", "--repo", "me/gamebot")
-                .subcommand().subcommand();
-        assertTrue(botPublish.hasMatchedOption("--template"));
-        assertEquals("me/gamebot", botPublish.matchedOptionValue("--repo", ""));
+        ParseResult botPublish = parse("bot", "publish", "--repo", "me/farmbot").subcommand().subcommand();
+        assertEquals("me/farmbot", botPublish.matchedOptionValue("--repo", ""));
         assertEquals("v0.1.0", applied(botPublish, "--tag"));
+        assertEquals("me/farmbot", parse("bot", "unpublish", "--repo", "me/farmbot")
+                .subcommand().subcommand().matchedOptionValue("--repo", ""));
+        assertEquals("100", applied(parse("bot", "list").subcommand().subcommand(), "--limit"));
+    }
+
+    /** Studio's Browse Bots finds a bot by its topic, so the topics a publish sets are GitHub's spelling. */
+    @Test
+    void a_publish_lists_the_bot_by_its_topic_and_its_tags() {
+        assertEquals(List.of("botmaker-bot", "idle-game", "c-bot"),
+                BotPublishCommand.topics(List.of(" Idle _ Game!! ", "", "C# bot", "botmaker-detached", "idle-game")));
+        assertEquals(50, BotPublishCommand.asTopic("a".repeat(80)).length());
+        List<String> many = IntStream.range(0, 30).mapToObj(i -> "t" + i).toList();
+        assertEquals(BotPublishCommand.MAX_TOPICS, BotPublishCommand.topics(many).size());
+    }
+
+    /** {@code --from} is a repository, refused in any other shape before git is asked anything. */
+    @Test
+    void from_wants_owner_and_repo() throws Exception {
+        assertEquals("alice/farm-bot", BotNewCommand.slug(" alice/farm-bot "));
+        for (String bad : new String[]{"alice-farmbot", "alice/", "/farmbot", "a/b/c", "--upload-pack=x/y",
+                "--help/x", "-a/b", "a/-b", "a/.", "a/.."}) {
+            assertThrows(IOException.class, () -> BotNewCommand.slug(bad), bad);
+        }
+    }
+
+    /** A publish pushes only into the repository it names, never into one whose name merely contains it. */
+    @Test
+    void the_origin_check_compares_the_whole_repository() {
+        assertTrue(BotNewCommand.names("https://github.com/Alice/Farmbot.git", "alice/farmbot"));
+        assertTrue(BotNewCommand.names("git@github.com:alice/farmbot.git", "alice/farmbot"));
+        assertTrue(BotNewCommand.names("https://github.com/alice/farmbot/", "alice/farmbot"));
+        assertFalse(BotNewCommand.names("https://github.com/alice/farmbot-fork", "alice/farmbot"));
+        assertFalse(BotNewCommand.names("https://github.com/xalice/farmbot", "alice/farmbot"));
     }
 
     /**

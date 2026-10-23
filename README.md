@@ -12,10 +12,10 @@ botmaker plugin publish --repo me/discord-notifier
 ```
 
 ```bash
-botmaker bot new gamebot                     # a blank bot project — no plugin, no SDK
-botmaker bot new farmer --from BotMakerDev/botmaker-gamebot   # …or somebody's published template
-cd gamebot
-botmaker bot publish --repo me/gamebot --template --description "A game bot to start from"
+botmaker bot new farmbot                     # a blank bot project — no plugin, no SDK
+botmaker bot new farmer --from alice/farmbot # …or somebody's published bot, linked to its author
+cd farmbot
+botmaker bot publish --repo me/farmbot --description "Harvests the farm"
 ```
 
 ## Installing it
@@ -158,15 +158,15 @@ plugins/<id>.json` is the by-hand path when `gh` is not installed. The validatio
 
 ## `botmaker bot` — about a bot
 
-The verbs above are all about a plugin. This is the other half, and it is the half that had no command at
-all: a **starting template** is a published bot, so making one meant a repository, a push, a release and a
-hand-written gallery entry, in that order, with nothing failing until somebody else's install 404'd.
+The verbs above are all about a plugin. This is the other half: every **published bot** is a starting point —
+a GitHub repository with a release and the topic `botmaker-bot`, which Studio's Browse Bots and New Project
+search. There is no gallery repository and no template kind (2026-10-23).
 
 ### `botmaker bot new <name>`
 
 ```bash
-botmaker bot new gamebot                                     # blank
-botmaker bot new farmer --from BotMakerDev/botmaker-gamebot   # from a published template
+botmaker bot new farmbot                        # blank
+botmaker bot new farmer --from alice/farmbot    # from a published bot
 ```
 
 **Blank means blank**: a pom and one `main()` that prints a line. No SDK,
@@ -174,31 +174,24 @@ no plugin, no BotMaker API — that is what a project with no plugins installed 
 from being a bot (**Project ▸ Plugins & Libraries…** in Studio). The repositories are declared, so that step needs
 no hand-edited XML.
 
-`--from` downloads that template's release archive and renames **its package** — the one holding its
-`main()` — into yours (`--package`,
-default `com.<name>`) **and its Maven coordinate** into your project's name. Its entry class keeps the
-author's name, its helpers keep theirs, its javadoc keeps its wording: what they shipped is what
-demonstrably built for them. The coordinate is the exception because it is not the author's code — it says
-which project this is, and a project you called `farm` announcing itself as `base` builds
-`base-0.0.1-SNAPSHOT.jar` and collides in `~/.m2` with everyone else's copy of the same template.
+`--from` **clones** the bot at its newest GitHub Release (`--tag` for another), starts branch `main` there
+and names the remote `original` — what Studio's Browse Bots does. Nothing is renamed, so the author's later
+releases merge in (Studio's *Get vX.Y*), and the remote is the only record of where it came from. A bot runs
+its author's code on your computer: read it before you run it.
 
-### `botmaker bot publish`
+### `botmaker bot publish`, `unpublish`, `list`
 
 ```bash
-botmaker bot publish --repo me/gamebot --template --description "A game bot to start from"
+botmaker bot publish --repo me/farmbot --description "Harvests the farm" --tags farming,idle
+botmaker bot unpublish --repo me/farmbot
+botmaker bot list
 ```
 
-Four steps, each refusing before the next: create the repository and push (a dirty tree is refused; a
-directory that is not a repository yet is initialised and committed), cut the release `--tag` names
-(default `v0.1.0`), **download that release archive** to check an install can actually fetch it, then fork
-`BotMakerDev/botmaker-gallery`, write `bots/<owner>-<repo>.json` and open the pull request.
-
-`--template` adds the reserved `template` tag, which is what offers the bot in Studio's **New Project**
-rather than as something to install and run. Nothing else about a template is different — so anybody can
-write one, and it needs no Studio release to appear.
-
-`--dry-run` prints the entry on stdout and does nothing else, so
-`botmaker bot publish --dry-run > bots/me-gamebot.json` is the by-hand path when `gh` is not installed.
+`publish` runs three steps, each refusing before the next: create the repository and push (a dirty tree is
+refused; a directory that is not a repository yet is initialised and committed), cut the release `--tag` names
+(default `v0.1.0`), then add the topic `botmaker-bot` — and each tag as a topic — with `gh repo edit`. Browse
+Bots lists the bot when its release's pom declares a plugin from the registry. `unpublish` takes the topic
+off and keeps everything else; `list` is `gh search repos --topic botmaker-bot`, forks included.
 
 ## `botmaker doctor` — the tools everything else needs
 

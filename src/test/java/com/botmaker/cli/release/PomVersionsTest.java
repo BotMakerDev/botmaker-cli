@@ -63,11 +63,10 @@ class PomVersionsTest {
     }
 
     @Test
-    void onlyAMavenModuleThatIsNotATemplateMovesItsVersion() {
+    void onlyAMavenModuleMovesItsVersion() {
         assertTrue(PomVersions.moves(Module.STUDIO));
         assertTrue(PomVersions.moves(Module.REMOTE_SERVER));
         assertFalse(PomVersions.moves(Module.PILOT));
-        assertFalse(PomVersions.moves(Module.GAMEBOT));
     }
 
     /**

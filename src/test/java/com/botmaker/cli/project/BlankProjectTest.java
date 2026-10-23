@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * What {@code botmaker bot new} writes when it is not starting from a template.
+ * What {@code botmaker bot new} writes when it is not starting from a published bot.
  *
  * <p>The load-bearing assertion is {@link #the_blank_project_names_no_plugin_at_all}: "blank" stopped
  * meaning "a bot project with a println in it" on 2026-09-04, in Studio and here, and a pom that quietly
@@ -27,7 +27,7 @@ class BlankProjectTest {
 
     @Test
     void the_blank_project_names_no_plugin_at_all() {
-        String pom = BlankProject.files("gamebot", "com.gamebot").get("pom.xml");
+        String pom = BlankProject.files("farmbot", "com.farmbot").get("pom.xml");
 
         assertFalse(pom.contains("botmaker"), "a blank pom names no plugin:\n" + pom);
         assertEquals(1, pom.split("<dependency>", -1).length - 1, "exactly one dependency:\n" + pom);
@@ -36,13 +36,13 @@ class BlankProjectTest {
 
     /**
      * The compiler release is a fixed number and never the running JVM's. A project written here is one
-     * {@code bot publish} away from being a template somebody else downloads, and the first one published
+     * {@code bot publish} away from being a bot somebody else starts from, and the first one published
      * was composed on a Java 27 box: every author on 25 would have met
      * {@code release version 27 not supported} on a project containing one {@code println}.
      */
     @Test
     void the_blank_pom_targets_the_platform_not_this_jvm() {
-        String pom = BlankProject.files("gamebot", "com.gamebot").get("pom.xml");
+        String pom = BlankProject.files("farmbot", "com.farmbot").get("pom.xml");
 
         assertTrue(pom.contains("<maven.compiler.release>" + BlankProject.PLATFORM_RELEASE
                 + "</maven.compiler.release>"), pom);
@@ -58,7 +58,7 @@ class BlankProjectTest {
      */
     @Test
     void the_blank_pom_keeps_the_repositories() {
-        String pom = BlankProject.files("gamebot", "com.gamebot").get("pom.xml");
+        String pom = BlankProject.files("farmbot", "com.farmbot").get("pom.xml");
 
         assertTrue(pom.contains("https://jitpack.io"), pom);
         assertTrue(pom.contains("repo.maven.apache.org"), pom);
@@ -70,20 +70,20 @@ class BlankProjectTest {
      */
     @Test
     void the_two_files_are_the_pom_and_one_main() {
-        Map<String, String> files = BlankProject.files("gamebot", "com.example.game");
+        Map<String, String> files = BlankProject.files("farmbot", "com.example.game");
 
         assertEquals(java.util.Set.of("pom.xml",
-                        "src/main/java/com/example/game/Gamebot.java"),
+                        "src/main/java/com/example/game/Farmbot.java"),
                 files.keySet());
-        assertTrue(files.get("src/main/java/com/example/game/Gamebot.java")
+        assertTrue(files.get("src/main/java/com/example/game/Farmbot.java")
                 .contains("package com.example.game;"));
     }
 
     /** The starting file imports nothing, because there is nothing on its classpath to import. */
     @Test
     void the_starting_class_imports_nothing() {
-        String main = BlankProject.files("gamebot", "com.gamebot")
-                .get("src/main/java/com/gamebot/Gamebot.java");
+        String main = BlankProject.files("farmbot", "com.farmbot")
+                .get("src/main/java/com/farmbot/Farmbot.java");
 
         assertFalse(main.contains("import "), main);
         assertTrue(main.contains("public static void main(String[] args)"), main);
@@ -92,7 +92,7 @@ class BlankProjectTest {
     @Test
     void names_become_a_class_and_a_package() {
         assertEquals("ClickerBot", BlankProject.className("clicker-bot"));
-        assertEquals("Gamebot", BlankProject.className("gamebot"));
+        assertEquals("Farmbot", BlankProject.className("farmbot"));
         assertEquals("com.clickerbot", BlankProject.defaultPackage("clicker-bot"));
     }
 
@@ -106,14 +106,14 @@ class BlankProjectTest {
 
     @Test
     void writing_lands_every_file_and_refuses_a_directory_that_holds_anything() throws Exception {
-        Path project = root.resolve("gamebot");
-        BlankProject.write(project, "gamebot", "com.gamebot");
+        Path project = root.resolve("farmbot");
+        BlankProject.write(project, "farmbot", "com.farmbot");
 
         assertTrue(Files.isRegularFile(project.resolve("pom.xml")));
-        assertTrue(Files.isRegularFile(project.resolve("src/main/java/com/gamebot/Gamebot.java")));
+        assertTrue(Files.isRegularFile(project.resolve("src/main/java/com/farmbot/Farmbot.java")));
         assertFalse(Files.exists(project.resolve("botmaker-template.properties")));
 
-        assertThrows(IOException.class, () -> BlankProject.write(project, "gamebot", "com.gamebot"),
+        assertThrows(IOException.class, () -> BlankProject.write(project, "farmbot", "com.farmbot"),
                 "a second write into the same directory must refuse rather than merge");
     }
 }

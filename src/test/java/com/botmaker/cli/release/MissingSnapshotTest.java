@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A gate whose Maven run could not find an upstream's {@code -SNAPSHOT} says so, with the install, rather than
@@ -45,13 +44,5 @@ class MissingSnapshotTest {
         }
         assertEquals(GateVerdict.Status.REFUSED,
                 SdkGates.validated(new Proc.Result(1, "FAIL pom-scopes"), false).status());
-    }
-
-    @Test
-    void aTemplateInstallsTheModuleItsPinNames() {
-        GateVerdict verdict = TemplateGate.verdict("botmaker-gamebot", new Proc.Result(1, "[ERROR] Could not find "
-                + "artifact com.github.BotMakerDev:botmaker-sdk:jar:1.4.5-SNAPSHOT in jitpack.io"), false);
-        assertEquals(GateVerdict.Status.SKIPPED, verdict.status());
-        assertTrue(verdict.line().contains("mvn -pl botmaker-sdk -am install"), verdict.line());
     }
 }

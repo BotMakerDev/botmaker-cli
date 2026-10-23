@@ -7,7 +7,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- **`bot new --from owner/repo` clones the bot, linked to its author.** It clones the newest release (or `--tag`),
+  starts branch `main` there and names the remote `original`, as Studio's Browse Bots does; nothing is renamed, so
+  the author's later releases merge in. `--package` is for a blank project only.
+- **`bot publish` lists the bot by a GitHub topic.** After the repository and the release it adds the topic
+  `botmaker-bot` (and each `--tags` value as a topic), which Studio's Browse Bots searches. `--repo` is required.
+
+### Added
+
+- **`bot unpublish --repo owner/repo`** removes the topic; the repository and its releases stay.
+- **`bot list`** lists every repository with the topic, forks included.
+
 ### Removed
+
+- **Templates and the gallery repository.** `release --gamebot` and its template pin, gate and GitHub Release step;
+  `bot publish --template` and `--dry-run`, the release archive check and the gallery pull request; the
+  `com.botmaker.cli.gallery` package (`GalleryGate`, `CatalogBuilder`, `ListingPolicy`, tiers, vetting records).
 
 - **The `records` check of `plugin validate`**: the contract's `@Records` went with the macro recorder.
 

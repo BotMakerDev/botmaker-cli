@@ -1,5 +1,9 @@
 # `com.botmaker.cli.release` — `release.sh`, being ported into the library artifact
 
+> **2026-10-23: templates gone.** `--gamebot`, `Module.GAMEBOT`, `Module.template()`, `TemplatePin`, `TemplateGate`
+> and `TemplateRelease` are removed; fourteen modules, and the dashboard is last in both orders. Text below that
+> names them is history.
+
 **A second package with the same shape as `validate`, for the same reason.** The ordered cross-module
 release has three callers — a maintainer's terminal, `.github/workflows/release.yml` (`--ci`), and
 `botmaker-dashboard` — and CI cannot run a JavaFX app, so the owner of these decisions cannot be the GUI.

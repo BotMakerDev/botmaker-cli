@@ -1,13 +1,5 @@
 package com.botmaker.cli;
 
-import com.botmaker.cli.gallery.GalleryEntry;
-import com.botmaker.cli.gallery.GalleryFacts;
-import com.botmaker.cli.gallery.GalleryGate;
-import com.botmaker.cli.gallery.ListingPolicy;
-import com.botmaker.cli.gallery.Templates;
-import com.botmaker.cli.gallery.Tier;
-import com.botmaker.cli.project.Poms;
-import com.botmaker.cli.registry.Registry;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -16,49 +8,46 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
- * {@code botmaker bot publish} — repository, release, and the gallery pull request.
+ * {@code botmaker bot publish} — repository, release, and the topic that lists it.
  *
- * <h2>Four steps, in one order, each refusing before the next</h2>
+ * <h2>Three steps, in one order, each refusing before the next</h2>
  *
  * <ol>
  *   <li><b>The repository</b> — {@code gh repo create --source . --push}, or a push when the working copy's
  *       {@code origin} already is that repository. A dirty tree is refused: what gets published is a commit,
  *       and a commit that omits the file the author is looking at is the confusing kind of wrong.</li>
- *   <li><b>The release</b> — {@code gh release create}. This is the step that matters and the one nobody
- *       remembers: a bot is installed from its <em>release archive</em>, so a gallery entry with no release
- *       behind it is a 404 on somebody else's machine.</li>
- *   <li><b>The archive is fetched before anything points at it.</b> Same principle {@code botmaker plugin publish}
- *       follows for a coordinate: do not publish a pointer nobody has followed.</li>
- *   <li><b>The gallery pull request</b> — the gallery's own {@code GalleryGate} entry checks run first, on
- *       this machine; then fork, one file at {@code bots/<owner>-<repo>.json}, open it. One file per entry,
- *       never the generated index, so two authors publishing on the same day open two pull requests with no
- *       line in common. A passing pull request is merged by the gallery's CI and listed as Community.</li>
+ *   <li><b>The release</b> — {@code gh release create}. A bot is started from its newest release, so a
+ *       listed bot with none behind it is something nobody can start from.</li>
+ *   <li><b>The listing</b> — the topic {@link #TOPIC} on the repository, beside the author's tags as topics,
+ *       and the description. Studio's Browse Bots finds bots by that topic (2026-10-23: no gallery repository,
+ *       nothing stored but the repository's own metadata) and lists one whose release's pom declares a
+ *       registry plugin.</li>
  * </ol>
  *
- * <p><b>{@code --template} is the whole reason this exists.</b> It puts {@code "template"} in the entry's
- * tags, which is what makes the bot a <em>starting point</em> in Studio's New Project rather than something
- * to install and run. Nothing else about a template is different — same repository, same release, same
- * archive — and that is the design: anybody can write one, and it needs no Studio release to be offered.
- *
- * <p>{@code --dry-run} prints the entry on stdout and does nothing else, so
- * {@code botmaker bot publish --dry-run > bots/x.json} is a file a parser reads. Progress is on stderr,
- * which is the same split {@code Console} opens with.
+ * <p>{@code botmaker bot unpublish} takes the topic off; the repository and its releases stay.
  */
 @Command(name = "publish",
-        header = "Publish this bot: repository, release, and the gallery entry.",
-        description = "Creates the repository, pushes, cuts the release, checks the archive can actually be "
-                + "downloaded, then opens the gallery pull request.",
+        header = "Publish this bot: repository, release, and the botmaker-bot topic.",
+        description = "Creates the repository, pushes, cuts the release, then adds the topic botmaker-bot that "
+                + "lists it in Studio's Browse Bots. A bot is listed when its release's pom declares a plugin "
+                + "from the registry.",
         mixinStandardHelpOptions = true)
 final class BotPublishCommand implements Callable<Integer> {
 
-    private static final String GALLERY_REPO = "BotMakerDev/botmaker-gallery";
+    /** The topic Studio's Browse Bots searches for. */
+    static final String TOPIC = "botmaker-bot";
 
-    private final GalleryFacts facts = GalleryFacts.github();
+    /** GitHub's own limits on a repository's topics. */
+    static final int MAX_TOPICS = 20;
+    static final int MAX_TOPIC_LENGTH = 50;
 
     @ParentCommand
     private BotCommand parent;
@@ -66,113 +55,70 @@ final class BotPublishCommand implements Callable<Integer> {
     @Option(names = "--dir", defaultValue = ".", description = "The bot project. Default: ${DEFAULT-VALUE}")
     private String directory;
 
-    @Option(names = "--repo", paramLabel = "<owner/name>",
-            description = "Where the bot's source will live. Required for a real run; without it this is a "
-                    + "dry run, because an entry needs somewhere for a reader to go and look.")
+    @Option(names = "--repo", paramLabel = "<owner/name>", required = true,
+            description = "Where the bot's source lives on GitHub.")
     private String repo;
 
-    @Option(names = "--name", description = "The project name in the entry. Default: the pom's artifactId.")
-    private String projectName;
-
-    @Option(names = "--description", defaultValue = "", description = "One sentence, for the gallery.")
+    @Option(names = "--description", defaultValue = "",
+            description = "One sentence, shown in Browse Bots. Empty keeps the repository's.")
     private String description;
 
-    @Option(names = "--tags", defaultValue = "", paramLabel = "<a,b,c>", description = "Comma separated.")
+    @Option(names = "--tags", defaultValue = "", paramLabel = "<a,b,c>",
+            description = "Comma separated; each becomes a topic.")
     private String tags;
 
-    @Option(names = "--template",
-            description = "Publish as a starting template: adds the reserved \"template\" tag, which is what "
-                    + "offers it in New Project rather than as a bot to install.")
-    private boolean template;
-
     @Option(names = "--tag", defaultValue = "v0.1.0", paramLabel = "<tag>",
-            description = "The release to cut and point the entry at. Default: ${DEFAULT-VALUE}")
+            description = "The release to cut. Default: ${DEFAULT-VALUE}")
     private String tag;
-
-    @Option(names = "--dry-run", description = "Print the entry and open nothing.")
-    private boolean dryRun;
 
     @Override
     public Integer call() throws IOException {
         Console console = parent.main().console();
         Path dir = Path.of(directory).toAbsolutePath().normalize();
-        Path pom = dir.resolve("pom.xml");
-        if (!Files.isRegularFile(pom)) {
+        if (!Files.isRegularFile(dir.resolve("pom.xml"))) {
             throw new IOException("no pom.xml in " + dir + " — point `botmaker bot publish` at a bot project");
         }
-
-        GalleryEntry entry = compose(dir, pom);
-        String json = Registry.mapper().writerWithDefaultPrettyPrinter().writeValueAsString(entry);
-
-        if (dryRun || repo == null) {
-            if (repo == null) {
-                console.warn("--repo <owner/name> was not given, so this is a dry run: a gallery entry needs"
-                        + " somewhere for a reader to go and look at the source.");
-            }
-            console.out(json);
-            return 0;
-        }
-
-        if (!publishRepository(console, dir, entry)) {
+        String slug = BotNewCommand.slug(repo);
+        if (!publishRepository(console, dir, slug) || !cutRelease(console, dir, slug)) {
             return 1;
         }
-        if (!cutRelease(console, dir, entry)) {
+        List<String> args = new ArrayList<>(List.of("repo", "edit", slug));
+        for (String topic : topics(List.of(tags.split(",")))) {
+            args.addAll(List.of("--add-topic", topic));
+        }
+        if (!description.isBlank()) {
+            args.addAll(List.of("--description", description.strip()));
+        }
+        if (Shell.gh(console, dir, args.toArray(String[]::new)) != 0) {
+            console.error("released " + tag + ", but could not add the topic " + TOPIC + " to " + slug
+                    + ", so it is not listed. GitHub takes at most " + MAX_TOPICS + " topics, counting the ones the"
+                    + " repository already has; re-run once `gh` can edit it.");
             return 1;
         }
-        if (!Templates.archiveExists(entry.owner(), entry.repo(), tag)) {
-            console.error("the release archive for " + entry.slug() + "@" + tag + " cannot be downloaded"
-                    + " yet, and that archive is what an install actually fetches. Nothing was submitted.");
-            return 1;
-        }
-
-        // The gallery's own gate, on this machine, before a pull request exists — so a refusal is met here
-        // rather than as a red check on somebody else's repository.
-        Path work = Files.createTempDirectory("botmaker-bot-publish");
-        String login = Shell.capture(work, "gh", "api", "user", "--jq", ".login").orElse("").trim();
-        boolean push = Shell.capture(work, "gh", "api", "repos/" + GALLERY_REPO, "--jq",
-                ".permissions.push").orElse("").trim().equals("true");
-        List<GalleryGate.Finding> findings = GalleryGate.checkEntry(entry, entry.path(), login, push,
-                facts.listedEntry(entry.path()), facts);
-        boolean refused = false;
-        for (GalleryGate.Finding finding : findings) {
-            if (finding.severity() == GalleryGate.Severity.ERROR) {
-                console.error(finding.message());
-                refused = true;
-            } else {
-                console.warn(finding.message());
-            }
-        }
-        if (refused) {
-            console.error("the gallery would refuse this entry, so nothing was submitted.");
-            return 1;
-        }
-        int opened = openPullRequest(console, work, push, entry, json);
-        if (opened == 0) {
-            console.step(push
-                    ? "Opened by a maintainer: it is merged as soon as the gallery's checks pass."
-                    : "Once the gallery's checks pass it is merged automatically and listed as "
-                            + Tier.COMMUNITY.displayName() + " (at most " + ListingPolicy.NEW_LISTINGS_PER_DAY
-                            + " new bots a day per author). " + Tier.VETTED.displayName()
-                            + " is granted by a maintainer, per release.");
-        }
-        return opened;
+        console.step(slug + " is listed in Browse Bots once its release's pom declares a registry plugin.");
+        return 0;
     }
 
-    private GalleryEntry compose(Path dir, Path pom) throws IOException {
-        String[] target = repo == null ? new String[]{"", ""} : ownerAndName(repo);
-        String name = projectName != null && !projectName.isBlank()
-                ? projectName.trim() : Poms.coordinate(pom).artifactId();
-        List<String> entryTags = new ArrayList<>(List.of(tags.split("\\s*,\\s*")).stream()
-                .filter(t -> !t.isBlank()).toList());
-        if (template && entryTags.stream().noneMatch(GalleryEntry.TEMPLATE_TAG::equalsIgnoreCase)) {
-            entryTags.add(GalleryEntry.TEMPLATE_TAG);
+    /**
+     * The topics a publish adds: {@link #TOPIC} first, then each tag as GitHub takes a topic, at most
+     * {@link #MAX_TOPICS}. A tag spelling a {@code botmaker-} topic is dropped: those are the listing's own.
+     */
+    static List<String> topics(List<String> tags) {
+        Set<String> out = new LinkedHashSet<>(List.of(TOPIC));
+        for (String tag : tags) {
+            String topic = asTopic(tag);
+            if (!topic.isEmpty() && !topic.startsWith("botmaker-") && out.size() < MAX_TOPICS) {
+                out.add(topic);
+            }
         }
-        if (template) {
-            // Refused here rather than on somebody's New Project: the package holding main is what a copy
-            // renames, so a template with none, or with two unrelated ones, cannot be started from.
-            Templates.packageOf(dir);
-        }
-        return new GalleryEntry(name, target[0], target[1], description, entryTags);
+        return List.copyOf(out);
+    }
+
+    /** A tag as GitHub accepts a topic: lowercase letters, digits and single dashes, at most 50 long. */
+    static String asTopic(String tag) {
+        String topic = tag.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
+        return topic.length() <= MAX_TOPIC_LENGTH ? topic
+                : topic.substring(0, MAX_TOPIC_LENGTH).replaceAll("-+$", "");
     }
 
     /**
@@ -183,12 +129,11 @@ final class BotPublishCommand implements Callable<Integer> {
      * changes</em> is refused instead: guessing that the author meant to publish them is guessing about the
      * one thing they can see and this command cannot.
      */
-    private boolean publishRepository(Console console, Path dir, GalleryEntry entry) throws IOException {
+    private static boolean publishRepository(Console console, Path dir, String slug) throws IOException {
         if (Shell.capture(dir, "git", "rev-parse", "--git-dir").isEmpty()) {
             console.step("Not a git repository yet — initialising one.");
             // -b main, not the built-in default: a machine with no init.defaultBranch set gets `master`,
-            // which is what the first real run of this command produced. The branch name is in every URL
-            // the entry's readers follow.
+            // which is what the first real run of this command produced.
             if (Shell.run(console, dir, "git", "init", "-q", "-b", "main") != 0
                     || Shell.run(console, dir, "git", "add", "-A") != 0
                     || Shell.run(console, dir, "git", "commit", "-qm", "Initial commit") != 0) {
@@ -201,11 +146,10 @@ final class BotPublishCommand implements Callable<Integer> {
             return false;
         }
 
-        boolean exists = Shell.capture(dir, "gh", "repo", "view", entry.slug(), "--json", "name").isPresent();
+        boolean exists = Shell.capture(dir, "gh", "repo", "view", slug, "--json", "name").isPresent();
         if (!exists) {
-            if (Shell.gh(console, dir, "repo", "create", entry.slug(), "--source", ".", "--push",
-                    "--public") != 0) {
-                console.error("could not create " + entry.slug() + ". Is `gh` installed and authenticated?");
+            if (Shell.gh(console, dir, "repo", "create", slug, "--source", ".", "--push", "--public") != 0) {
+                console.error("could not create " + slug + ". Is `gh` installed and authenticated?");
                 return false;
             }
             return true;
@@ -215,96 +159,31 @@ final class BotPublishCommand implements Callable<Integer> {
         // release of the author's own bot — and wrong when it is somebody else's repository that happens
         // to have the name, which is a mistake no push should be the first to discover.
         Optional<String> origin = Shell.capture(dir, "git", "remote", "get-url", "origin");
-        if (origin.filter(url -> url.contains(entry.slug())).isEmpty()) {
-            console.error(entry.slug() + " already exists and is not this working copy's origin. Pick"
-                    + " another --repo, or set origin to it if it is yours.");
+        if (origin.filter(url -> BotNewCommand.names(url, slug)).isEmpty()) {
+            console.error(slug + " already exists and is not this working copy's origin. Pick another --repo,"
+                    + " or set origin to it if it is yours.");
             return false;
         }
-        console.step(entry.slug() + " already exists and is this project's origin — pushing.");
+        console.step(slug + " already exists and is this project's origin — pushing.");
         if (Shell.run(console, dir, "git", "push", "-u", "origin", "HEAD") != 0) {
-            console.error("could not push to " + entry.slug());
+            console.error("could not push to " + slug);
             return false;
         }
         return true;
     }
 
-    /** Step two: the release, which is the thing an install actually downloads. */
-    private boolean cutRelease(Console console, Path dir, GalleryEntry entry) throws IOException {
-        if (Shell.capture(dir, "gh", "release", "view", tag, "--repo", entry.slug()).isPresent()) {
+    /** Step two: the release, which is what a bot is started from. */
+    private boolean cutRelease(Console console, Path dir, String slug) throws IOException {
+        if (Shell.capture(dir, "gh", "release", "view", tag, "--repo", slug).isPresent()) {
             console.step("Release " + tag + " already exists — leaving it alone.");
             return true;
         }
-        int created = Shell.gh(console, dir, "release", "create", tag, "--repo", entry.slug(),
-                "--title", tag, "--notes", entry.name() + " " + tag + ".");
-        if (created != 0) {
-            console.error("could not create release " + tag + " on " + entry.slug()
-                    + ". A bot is installed from its release archive, so nothing was submitted.");
+        if (Shell.gh(console, dir, "release", "create", tag, "--repo", slug, "--title", tag,
+                "--notes", slug + " " + tag + ".") != 0) {
+            console.error("could not create release " + tag + " on " + slug
+                    + ". A bot is started from its newest release, so it was not listed.");
             return false;
         }
         return true;
-    }
-
-    /**
-     * Step four: one file, on a branch, as a pull request.
-     *
-     * <p><b>A fork only when a fork is needed.</b> The first real run of this command was the gallery's
-     * own maintainer publishing a template, and GitHub does not fork a repository into the account that
-     * already owns it — so the branch goes straight onto the gallery whenever the authenticated user can
-     * push there, and through a fork otherwise. That is the same pull request either way; what changes is
-     * only where its head branch lives.
-     */
-    private int openPullRequest(Console console, Path work, boolean push, GalleryEntry entry, String json)
-            throws IOException {
-        if (push) {
-            console.step("You can push to " + GALLERY_REPO + " — branching on it directly rather than"
-                    + " forking.");
-            if (Shell.gh(console, work, "repo", "clone", GALLERY_REPO, "botmaker-gallery") != 0) {
-                console.error("could not clone " + GALLERY_REPO + ". Is `gh` installed and authenticated?");
-                return 1;
-            }
-            // `gh repo fork` takes no --remote when it is given a repository argument, which is the flag
-            // that failed the first real run; the clone arm never wanted one.
-        } else if (Shell.gh(console, work, "repo", "fork", GALLERY_REPO, "--clone=true",
-                "--fork-name=botmaker-gallery") != 0) {
-            console.error("could not fork " + GALLERY_REPO + ". Is `gh` installed and authenticated?");
-            return 1;
-        }
-        Path clone = work.resolve("botmaker-gallery");
-        if (!Files.isDirectory(clone)) {
-            console.error("the " + (push ? "clone" : "fork") + " of " + GALLERY_REPO
-                    + " did not land in " + work);
-            return 1;
-        }
-        Path entries = clone.resolve(GalleryEntry.ENTRIES_DIRECTORY);
-        if (!Files.isDirectory(entries)) {
-            console.error("no " + GalleryEntry.ENTRIES_DIRECTORY + "/ in " + GALLERY_REPO + " — re-run with"
-                    + " --dry-run and open the pull request by hand.");
-            return 1;
-        }
-        String branch = "add-" + (entry.owner() + "-" + entry.repo()).replaceAll("[^a-zA-Z0-9]+", "-");
-        Shell.run(console, clone, "git", "checkout", "-b", branch);
-        Files.writeString(clone.resolve(entry.path()), json + "\n");
-        Shell.run(console, clone, "git", "add", entry.path());
-        Shell.run(console, clone, "git", "commit", "-m", "gallery: add " + entry.slug());
-        if (Shell.run(console, clone, "git", "push", "-u", "origin", branch) != 0) {
-            console.error("could not push the branch");
-            return 1;
-        }
-        String kind = entry.isTemplate() ? "template" : "bot";
-        int opened = Shell.gh(console, clone, "pr", "create", "--repo", GALLERY_REPO,
-                "--title", "Add " + entry.name() + " (" + kind + ")",
-                "--body", "Adds `" + entry.path() + "` — [" + entry.slug()
-                        + "](https://github.com/" + entry.slug() + "), released as `" + tag + "`.\n\n"
-                        + "Composed by `botmaker bot publish`, which downloaded the release archive and ran"
-                        + " the gallery's checks before writing this entry.\n\n```json\n" + json + "\n```");
-        return opened == 0 ? 0 : 1;
-    }
-
-    private static String[] ownerAndName(String slug) throws IOException {
-        int slash = slug.indexOf('/');
-        if (slash <= 0 || slash == slug.length() - 1) {
-            throw new IOException("--repo wants owner/name, got '" + slug + "'");
-        }
-        return new String[]{slug.substring(0, slash), slug.substring(slash + 1)};
     }
 }

@@ -49,10 +49,9 @@ public final class Plan {
             Map.entry(Module.PILOT, "pilot  "),
             Map.entry(Module.REMOTE_SERVER, "remote-server"),
             Map.entry(Module.REMOTE, "remote       "),
-            Map.entry(Module.DASHBOARD, "dashboard    "),
-            Map.entry(Module.GAMEBOT, "gamebot      ")));
+            Map.entry(Module.DASHBOARD, "dashboard    ")));
 
-    // Map.ofEntries here too, since 2026-09-21: the worked bot made it eleven.
+    // Map.ofEntries here too: more than ten entries.
     private static final Map<Module, String> NOTE = new EnumMap<>(Map.ofEntries(
             Map.entry(Module.STUDIO_API, "  (the plugin contract)"),
             Map.entry(Module.PLUGIN_TOOLKIT, "  (the plugin widget toolkit)"),
@@ -63,8 +62,7 @@ public final class Plan {
             Map.entry(Module.PILOT, "  (tags -> APK GitHub Release)"),
             Map.entry(Module.REMOTE_SERVER, "  (tags -> jar GitHub Release)"),
             Map.entry(Module.REMOTE, "  (tags -> APK GitHub Release)"),
-            Map.entry(Module.DASHBOARD, "  (tags -> rpm + deb GitHub Release)"),
-            Map.entry(Module.GAMEBOT, "  (the worked bot a new project copies)")));
+            Map.entry(Module.DASHBOARD, "  (tags -> rpm + deb GitHub Release)")));
 
     /** What one module was asked for, what that resolves to, and what was decided about it. */
     public record Decision(Module module, VersionSpec spec, Version version,

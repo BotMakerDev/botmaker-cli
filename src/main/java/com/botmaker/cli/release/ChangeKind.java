@@ -64,9 +64,7 @@ public enum ChangeKind {
      * <p>Unreadable answers true, as everything here does: the harmless direction is a duplicate artifact.
      */
     static boolean pinsMove(Path umbrella, Module module, String ref) {
-        // A template's SDK pin moves to the SDK's newest tag on its release (TemplatePin.targets), so a template
-        // whose tag pins an older SDK is a real change too: gamebot v0.2.6 pinned SDK 1.4.2 with 1.4.4 out.
-        List<Module> pinned = module.template() ? List.copyOf(TemplatePin.PINS.keySet()) : module.upstreams();
+        List<Module> pinned = module.upstreams();
         if (pinned.isEmpty()) {
             return false;
         }

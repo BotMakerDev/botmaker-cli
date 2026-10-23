@@ -12,10 +12,9 @@ import java.util.concurrent.Callable;
  * 2026-09-05: {@code new}, {@code validate}, {@code run},
  * {@code publish}. Every one of them automates something that already had a Studio UI or an obvious
  * {@code mvn} incantation. What had neither is the other half — a <b>bot</b>, and in particular a bot
- * published as a starting <b>template</b>. Since 2026-09-04 a blank project names no plugin, so the richer
- * starting point <em>has</em> to be a published bot carrying {@code template}; and until this command
- * existed, making one meant a repository, a push, a release and a hand-written gallery entry, by hand, in
- * that order, with no error until an install failed on somebody else's machine.
+ * published for others to start from. Since 2026-10-23 every published bot is a starting point: a
+ * repository with a release and the topic {@code botmaker-bot}, found by GitHub's search, with no gallery
+ * repository and no template kind.
  *
  * <p>A noun rather than four more verbs because {@code new} and {@code publish} already mean something here
  * and mean it about a plugin. {@code botmaker bot new} and {@code botmaker plugin new} being different
@@ -23,12 +22,13 @@ import java.util.concurrent.Callable;
  * noun is why the plugin verbs eventually grew one of their own.
  */
 @Command(name = "bot",
-        header = "Create and publish a bot project.",
-        description = "Start blank or from a published template, then publish the result — repository, "
-                + "release and gallery entry — as a template anybody else can start from.",
+        header = "Create, publish and list bot projects.",
+        description = "Start blank or from a published bot, then publish the result — repository, release and "
+                + "the botmaker-bot topic — for anybody else to start from.",
         mixinStandardHelpOptions = true,
         synopsisSubcommandLabel = "<command>",
-        subcommands = {BotNewCommand.class, BotPublishCommand.class})
+        subcommands = {BotNewCommand.class, BotPublishCommand.class, BotUnpublishCommand.class,
+                BotListCommand.class})
 final class BotCommand implements Callable<Integer> {
 
     @ParentCommand
