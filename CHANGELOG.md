@@ -27,6 +27,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   `v0.1.0` are gone.
 - **`plugin unpublish` and `bot unpublish` take `--release <tag>`** to remove one release; the last one removes the
   entry.
+- **A release lists its plugins' new tags in the catalog.** After the verify pass, each released plugin the
+  catalog lists gets a pull request appending its tag, once the tag's GitHub Release is out (`Release.run` takes a
+  `CatalogStep`; `ReleaseListing` is the publish library's). The result is the release log's `## Catalog` section;
+  a refusal is a `catalog` error and stops nothing. `--dry-run` only names them.
+- **An admin in `publishers.json` passes the publish's own rule 4**, as the catalog's check lets them.
 
 ### Added
 

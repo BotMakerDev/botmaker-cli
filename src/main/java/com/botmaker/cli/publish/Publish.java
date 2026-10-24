@@ -2,6 +2,7 @@ package com.botmaker.cli.publish;
 
 import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.BotEntry;
+import com.botmaker.cli.catalog.Catalog;
 import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryFacts;
 import com.botmaker.cli.catalog.EntryGate;
@@ -9,6 +10,7 @@ import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.Finding;
 import com.botmaker.cli.catalog.PluginEntry;
 import com.botmaker.cli.release.Jitpack;
+import com.botmaker.cli.release.Level;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -93,6 +95,48 @@ public final class Publish {
         }
     }
 
+    /**
+     * The release library's step ({@link ReleaseListing}): {@code tag}, which the release just pushed, listed in the
+     * entry {@code catalog.json} holds for {@code repo} — {@link #run} with {@code --tag}, once the tag's GitHub
+     * Release is out (its own CI makes it, minutes after the tag). The folder is past the tag, so the listing is
+     * {@link NextVersion.Listing#EXISTING EXISTING}: nothing tagged, the jar checked from JitPack.
+     *
+     * @return empty when the catalog lists no plugin of {@code repo}: a release lists no plugin by itself
+     */
+    public Optional<Outcome> listRelease(Path dir, String repo, String tag, String command, Listener listener,
+                                         StepRunner runner) {
+        Optional<Catalog> index = catalog.catalog();
+        if (index.isEmpty()) {
+            return Optional.of(new Outcome.Refused("the catalog's " + Catalog.FILE + " did not read, so whether it"
+                    + " lists " + repo + " cannot be told."));
+        }
+        if (index.get().plugins().stream().noneMatch(p -> p.repo().equalsIgnoreCase(repo))) return Optional.empty();
+        Optional<String> unreleased = awaitRelease(repo, tag, listener);
+        if (unreleased.isPresent()) {
+            return Optional.of(new Outcome.Refused(unreleased.get() + " Once it is out, run `botmaker plugin publish"
+                    + " --tag " + tag + "` in " + dir + "."));
+        }
+        return Optional.of(run(new PublishRequest(dir, EntryPath.Kind.PLUGIN, Level.DEFAULT, Optional.of(tag),
+                Optional.of(repo), false, command), listener, runner));
+    }
+
+    private static final Duration RELEASE_WAIT = Duration.ofMinutes(20);
+    private static final Duration RELEASE_EVERY = Duration.ofSeconds(30);
+
+    /** Waits a while for {@code tag}'s GitHub Release to be published: empty once it is, else why it is not. */
+    private Optional<String> awaitRelease(String repo, String tag, Listener listener) {
+        String release = "the GitHub Release of " + repo + " " + tag;
+        for (Duration waited = Duration.ZERO; ; waited = waited.plus(RELEASE_EVERY)) {
+            if (facts.release(repo, tag).filter(r -> !r.draft()).isPresent()) return Optional.empty();
+            if (waited.isZero()) listener.step("Waiting for " + release + ".");
+            if (waited.compareTo(RELEASE_WAIT) >= 0) {
+                return Optional.of(release + " was not out after " + RELEASE_WAIT.toMinutes() + " minutes (the tag's"
+                        + " CI makes it).");
+            }
+            if (!sleeper.sleep(RELEASE_EVERY)) return Optional.of("stopped while waiting for " + release + ".");
+        }
+    }
+
     private Outcome steps(PublishRequest request, Listener listener, StepRunner runner) throws Refusal {
         String login = CatalogPr.login(runner)
                 .orElseThrow(() -> new Refusal("`gh` is not signed in; run `gh auth login` first."));
@@ -134,7 +178,7 @@ public final class Publish {
                     if (lists(listed, tag)) return new Outcome.AlreadyListed(repo, tag);
                 }
             }
-            owner(path.orElseThrow(), listed, repo, login);
+            owner(path.orElseThrow(), listed, repo, login, runner);
         }
         if (request.dryRun()) {
             return new Outcome.WouldList(repo, tag, version.listing(),
@@ -152,7 +196,8 @@ public final class Publish {
                 throw new Refusal("the jar JitPack built for " + tag + " does not pass the checks the catalog runs: "
                         + jar.refusal().get() + " Fix it and publish the next version.");
             }
-            EntryPath own = pluginPath(jar.pluginId());
+            // No id when the checks are the catalog's alone (Checks.LEFT_TO_THE_CATALOG): the known path stands.
+            EntryPath own = jar.pluginId().isEmpty() && path.isPresent() ? path.get() : pluginPath(jar.pluginId());
             if (!path.equals(Optional.of(own))) {
                 path = Optional.of(own);
                 listed = catalog.listed(own);
@@ -169,7 +214,8 @@ public final class Publish {
                 ? new PluginEntry(key, repo, List.of(release))
                 : new BotEntry(repo, List.of(release), false));
 
-        List<Finding> findings = EntryGate.checkEntry(entry, EntryPath.of(entry), login, listed, facts);
+        List<Finding> findings = EntryGate.checkEntry(entry, EntryPath.of(entry), login,
+                listed.isPresent() && CatalogPr.admin(runner, catalog), listed, facts);
         findings.stream().filter(f -> f.severity() != Finding.Severity.ERROR).forEach(f -> listener.warn(f.message()));
         List<String> errors = findings.stream().filter(f -> f.severity() == Finding.Severity.ERROR)
                 .map(Finding::message).toList();
@@ -206,15 +252,19 @@ public final class Publish {
         return listed.flatMap(e -> e.release(tag)).isPresent();
     }
 
-    /** Rule 4 before anything is tagged: a listed entry keeps its repository and belongs to whoever controls it. */
-    private void owner(EntryPath path, Optional<Entry> listed, String repo, String login) throws Refusal {
+    /**
+     * Rule 4 before anything is tagged: a listed entry keeps its repository and belongs to whoever controls it, or to
+     * an admin (the catalog's own exception).
+     */
+    private void owner(EntryPath path, Optional<Entry> listed, String repo, String login, StepRunner runner)
+            throws Refusal {
         if (listed.isEmpty()) return;
         Entry held = listed.get();
         if (!held.repo().equalsIgnoreCase(repo)) {
             throw new Refusal("the catalog lists " + path.key() + " for " + held.repo() + ", not " + repo + ", and a"
                     + " listed entry keeps its repository. Nothing was tagged.");
         }
-        if (!EntryGate.controls(login, held.repo(), held.newest().tag(), facts)) {
+        if (!EntryGate.controls(login, held.repo(), held.newest().tag(), facts) && !CatalogPr.admin(runner, catalog)) {
             throw new Refusal(path.key() + "'s entry belongs to whoever controls " + held.repo() + ", and " + login
                     + " neither made its release " + held.newest().tag() + " nor owns it. Nothing was tagged.");
         }

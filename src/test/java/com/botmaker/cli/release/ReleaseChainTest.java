@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -236,5 +237,40 @@ class ReleaseChainTest {
         assertNull(chain.log());
         assertTrue(Files.notExists(umbrella.resolve("releases")));
         assertEquals(Order.toTag(fiveModules().keySet()), walked);
+    }
+
+    /**
+     * After the verify pass: the catalog step for each tagged Maven artifact JitPack built, and nothing it says stops
+     * the release — a refusal and a throw are each that module's {@code refused} row, the next module still listed.
+     */
+    @Test
+    void theCatalogPassListsTaggedBuiltPluginsAndAFailureStopsNothing(@TempDir Path umbrella) {
+        List<ReleaseLog.Row> rows = List.of(
+                new ReleaseLog.Row(Module.SHARED, new Version(0, 1, 0)).withStage(ReleaseLog.Stage.TAGGED),
+                new ReleaseLog.Row(Module.PLUGIN_BASICS, new Version(0, 5, 0)).withStage(ReleaseLog.Stage.BUILT)
+                        .withJitpack("BROKEN", "no jar"),
+                new ReleaseLog.Row(Module.SDK, new Version(1, 7, 0)).withStage(ReleaseLog.Stage.TAGGED),
+                new ReleaseLog.Row(Module.SESSION, new Version(0, 1, 0)).withStage(ReleaseLog.Stage.NOT_REACHED),
+                new ReleaseLog.Row(Module.STUDIO, new Version(1, 3, 0)).withStage(ReleaseLog.Stage.TAGGED));
+        List<Module> asked = new ArrayList<>();
+        List<String> said = new ArrayList<>();
+
+        List<ReleaseLog.Row> done = Release.catalogPass(new Runner(false, said::add), umbrella, rows,
+                (module, version, dir, say) -> {
+                    asked.add(module);
+                    assertEquals(umbrella.resolve(module.directory()), dir);
+                    return switch (module) {
+                        case SHARED -> Optional.empty();
+                        case SDK -> throw new IllegalStateException("gh is gone");
+                        default -> Optional.of(new CatalogStep.Listed("pull request opened", "u", ""));
+                    };
+                });
+
+        assertEquals(List.of(Module.SHARED, Module.SDK), asked, "broken, untagged and non-Maven rows are skipped");
+        assertEquals(rows.get(0), done.get(0), "a module the catalog does not list keeps its row");
+        assertEquals(CatalogStep.REFUSED, done.get(2).catalog());
+        assertEquals("gh is gone", done.get(2).catalogError());
+        assertTrue(said.stream().anyMatch(line -> line.startsWith("warning: botmaker-sdk v1.7.0 is not listed")), said.toString());
+        assertEquals(rows.subList(3, 5), done.subList(3, 5));
     }
 }

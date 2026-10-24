@@ -4,9 +4,11 @@ import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.BotEntry;
 import com.botmaker.cli.catalog.Catalog;
 import com.botmaker.cli.catalog.Entry;
+import com.botmaker.cli.catalog.EntryGate;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.FakeFacts;
 import com.botmaker.cli.catalog.PluginEntry;
+import com.botmaker.cli.catalog.Publishers;
 import com.botmaker.cli.release.Jitpack;
 import com.botmaker.cli.release.Level;
 import org.junit.jupiter.api.Test;
@@ -67,9 +69,16 @@ class PublishTest {
 
         @Override
         public Optional<Catalog> catalog() {
-            return Optional.empty();
+            return index;
+        }
+
+        @Override
+        public Optional<Publishers> publishers() {
+            return publishers;
         }
     };
+    private Optional<Catalog> index = Optional.empty();
+    private Optional<Publishers> publishers = Optional.empty();
 
     private final Jitpack.Probe jitpack = new Jitpack.Probe() {
         @Override
@@ -252,5 +261,91 @@ class PublishTest {
         runner.failing.add(List.of("git", "push", "origin", "HEAD"));
         assertInstanceOf(Publish.Outcome.Refused.class, publish());
         assertEquals(List.of("git push origin HEAD"), runner.commands());
+    }
+
+    /** An admin (by account id) lists an entry whose release no one person made: rule 4's exception, as the catalog's. */
+    @Test
+    void an_admin_lists_a_release_the_actions_bot_made() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        runner.login = "maintainer";
+        facts.release(REPO, "v0.0.9", EntryGate.ACTIONS_BOT).release(REPO, "v0.1.0", EntryGate.ACTIONS_BOT);
+        listed.put("plugins/" + ID + ".json", new PluginEntry(ID, REPO, List.of(FakeFacts.pluginRelease("v0.0.9"))));
+        Publish.Outcome refused = publish(EntryPath.Kind.PLUGIN, Optional.of("v0.1.0"), false);
+        assertInstanceOf(Publish.Outcome.Refused.class, refused, "not an admin: " + refused);
+
+        publishers = Optional.of(new Publishers(List.of(new Publishers.Publisher(runner.accountId, "maintainer")),
+                List.of()));
+        Publish.Outcome outcome = publish(EntryPath.Kind.PLUGIN, Optional.of("v0.1.0"), false);
+        assertInstanceOf(Publish.Outcome.Opened.class, outcome, outcome.toString());
+    }
+
+    private Optional<Publish.Outcome> listRelease(String tag, Jitpack.Sleeper sleeper) {
+        return new Publish(facts, catalog, Checks.LEFT_TO_THE_CATALOG, jitpack, sleeper)
+                .listRelease(dir, REPO, tag, "botmaker release", FakeRunner.QUIET, runner);
+    }
+
+    private void catalogLists(String repo) {
+        index = Optional.of(new Catalog(4, "", List.of(new Catalog.Plugin(ID, repo, null, "com.github." + repo
+                .replace('/', ':'), ID, "", List.of(), 0, List.of())), List.of()));
+    }
+
+    @Test
+    void a_release_lists_no_plugin_the_catalog_does_not_list() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        catalogLists("otherdev/other");
+        assertEquals(Optional.empty(), listRelease("v0.1.0", duration -> true));
+        assertEquals(List.of(), runner.changes);
+        index = Optional.empty();
+        assertInstanceOf(Publish.Outcome.Refused.class, listRelease("v0.1.0", duration -> true).orElseThrow(),
+                "an unread catalog.json is said, not taken for \"not listed\"");
+    }
+
+    /** The release library's step: its CI's GitHub Release awaited, the tag appended, nothing tagged here. */
+    @Test
+    void a_release_appends_its_tag_once_the_github_release_is_out() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        FakeRunner.git(dir, "tag", "v0.2.0");
+        FakeRunner.commit(dir, "back-to-snapshot");
+        catalogLists(REPO);
+        facts.release(REPO, "v0.1.0", "somedev");
+        listed.put("plugins/" + ID + ".json", new PluginEntry(ID, REPO, List.of(FakeFacts.pluginRelease("v0.1.0"))));
+        int[] slept = {0};
+        Optional<Publish.Outcome> outcome = listRelease("v0.2.0", duration -> {
+            if (++slept[0] == 2) facts.release(REPO, "v0.2.0", "somedev");
+            return true;
+        });
+
+        Publish.Outcome.Opened opened = assertInstanceOf(Publish.Outcome.Opened.class, outcome.orElseThrow(),
+                outcome.toString());
+        assertEquals(List.of("v0.1.0", "v0.2.0"),
+                opened.entry().releases().stream().map(ApprovedRelease::tag).toList());
+        assertTrue(slept[0] >= 2, "waited for the release");
+        assertTrue(runner.commands().stream().noneMatch(c -> c.startsWith("git tag") || c.startsWith("gh release")
+                || c.equals("git push origin HEAD")), runner.commands().toString());
+    }
+
+    @Test
+    void a_release_whose_github_release_never_comes_is_refused_naming_the_command() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        catalogLists(REPO);
+        Publish.Outcome.Refused refused = assertInstanceOf(Publish.Outcome.Refused.class,
+                listRelease("v0.2.0", duration -> true).orElseThrow());
+        assertTrue(refused.reason().contains("botmaker plugin publish --tag v0.2.0"), refused.reason());
+        assertTrue(refused.reason().contains("was not out after 20 minutes"), refused.reason());
+        assertEquals(List.of(), runner.changes);
+
+        Publish.Outcome.Refused stopped = assertInstanceOf(Publish.Outcome.Refused.class,
+                listRelease("v0.2.0", duration -> false).orElseThrow());
+        assertTrue(stopped.reason().startsWith("stopped while waiting"), "a Stop is no timeout: " + stopped.reason());
+    }
+
+    @Test
+    void checks_left_to_the_catalog_never_publish_a_new_version() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        Publish.Outcome outcome = new Publish(facts, catalog, Checks.LEFT_TO_THE_CATALOG, jitpack, duration -> true)
+                .run(new PublishRequest(dir, EntryPath.Kind.PLUGIN, Level.PATCH, Optional.empty(), Optional.empty(),
+                        false, "test"), FakeRunner.QUIET, runner);
+        assertInstanceOf(Publish.Outcome.Refused.class, outcome);
+        assertEquals(List.of(), runner.changes);
     }
 }

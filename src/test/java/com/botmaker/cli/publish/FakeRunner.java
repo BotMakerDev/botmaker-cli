@@ -28,6 +28,8 @@ final class FakeRunner implements StepRunner {
     final List<List<String>> failing = new ArrayList<>();
     private final FakeFacts facts;
     String login = "somedev";
+    /** The signed-in account's id, which {@code publishers.json} ranks. */
+    long accountId = 7;
 
     FakeRunner(FakeFacts facts) {
         this.facts = facts;
@@ -42,6 +44,7 @@ final class FakeRunner implements StepRunner {
     public Optional<String> read(Path dir, List<String> argv) {
         if (argv.getFirst().equals("git")) return system(dir, argv);
         if (argv.equals(List.of("gh", "api", "user", "--jq", ".login"))) return Optional.ofNullable(login);
+        if (argv.equals(List.of("gh", "api", "user", "--jq", ".id"))) return Optional.of(String.valueOf(accountId));
         if (argv.subList(0, 3).equals(List.of("gh", "repo", "view"))) {
             return existingRepos.contains(argv.get(3)) ? Optional.of("{}") : Optional.empty();
         }

@@ -107,10 +107,20 @@ public final class ReleaseLog {
      */
     public record Row(Module module, Version version, Stage stage, String failure, String jitpack,
                       String actions, String jitpackError, String actionsError, String elapsed,
-                      String actionsUrl) {
+                      String actionsUrl, String catalog, String catalogUrl, String catalogError) {
 
         public Row {
             actionsUrl = actionsUrl == null ? "" : actionsUrl;
+            catalog = catalog == null ? "" : catalog;
+            catalogUrl = catalogUrl == null ? "" : catalogUrl;
+            catalogError = catalogError == null ? "" : catalogError;
+        }
+
+        /** The ten-argument shape from before a row carried the catalog step ({@link CatalogStep}). */
+        public Row(Module module, Version version, Stage stage, String failure, String jitpack,
+                   String actions, String jitpackError, String actionsError, String elapsed, String actionsUrl) {
+            this(module, version, stage, failure, jitpack, actions, jitpackError, actionsError, elapsed, actionsUrl,
+                    "", "", "");
         }
 
         /** The nine-argument shape from before a row carried the run's URL. */
@@ -125,23 +135,23 @@ public final class ReleaseLog {
 
         public Row withStage(Stage next) {
             return new Row(module, version, next, failure, jitpack, actions, jitpackError, actionsError,
-                    elapsed, actionsUrl);
+                    elapsed, actionsUrl, catalog, catalogUrl, catalogError);
         }
 
         public Row failed(String step, String message) {
             return new Row(module, version, Stage.FAILED, step + ": " + message, jitpack, actions,
-                    jitpackError, actionsError, elapsed, actionsUrl);
+                    jitpackError, actionsError, elapsed, actionsUrl, catalog, catalogUrl, catalogError);
         }
 
         /** Why the chain stopped at this row, keeping its stage: a row can be tagged and still be the stop. */
         public Row stoppedAt(String step, String message) {
             return new Row(module, version, stage, step + ": " + message, jitpack, actions, jitpackError,
-                    actionsError, elapsed, actionsUrl);
+                    actionsError, elapsed, actionsUrl, catalog, catalogUrl, catalogError);
         }
 
         public Row withJitpack(String verdict, String error) {
             return new Row(module, version, stage, failure, verdict, actions, error, actionsError, elapsed,
-                    actionsUrl);
+                    actionsUrl, catalog, catalogUrl, catalogError);
         }
 
         public Row withActions(String verdict, String error) {
@@ -151,7 +161,18 @@ public final class ReleaseLog {
         /** The same, with the run the verdict is about. */
         public Row withActions(String verdict, String error, String url) {
             return new Row(module, version, stage, failure, jitpack, verdict, jitpackError, error, elapsed,
-                    url);
+                    url, catalog, catalogUrl, catalogError);
+        }
+
+        /** What the catalog step did ({@link CatalogStep.Listed}); a row it never reached keeps all three empty. */
+        public Row withCatalog(String verdict, String url, String error) {
+            return new Row(module, version, stage, failure, jitpack, actions, jitpackError, actionsError, elapsed,
+                    actionsUrl, verdict, url, error);
+        }
+
+        /** The {@code ## Catalog} cell: the verdict, a link to the pull request when there is one. */
+        String catalogCell() {
+            return catalogUrl.isBlank() ? catalog : "[" + catalog + "](" + catalogUrl + ")";
         }
 
         /**
@@ -162,7 +183,7 @@ public final class ReleaseLog {
          */
         public Row withElapsed(Duration took) {
             return new Row(module, version, stage, failure, jitpack, actions, jitpackError, actionsError,
-                    ReleaseLog.elapsed(took), actionsUrl);
+                    ReleaseLog.elapsed(took), actionsUrl, catalog, catalogUrl, catalogError);
         }
 
         /**
@@ -283,15 +304,36 @@ public final class ReleaseLog {
         // The errors go in full UNDER the table rather than in it: a cell holds a verdict, and what a
         // reader needs six weeks later is the message Maven or Actions actually printed.
         if (rows.stream().anyMatch(row -> !row.failure().isBlank() || !row.jitpackError().isBlank()
-                || !row.actionsError().isBlank())) {
+                || !row.actionsError().isBlank() || !row.catalogError().isBlank())) {
             out.append("\n## Errors\n");
             for (Row row : rows) {
                 append(out, row.module(), "release", row.failure());
                 append(out, row.module(), "jitpack", row.jitpackError());
                 append(out, row.module(), "actions", row.actionsError());
+                append(out, row.module(), "catalog", row.catalogError());
             }
         }
+        out.append(catalogSection(rows));
         out.append(timingSection(rows, timing));
+        return out.toString();
+    }
+
+    /**
+     * {@code ## Catalog}: what {@link CatalogStep} did for each plugin the catalog lists, or nothing when it did
+     * nothing. A section of two-cell rows for the timings' reason: the dashboard's reader takes a row of six or
+     * seven cells as a module's, and declines these. A refusal's whole text is under {@code ## Errors}, as
+     * {@code <module> — catalog}, where every dashboard already shows a module's errors.
+     */
+    private static String catalogSection(List<Row> rows) {
+        List<Row> listed = rows.stream().filter(row -> !row.catalog().isBlank()).toList();
+        if (listed.isEmpty()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder("\n## Catalog\n\n| plugin | catalog |\n|---|---|\n");
+        for (Row row : listed) {
+            out.append("| ").append(row.module().directory())
+                    .append(" | ").append(row.catalogCell()).append(" |\n");
+        }
         return out.toString();
     }
 
@@ -382,6 +424,7 @@ public final class ReleaseLog {
         Map<String, Integer> column = new HashMap<>();
         Map<String, String> errors = errors(lines);
         Map<String, String> timings = timings(lines);
+        Map<String, String> catalogs = catalogs(lines);
         List<Row> rows = new ArrayList<>();
         for (String line : lines) {
             // Every section under the release table has its own shape, and one of them is a second table
@@ -408,6 +451,7 @@ public final class ReleaseLog {
             Stage stage = cell(cells, column, "stage").map(Stage::fromCell).orElse(Stage.TAGGED);
             String dir = module.directory();
             String actions = verdict(cells, column, "actions");
+            String catalog = catalogs.getOrDefault(dir, "");
             rows.add(new Row(module, version, stage,
                     errors.getOrDefault(dir + " — release", ""),
                     verdict(cells, column, "jitpack"),
@@ -415,7 +459,10 @@ public final class ReleaseLog {
                     errors.getOrDefault(dir + " — jitpack", ""),
                     errors.getOrDefault(dir + " — actions", ""),
                     timings.getOrDefault(dir, ""),
-                    linkTarget(actions)));
+                    linkTarget(actions),
+                    linkText(catalog),
+                    linkTarget(catalog),
+                    errors.getOrDefault(dir + " — catalog", "")));
         }
         return List.copyOf(rows);
     }
@@ -479,23 +526,31 @@ public final class ReleaseLog {
      * measurement it was in no position to take.
      */
     private static Map<String, String> timings(List<String> lines) {
-        Map<String, String> timings = new HashMap<>();
+        return twoCells(lines, "## Timing", "| step |");
+    }
+
+    /** The {@code ## Catalog} table as {@code module -> cell}, read back for the same reason as the timings. */
+    private static Map<String, String> catalogs(List<String> lines) {
+        return twoCells(lines, "## Catalog", "| plugin |");
+    }
+
+    private static Map<String, String> twoCells(List<String> lines, String heading, String header) {
+        Map<String, String> cells = new HashMap<>();
         boolean inSection = false;
         for (String line : lines) {
             if (line.startsWith("## ")) {
-                inSection = line.strip().equals("## Timing");
+                inSection = line.strip().equals(heading);
                 continue;
             }
-            if (!inSection || !line.startsWith("| ") || line.startsWith("| step |")
-                    || line.startsWith("|---")) {
+            if (!inSection || !line.startsWith("| ") || line.startsWith(header) || line.startsWith("|---")) {
                 continue;
             }
-            String[] cells = line.split("\\|");
-            if (cells.length > 2) {
-                timings.put(cells[1].strip(), cells[2].strip());
+            String[] split = line.split("\\|");
+            if (split.length > 2) {
+                cells.put(split[1].strip(), split[2].strip());
             }
         }
-        return timings;
+        return cells;
     }
 
     /** What the run itself took, for a caller rewriting a log it did not produce. */

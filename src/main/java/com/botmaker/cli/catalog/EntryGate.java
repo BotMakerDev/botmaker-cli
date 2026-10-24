@@ -334,7 +334,7 @@ public final class EntryGate {
     }
 
     /** {@link #checkEntry(Entry, String, String, Optional, EntryFacts)}, with rules 3 and 4 passed for an admin. */
-    static List<Finding> checkEntry(Entry entry, String path, String author, boolean admin,
+    public static List<Finding> checkEntry(Entry entry, String path, String author, boolean admin,
                                     Optional<? extends Entry> previous, EntryFacts facts) {
         List<Finding> findings = new ArrayList<>();
         if (!Entry.isSlug(entry.repo())) {

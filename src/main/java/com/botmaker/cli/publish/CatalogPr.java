@@ -10,6 +10,7 @@ import com.botmaker.cli.catalog.EntryGate;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.GitHubFacts;
 import com.botmaker.cli.catalog.PluginEntry;
+import com.botmaker.cli.catalog.Publishers;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.io.IOException;
@@ -45,6 +46,11 @@ public final class CatalogPr {
         /** {@code catalog.json}, or empty. */
         Optional<Catalog> catalog();
 
+        /** {@code publishers.json}, or empty: nobody is an admin. */
+        default Optional<Publishers> publishers() {
+            return Optional.empty();
+        }
+
         /** Through GitHub's raw files. */
         static Reader of(GitHubFacts facts) {
             return new Reader() {
@@ -66,6 +72,17 @@ public final class CatalogPr {
                     return facts.raw(REPO, BRANCH, Catalog.FILE).flatMap(json -> {
                         try {
                             return Optional.of(CatalogJson.lenient().readValue(json, Catalog.class));
+                        } catch (JsonProcessingException e) {
+                            return Optional.empty();
+                        }
+                    });
+                }
+
+                @Override
+                public Optional<Publishers> publishers() {
+                    return facts.raw(REPO, BRANCH, Publishers.FILE).flatMap(json -> {
+                        try {
+                            return Optional.of(CatalogJson.strict().readValue(json, Publishers.class));
                         } catch (JsonProcessingException e) {
                             return Optional.empty();
                         }
@@ -275,5 +292,20 @@ public final class CatalogPr {
     /** The login {@code gh} is signed in as, or empty. */
     public static Optional<String> login(StepRunner runner) {
         return runner.read(Path.of("."), List.of("gh", "api", "user", "--jq", ".login")).filter(s -> !s.isBlank());
+    }
+
+    /**
+     * Whether the signed-in account is an admin in the catalog's {@code publishers.json}, by its account id as the
+     * catalog's check reads it. Unreadable is no: the exception is lost, never granted.
+     */
+    public static boolean admin(StepRunner runner, Reader catalog) {
+        Optional<Long> id = runner.read(Path.of("."), List.of("gh", "api", "user", "--jq", ".id")).flatMap(s -> {
+            try {
+                return Optional.of(Long.parseLong(s.strip()));
+            } catch (NumberFormatException e) {
+                return Optional.empty();
+            }
+        });
+        return id.isPresent() && catalog.publishers().map(p -> p.isAdmin(id.get())).orElse(false);
     }
 }

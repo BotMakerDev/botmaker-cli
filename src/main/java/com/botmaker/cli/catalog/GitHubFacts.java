@@ -59,9 +59,15 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
 
     @Override
     public Optional<Release> release(String repo, String tag) {
-        return releases.computeIfAbsent(repo + "@" + tag, k -> api(API + repo + "/releases/tags/" + encode(tag))
+        // Only a published release is kept: a publish waits for one its CI is still making (Publish.listRelease),
+        // and a cached "none" or draft would answer every later ask.
+        Optional<Release> known = releases.get(repo + "@" + tag);
+        if (known != null) return known;
+        Optional<Release> found = api(API + repo + "/releases/tags/" + encode(tag))
                 .map(json -> new Release(json.path("author").path("login").asText(),
-                        json.path("draft").asBoolean(), json.path("prerelease").asBoolean())));
+                        json.path("draft").asBoolean(), json.path("prerelease").asBoolean()));
+        found.filter(release -> !release.draft()).ifPresent(release -> releases.put(repo + "@" + tag, found));
+        return found;
     }
 
     @Override

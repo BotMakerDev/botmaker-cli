@@ -28,12 +28,15 @@ import java.util.stream.Collectors;
  *   <li><b>Tag in {@link Order#TAG}</b> — the pilot first, Studio last. A module that throws stops the chain
  *       and is recorded, with the tagged modules' pointers, before the exception leaves
  *       ({@link #tagChain}).</li>
- *   <li><b>Verify, then record the pointers and push the branches</b>, umbrella last.</li>
+ *   <li><b>Verify, then list each released plugin the catalog lists</b> ({@link CatalogStep}), then record the
+ *       pointers and push the branches, umbrella last.</li>
  * </ol>
  *
  * <p>It opened the plugin registry's pull requests moving each released plugin's {@code verifiedVersion} until
  * 2026-10-12, when the ones for SDK v1.4.3 and v1.4.4 failed the registry's gate and sat unmerged: Studio now
- * installs a plugin at JitPack's newest build, so the registry's pin moves nothing.
+ * installs a plugin at JitPack's newest build, so the registry's pin moves nothing. Since 2026-10-24 the catalog
+ * keeps every approved release, so a release appends its plugins' new tags again, through the catalog's own
+ * publish steps.
  */
 public final class Release {
 
@@ -57,9 +60,10 @@ public final class Release {
      * @param wait whether to block on each JitPack build before tagging the next module. Costs a few
      *             minutes per link and is worth it: a build result is cached per tag, so losing the race
      *             burns a tag that cannot be reused (see {@link Jitpack}).
+     * @param catalog lists each released plugin's new tag in the catalog, after the verify pass
      */
     public static Outcome run(Runner runner, Path umbrella, Map<Module, String> requested,
-                              boolean force, boolean wait, boolean why) {
+                              boolean force, boolean wait, boolean why, CatalogStep catalog) {
         // From here rather than from the first tag: "how long does a release take" is asked by somebody
         // about to start one, and the decide pass and the gates are part of the wait.
         java.time.Instant started = java.time.Instant.now();
@@ -112,12 +116,16 @@ public final class Release {
                     .collect(Collectors.joining(" "));
             runner.say("    (dry-run) would verify on JitPack: "
                     + (artifacts.isEmpty() ? "nothing (no Maven artifact in this release)" : artifacts));
+            if (!artifacts.isEmpty()) {
+                runner.say("    (dry-run) would list in the catalog each of these it lists: " + artifacts);
+            }
         }
         if (log != null) {
             // Every tag is pushed by now, so this blocks nothing: it fills the log's columns in.
             java.time.Instant verifyStarted = java.time.Instant.now();
-            List<ReleaseLog.Row> polled = VerifyPass.run(runner, chain.rows(),
+            List<ReleaseLog.Row> verified = VerifyPass.run(runner, chain.rows(),
                     (own, row) -> row.stage().tagged() ? VerifyPass.verify(own, row) : row);
+            List<ReleaseLog.Row> polled = catalogPass(runner, umbrella, verified, catalog);
             ReleaseLog.Timing timing = new ReleaseLog.Timing(
                     ReleaseLog.elapsed(java.time.Duration.between(verifyStarted, java.time.Instant.now())),
                     ReleaseLog.elapsed(java.time.Duration.between(started, java.time.Instant.now())));
@@ -132,6 +140,44 @@ public final class Release {
         return new Outcome(plan, List.of(), Optional.ofNullable(log), pushed);
     }
 
+
+    /**
+     * The catalog step for each row tagged whose JitPack build is not broken, one after another. <b>Nothing in it
+     * stops the release</b>, like the verify pass before it: every tag is out, the log is still to be written, and a
+     * plugin that could not be listed is a {@code refused} row with its reason, listed later by
+     * {@code botmaker plugin publish --tag} in its folder.
+     */
+    static List<ReleaseLog.Row> catalogPass(Runner runner, Path umbrella, List<ReleaseLog.Row> rows,
+                                            CatalogStep step) {
+        List<ReleaseLog.Row> done = new ArrayList<>(rows.size());
+        for (ReleaseLog.Row row : rows) {
+            if (!row.stage().tagged() || !ReleaseLog.onJitpack(row.module()) || row.jitpack().startsWith("BROKEN")
+                    || row.stage() == ReleaseLog.Stage.JITPACK_FAILED) {
+                done.add(row);
+                continue;
+            }
+            Optional<CatalogStep.Listed> listed;
+            if (runner.stopping()) {
+                done.add(row.withCatalog(CatalogStep.REFUSED, "", STOPPED_BY_YOU + " before the catalog step."));
+                continue;
+            }
+            try {
+                listed = step.list(row.module(), row.version(), umbrella.resolve(row.module().directory()),
+                        runner::say);
+            } catch (RuntimeException e) {
+                listed = Optional.of(CatalogStep.Listed.refused(
+                        e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            }
+            done.add(listed.map(l -> {
+                if (!l.error().isBlank()) {
+                    runner.say("warning: " + row.module().directory() + " " + row.version().tag()
+                            + " is not listed in the catalog: " + l.error().lines().findFirst().orElse(""));
+                }
+                return row.withCatalog(l.verdict(), l.url(), l.error());
+            }).orElse(row));
+        }
+        return List.copyOf(done);
+    }
 
     /** What the tag chain left: the log it kept (null on a dry run) and every row's final stage. */
     record Chain(Path log, List<ReleaseLog.Row> rows) {

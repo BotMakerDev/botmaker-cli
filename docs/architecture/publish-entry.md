@@ -30,6 +30,15 @@
    can lag a tag just pushed), appended to the entry or a new one, the catalog's rules 2–5 run here
    (`EntryGate.checkEntry`), then `CatalogPr.open`.
 
+Rule 4, at step 3 and in step 6's `checkEntry`, has the catalog's own exception: an admin in `publishers.json` (the
+signed-in account's id, `gh api user`) may change any entry (2026-10-24). A release the Actions bot made in an
+organisation's repository is otherwise nobody's to list.
+
+`Publish.listRelease` is the release library's entry (`ReleaseListing`, `release-library.md`): a tag the release
+just pushed, listed only when `catalog.json` lists a plugin of the repository, once its GitHub Release is out.
+`Checks.LEFT_TO_THE_CATALOG` is for a host that loads no plugin (the dashboard): it checks no jar, the known entry
+path stands, and it refuses to publish a new version.
+
 `Publish` prints nothing: progress goes to a `Listener`, every `git` and `gh` through a `StepRunner` (which tells
 `gh` never to prompt), and a refusal is the `Outcome` it returns. A plugin's id names its entry and is read off
 the loaded jar, so a plugin's entry path is known up front only from `catalog.json`'s row for its repository.

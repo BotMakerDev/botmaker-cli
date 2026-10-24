@@ -1,5 +1,6 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.publish.ReleaseListing;
 import com.botmaker.cli.release.Module;
 import com.botmaker.cli.release.PomVersions;
 import com.botmaker.cli.release.Release;
@@ -219,7 +220,8 @@ public final class ReleaseCommand implements Callable<Integer> {
             parent.console().error("nothing to release — pass --all or a module flag.");
             return 2;
         }
-        Release.Outcome outcome = Release.run(runner, umbrella, requested, force, wait, why);
+        Release.Outcome outcome = Release.run(runner, umbrella, requested, force, wait, why,
+                ReleaseListing.of(catalog -> new CliChecks(parent, catalog), runner::stopping, "botmaker release"));
         if (outcome.refused()) {
             outcome.refusals().forEach(refused -> parent.console().error(refused.refusal()));
             return 1;

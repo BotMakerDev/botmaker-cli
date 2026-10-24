@@ -112,6 +112,34 @@ class ReleaseLogTest {
         assertEquals("https://example.invalid/run/9", back.actionsUrl());
     }
 
+    /**
+     * The catalog step's answer is a section of two-cell rows, never an eighth column: the dashboard's reader takes
+     * six or seven cells as a module's row. A refusal's text is a {@code catalog} error block, and both read back so
+     * a {@code --status} rewrite keeps them.
+     */
+    @Test
+    void theCatalogStepIsASectionAndAnErrorAndReadsBack() {
+        ReleaseLog.Row opened = new ReleaseLog.Row(Module.PLUGIN_BASICS, new Version(0, 5, 0))
+                .withStage(ReleaseLog.Stage.TAGGED)
+                .withCatalog("pull request opened", "https://example.invalid/pull/3", "");
+        ReleaseLog.Row refused = new ReleaseLog.Row(Module.SDK, new Version(1, 7, 0))
+                .withStage(ReleaseLog.Stage.TAGGED)
+                .withCatalog(CatalogStep.REFUSED, "", "the GitHub Release was not out");
+        ReleaseLog.Row studio = new ReleaseLog.Row(Module.STUDIO, new Version(1, 3, 0)).withStage(ReleaseLog.Stage.TAGGED);
+
+        String rendered = ReleaseLog.render(WHEN, List.of(opened, refused, studio));
+        assertTrue(rendered.contains("## Catalog\n\n| plugin | catalog |\n|---|---|\n"
+                + "| botmaker-plugin-basics | [pull request opened](https://example.invalid/pull/3) |\n"
+                + "| botmaker-sdk | refused |\n"), rendered);
+        assertTrue(rendered.contains("**botmaker-sdk — catalog**\n```\nthe GitHub Release was not out\n```"), rendered);
+        assertFalse(rendered.substring(rendered.indexOf("## Catalog")).contains("| botmaker-studio | "),
+                "a row the step never reached is not in the section");
+
+        List<ReleaseLog.Row> back = ReleaseLog.parse(rendered.lines().toList());
+        assertEquals(List.of(opened, refused, studio), back);
+        assertFalse(ReleaseLog.render(WHEN, List.of(studio)).contains("## Catalog"), "no section when nothing listed");
+    }
+
     /** Every log written before 2026-09-19: a plain verdict, and no run to open. */
     @Test
     void aCellWithNoLinkIsStillReadAsAVerdict() {

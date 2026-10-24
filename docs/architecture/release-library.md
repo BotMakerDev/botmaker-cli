@@ -116,6 +116,22 @@ v1.4.4 failed the registry's gate (its CI pinned cli v0.3.0, whose contract lack
 unmerged, so Studio kept installing v1.4.2. Studio installs a plugin at JitPack's newest build since, and the
 release leaves the registry alone.
 
+**The catalog's pull request, again (2026-10-24).** The catalog keeps every approved release, so a release appends
+its plugins' new tags (the user's call: the release always opens it). After the verify pass, `Release.catalogPass`
+runs the caller's `CatalogStep` for each row tagged on JitPack whose build is not broken; `ReleaseListing` is
+`Publish.listRelease` for `BotMakerDev/<directory>`, which lists nothing unless `catalog.json` lists a plugin of
+that repository, waits up to 20 minutes for the tag's GitHub Release (its own CI's JReleaser job makes it), then
+runs the publish steps with `--tag` (`EXISTING`: nothing tagged, the jar checked from JitPack, the release pinned,
+the pull request opened). The step is in the publish library, which builds on this package; `CatalogStep` is the
+hook. Nothing it says stops the release: a refusal or a throw is the module's `refused` row in the log's
+`## Catalog` section (two-cell rows, for the reason the timings are a section: an eighth column makes every
+installed dashboard drop the rows) with its reason as a `<module> — catalog` error block, which the dashboard's lanes
+show with the module's other errors; `botmaker plugin publish --tag <tag>` in the module's folder lists it later.
+`--dry-run` names the artifacts it would list and calls nothing. `botmaker release` checks the jar with
+`PluginValidator`; the dashboard, which loads no plugin, passes `Checks.LEFT_TO_THE_CATALOG` and leaves the checks
+to the catalog's pull-request check. Both pass rule 4 as an admin (`publishers.json`, by account id): the
+releases are made by the Actions bot and the repositories are the organisation's.
+
 **A run that does not wait still stops on a failed upstream (2026-10-12).** A waiting run stops at an owed wait
 JitPack answers `Error` (`Release.AfterTag`). Under `--no-wait-jitpack`, before tagging a module that resolves
 its upstreams from JitPack, `Waits.failedUpstream` asks JitPack once, without waiting, about each upstream this
