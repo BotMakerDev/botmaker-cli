@@ -64,7 +64,7 @@ public final class EntryGate {
     public static final String ACTIONS_BOT = "github-actions[bot]";
 
     /** A tag git and a URL both carry as is. */
-    static final Pattern TAG = Pattern.compile("[A-Za-z0-9_][A-Za-z0-9._+-]{0,99}");
+    public static final Pattern TAG =Pattern.compile("[A-Za-z0-9_][A-Za-z0-9._+-]{0,99}");
 
     /**
      * A pull request as the check sees it.
@@ -503,7 +503,7 @@ public final class EntryGate {
     }
 
     /** The catalog's plugin ids by coordinate key ({@link PomFacts#key}). */
-    static Map<String, String> pluginIds(Optional<Catalog> catalog) {
+    public static Map<String, String> pluginIds(Optional<Catalog> catalog) {
         return catalog.map(c -> c.plugins().stream().collect(Collectors.toMap(
                 p -> p.coordinate().toLowerCase(Locale.ROOT), Catalog.Plugin::id, (a, b) -> a))).orElse(Map.of());
     }

@@ -19,12 +19,12 @@ import java.util.Set;
  * JitPack serves {@link #shaOf}{@code ("jar:" + tag)} unless the test says otherwise, which is what
  * {@link #botRelease} and {@link #pluginRelease} pin.
  */
-final class FakeFacts implements EntryFacts, PomFacts.Source {
+public final class FakeFacts implements EntryFacts, PomFacts.Source {
 
     final Map<String, Repo> repos = new HashMap<>();
-    final Map<String, Release> releases = new HashMap<>();
-    final Map<String, String> commits = new HashMap<>();
-    final Set<String> jitpack = new HashSet<>();
+    public final Map<String, Release> releases = new HashMap<>();
+    public final Map<String, String> commits = new HashMap<>();
+    public final Set<String> jitpack = new HashSet<>();
     final Map<String, String> hashes = new HashMap<>();
     final Map<String, String> poms = new HashMap<>();
 
@@ -39,7 +39,7 @@ final class FakeFacts implements EntryFacts, PomFacts.Source {
         return Optional.ofNullable(poms.get(repo + "@" + ref));
     }
 
-    FakeFacts repo(String slug, long ownerId, String description, String parent) {
+    public FakeFacts repo(String slug, long ownerId, String description, String parent) {
         return repo(slug, ownerId, slug, description, parent);
     }
 
@@ -52,7 +52,7 @@ final class FakeFacts implements EntryFacts, PomFacts.Source {
     }
 
     /** A published release made by {@code author}, its tag at {@link #commitOf}{@code (tag)}. */
-    FakeFacts release(String slug, String tag, String author) {
+    public FakeFacts release(String slug, String tag, String author) {
         releases.put(slug + "@" + tag, new Release(author, false, false));
         commits.put(slug + "@" + tag, commitOf(tag));
         return this;
@@ -86,7 +86,7 @@ final class FakeFacts implements EntryFacts, PomFacts.Source {
     }
 
     /** A commit hash for {@code tag}: 40 hex digits. */
-    static String commitOf(String tag) {
+    public static String commitOf(String tag) {
         return shaOf("commit:" + tag).substring(0, 40);
     }
 
@@ -99,11 +99,11 @@ final class FakeFacts implements EntryFacts, PomFacts.Source {
         }
     }
 
-    static ApprovedRelease botRelease(String tag) {
+    public static ApprovedRelease botRelease(String tag) {
         return ApprovedRelease.ofBot(tag, commitOf(tag));
     }
 
-    static ApprovedRelease pluginRelease(String tag) {
+    public static ApprovedRelease pluginRelease(String tag) {
         return new ApprovedRelease(tag, commitOf(tag), shaOf("jar:" + tag), shaOf("pom:" + tag));
     }
 

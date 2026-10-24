@@ -17,9 +17,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   refuses a tag that no longer points at the pinned commit, and refuses a plugin whose JitPack jar or pom no longer
   hashes to its pins; a bot is built at its pinned commit. `catalog.json` lists each entry's releases newest first
   with their pins and facts, each pom read at its commit, and leaves out a release whose GitHub Release is gone.
-- **`plugin publish` and `bot publish` append a pinned release** to the entry the catalog holds
-  (`ApprovedRelease.pinPlugin`/`pinBot`). `plugin publish --dry-run` prints the release it would list, no longer an
-  entry file.
+- **`plugin publish [patch|minor|major]` and `bot publish [patch|minor|major]` run in the folder and name
+  nothing.** The repository is the folder's `origin` (`--repo` must agree; a bot with none gets one created), the
+  version the newest `vX.Y.Z` bumped (`patch` by default, `v0.1.0` first) or `--tag`; `HEAD`'s released tag the
+  catalog lacks is listed instead of bumping, so a re-run after a failure finishes it. The folder is checked before
+  anything is tagged, then the command pushes, tags, releases, waits for JitPack (a plugin; a build `Error` stops
+  with its log and opens nothing), checks the jar, pins the release and opens the pull request appending it.
+  `--dry-run` checks and tags nothing. `--no-build`, the "no `--repo` = dry run" branch and `bot publish`'s fixed
+  `v0.1.0` are gone.
+- **`plugin unpublish` and `bot unpublish` take `--release <tag>`** to remove one release; the last one removes the
+  entry.
+
+### Added
+
+- **`com.botmaker.cli.publish`**, the silent library both publish commands are (`Publish`, `NextVersion`,
+  `PublishTarget`, `CatalogPr`, with a `Listener` and a `StepRunner`), for Studio's Publish and the release library
+  to call. `Jitpack.waitFor` takes any coordinate.
 
 ## [0.5.0] — 2026-10-23
 

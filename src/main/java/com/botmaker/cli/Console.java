@@ -64,10 +64,9 @@ public final class Console {
     /**
      * The same report, on {@code stderr}.
      *
-     * <p>For {@code botmaker plugin publish}, whose <em>result</em> is the entry JSON: a report sharing that stream
-     * makes {@code --dry-run > entry.json} produce something no parser will read, which is exactly the
-     * failure the stdout/stderr split above exists to prevent. Validation is a diagnostic there and the
-     * entry is the answer.
+     * <p>For {@code botmaker plugin publish}, whose <em>result</em> is the pull request's URL (or, with
+     * {@code --dry-run}, the release it would list): validation is a diagnostic there, and a report sharing stdout
+     * would bury the one line a script reads.
      */
     public void reportAside(List<CheckResult> results) {
         report(results, System.err);

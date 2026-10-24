@@ -24,7 +24,7 @@ import java.util.concurrent.Callable;
  * question "can this machine run the other verbs" must be answerable on a train.
  *
  * <p>The report is the command's <em>result</em>, so it goes to stdout — the same rule {@link Console}
- * opens with, which is why {@code plugin publish --dry-run} can be redirected into a file.
+ * opens with, which is why {@code plugin list} can be redirected into a file.
  */
 @Command(name = "doctor",
         header = "Check the tools the other commands need.",
@@ -107,8 +107,7 @@ final class DoctorCommand implements Callable<Integer> {
         Optional<String> out = Shell.capture(dir, "gh", "--version");
         return new Finding(out.isPresent(), false, "gh",
                 out.map(DoctorCommand::firstLine)
-                        .orElse("not installed — `plugin publish` and `bot publish` need it, "
-                                + "or use --dry-run and open the pull request by hand"));
+                        .orElse("not installed — `plugin publish`, `bot publish` and `unpublish` need it"));
     }
 
     private Finding ghAuth(Path dir) {

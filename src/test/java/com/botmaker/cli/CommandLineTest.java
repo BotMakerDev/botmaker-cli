@@ -1,5 +1,6 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.release.Level;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 import picocli.CommandLine.ParseResult;
@@ -192,11 +193,16 @@ class CommandLineTest {
         assertEquals("alice/farmbot", botNew.matchedOptionValue("--from", ""));
         assertEquals(".", applied(botNew, "--dir"));
 
-        ParseResult botPublish = parse("bot", "publish", "--repo", "me/farmbot").subcommand().subcommand();
+        ParseResult botPublish = parse("bot", "publish", "minor", "--repo", "me/farmbot").subcommand().subcommand();
         assertEquals("me/farmbot", botPublish.matchedOptionValue("--repo", ""));
-        assertEquals("v0.1.0", applied(botPublish, "--tag"));
-        assertEquals("me/farmbot", parse("bot", "unpublish", "--repo", "me/farmbot")
-                .subcommand().subcommand().matchedOptionValue("--repo", ""));
+        assertEquals(Level.MINOR, botPublish.matchedPositionalValue(0, Level.PATCH));
+        assertEquals("null", applied(botPublish, "--tag"), "no fixed first tag: the version is bumped from the folder");
+        assertEquals(CommandLine.ExitCode.USAGE, exit("plugin", "publish", "huge"), "patch, minor or major only");
+        assertEquals(CommandLine.ExitCode.USAGE, exit("plugin", "publish", "--no-build"), "the folder is always built");
+        ParseResult botUnpublish = parse("bot", "unpublish", "--repo", "me/farmbot", "--release", "v1.0.0")
+                .subcommand().subcommand();
+        assertEquals("me/farmbot", botUnpublish.matchedOptionValue("--repo", ""));
+        assertEquals("v1.0.0", botUnpublish.matchedOptionValue("--release", ""));
         assertEquals("list", parse("bot", "list").subcommand().subcommand().commandSpec().name());
     }
 
@@ -225,16 +231,6 @@ class CommandLineTest {
                 "--help/x", "-a/b", "a/-b", "a/.", "a/.."}) {
             assertThrows(IOException.class, () -> BotNewCommand.slug(bad), bad);
         }
-    }
-
-    /** A publish pushes only into the repository it names, never into one whose name merely contains it. */
-    @Test
-    void the_origin_check_compares_the_whole_repository() {
-        assertTrue(BotNewCommand.names("https://github.com/Alice/Farmbot.git", "alice/farmbot"));
-        assertTrue(BotNewCommand.names("git@github.com:alice/farmbot.git", "alice/farmbot"));
-        assertTrue(BotNewCommand.names("https://github.com/alice/farmbot/", "alice/farmbot"));
-        assertFalse(BotNewCommand.names("https://github.com/alice/farmbot-fork", "alice/farmbot"));
-        assertFalse(BotNewCommand.names("https://github.com/xalice/farmbot", "alice/farmbot"));
     }
 
     /**

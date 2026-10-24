@@ -85,6 +85,21 @@ public final class BotChecks {
         return checkClasses(clone.resolve("target/classes"), path);
     }
 
+    /**
+     * Rules 6–8 on the author's own folder, before a publish tags it. Compiled as the author's own build (their
+     * Maven settings and repository): it is their code on their machine, which {@link #check} cannot assume.
+     */
+    public static List<Finding> checkFolder(Path dir, String path, Map<String, String> pluginIds, Mvn mvn)
+            throws IOException {
+        List<Finding> pom = checkPom(dir.resolve("pom.xml"), path, pluginIds);
+        if (Finding.refused(pom)) return pom;
+        Mvn.Result compiled = mvn.run(dir, "-q", "compile", "-Dmaven.test.skip");
+        if (!compiled.ok()) {
+            return List.of(Finding.error(path, "the bot does not compile:\n" + compiled.tail(15)));
+        }
+        return checkClasses(dir.resolve("target/classes"), path);
+    }
+
     /** Rule 6. */
     static List<Finding> checkPom(Path pom, String path, Map<String, String> pluginIds) throws IOException {
         if (!Files.isRegularFile(pom, LinkOption.NOFOLLOW_LINKS)) {

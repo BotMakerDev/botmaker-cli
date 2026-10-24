@@ -8,8 +8,8 @@ their next run). The spec is the umbrella's `docs/superpowers/specs/2026-10-23-c
 `2026-10-24-easy-publish-design.md`; `registry-gate.md` is the gate this replaced.
 
 The check lives here for the reason the validator is a library: **it must be the code the author already ran.**
-`botmaker plugin publish` and `botmaker bot publish` run rules 2–5 before opening a pull request (`CatalogPr`,
-`EntryGate.checkEntry`), and Studio's Publish runs 3 and 5 (`CatalogListing.refusal`; 1 and 2 hold by how it
+`botmaker plugin publish` and `botmaker bot publish` run rules 2–5 before opening a pull request
+(`com.botmaker.cli.publish.Publish`, `EntryGate.checkEntry`, `publish-entry.md`), and Studio's Publish runs 3 and 5 (`CatalogListing.refusal`; 1 and 2 hold by how it
 writes the entry), so a refusal is met on the author's own machine first.
 
 ## Every approved release, pinned (2026-10-24)

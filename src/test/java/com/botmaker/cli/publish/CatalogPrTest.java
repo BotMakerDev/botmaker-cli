@@ -1,14 +1,21 @@
-package com.botmaker.cli;
+package com.botmaker.cli.publish;
 
 import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.BotEntry;
+import com.botmaker.cli.catalog.Catalog;
+import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryPath;
+import com.botmaker.cli.catalog.FakeFacts;
 import com.botmaker.cli.catalog.PluginEntry;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The pull request {@code publish} and {@code unpublish} open on the catalog: one file, one branch, via {@code gh}. */
@@ -66,5 +73,46 @@ class CatalogPrTest {
         assertTrue(steps.stream().noneMatch(CatalogPr.Step.Write.class::isInstance), steps.toString());
         assertEquals(new CatalogPr.Step.Run(true, List.of("git", "rm", "--quiet", "--",
                 "plugins/com.example.thing.json")), steps.get(3));
+    }
+
+    @Test
+    void unpublishing_one_release_keeps_the_others_and_the_last_one_removes_the_entry() throws Refusal {
+        FakeFacts facts = new FakeFacts().repo("somedev/thing", 2, "", null)
+                .release("somedev/thing", "v1", "somedev").release("somedev/thing", "v2", "somedev");
+        EntryPath path = EntryPath.parse("plugins/com.example.thing.json").orElseThrow();
+        Map<String, Entry> held = new HashMap<>(Map.of(path.path(), new PluginEntry("com.example.thing",
+                "somedev/thing", List.of(FakeFacts.pluginRelease("v1"), FakeFacts.pluginRelease("v2")))));
+        CatalogPr.Reader catalog = reader(held);
+
+        FakeRunner runner = new FakeRunner(facts);
+        CatalogPr.unpublish(path, Optional.of("v1"), "somedev", "test", facts, catalog, runner, FakeRunner.QUIET);
+        assertTrue(runner.commands().contains("git add -- plugins/com.example.thing.json"), runner.commands().toString());
+        assertTrue(runner.commands().getLast().contains("plugin: somedev/thing remove v1"), runner.commands().getLast());
+
+        held.put(path.path(), new PluginEntry("com.example.thing", "somedev/thing",
+                List.of(FakeFacts.pluginRelease("v2"))));
+        FakeRunner last = new FakeRunner(facts);
+        CatalogPr.unpublish(path, Optional.of("v2"), "somedev", "test", facts, catalog, last, FakeRunner.QUIET);
+        assertTrue(last.commands().contains("git rm --quiet -- plugins/com.example.thing.json"), last.commands().toString());
+
+        Refusal unknown = assertThrows(Refusal.class, () -> CatalogPr.unpublish(path, Optional.of("v9"), "somedev",
+                "test", facts, catalog, new FakeRunner(facts), FakeRunner.QUIET));
+        assertTrue(unknown.getMessage().contains("lists no release v9"), unknown.getMessage());
+        assertThrows(Refusal.class, () -> CatalogPr.unpublish(path, Optional.empty(), "otherdev", "test", facts,
+                catalog, new FakeRunner(facts), FakeRunner.QUIET), "only whoever controls the entry");
+    }
+
+    private static CatalogPr.Reader reader(Map<String, Entry> held) {
+        return new CatalogPr.Reader() {
+            @Override
+            public Optional<Entry> listed(EntryPath path) {
+                return Optional.ofNullable(held.get(path.path()));
+            }
+
+            @Override
+            public Optional<Catalog> catalog() {
+                return Optional.empty();
+            }
+        };
     }
 }

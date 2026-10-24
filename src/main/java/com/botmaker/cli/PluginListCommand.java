@@ -3,6 +3,7 @@ package com.botmaker.cli;
 import com.botmaker.cli.catalog.Catalog;
 import com.botmaker.cli.catalog.GitHubFacts;
 import com.botmaker.cli.catalog.Rank;
+import com.botmaker.cli.publish.CatalogPr;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
@@ -25,7 +26,7 @@ final class PluginListCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         Console console = parent.main().console();
-        Optional<Catalog> catalog = CatalogPr.catalog(GitHubFacts.anonymousOrToken());
+        Optional<Catalog> catalog = CatalogPr.Reader.of(GitHubFacts.anonymousOrToken()).catalog();
         if (catalog.isEmpty()) {
             console.error("could not read " + Catalog.FILE + " from " + CatalogPr.REPO + ".");
             return 1;

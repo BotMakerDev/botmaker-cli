@@ -135,15 +135,4 @@ final class BotNewCommand implements Callable<Integer> {
         }
         return trimmed;
     }
-
-    /**
-     * Whether a git remote URL names exactly {@code slug}: its last two path segments, {@code .git} dropped,
-     * compared without case as GitHub does. {@code https://github.com/a/b-fork} is not {@code a/b}.
-     */
-    static boolean names(String url, String slug) {
-        String path = url.strip().replaceAll("/+$", "").replaceAll("\\.git$", "").replace(':', '/');
-        String[] parts = path.split("/");
-        return parts.length >= 2
-                && (parts[parts.length - 2] + "/" + parts[parts.length - 1]).equalsIgnoreCase(slug);
-    }
 }

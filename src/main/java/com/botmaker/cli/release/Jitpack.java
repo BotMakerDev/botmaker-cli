@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,15 +43,25 @@ public final class Jitpack {
 
     /** The pom a consumer would download — its presence is what "built" means for a waiting downstream. */
     public static String pomUrl(Module module, Version version) {
-        return "https://jitpack.io/com/github/" + CleanRoom.COORDINATE_OWNER + "/" + module.directory()
-                + "/" + version.tag() + "/" + module.directory() + "-" + version.tag() + ".pom";
+        return pomUrl(GROUP, module.directory(), version.tag());
+    }
+
+    /** {@link #pomUrl(Module, Version)} for any coordinate JitPack serves, a plugin author's included. */
+    public static String pomUrl(String groupId, String artifactId, String tag) {
+        return SITE + groupId.replace('.', '/') + "/" + artifactId + "/" + tag + "/" + artifactId + "-" + tag + ".pom";
     }
 
     /** The endpoint that asks JitPack to start a build rather than waiting for somebody to request it. */
     public static String buildUrl(Module module, Version version) {
-        return "https://jitpack.io/api/builds/com.github." + CleanRoom.COORDINATE_OWNER + "/"
-                + module.directory() + "/" + version.tag();
+        return buildUrl(GROUP, module.directory(), version.tag());
     }
+
+    /** {@link #buildUrl(Module, Version)} for any coordinate. */
+    public static String buildUrl(String groupId, String artifactId, String tag) {
+        return SITE + "api/builds/" + groupId + "/" + artifactId + "/" + tag;
+    }
+
+    private static final String GROUP = "com.github." + CleanRoom.COORDINATE_OWNER;
 
     /** How a wait ended. Only {@link #BUILT} lets the chain tag the next module. */
     public enum Build {
@@ -70,6 +81,11 @@ public final class Jitpack {
      * @param detail JitPack's own message for {@link Build#FAILED}, empty otherwise
      */
     public record Waited(Build build, String detail) {
+
+        /** The build log a {@link Build#FAILED} detail names, as a URL a reader opens; empty when it names none. */
+        public Optional<String> logUrl() {
+            return logPath(detail).map(path -> SITE + path);
+        }
     }
 
     /**
@@ -119,32 +135,44 @@ public final class Jitpack {
     }
 
     static Waited waitFor(Runner runner, Module module, Version version, Sleeper sleeper, Probe probe) {
-        String what = module.directory() + ":" + version.tag();
         if (runner.dryRun()) {
             runner.say("    (dry-run) would poll " + pomUrl(module, version) + " until built");
             return new Waited(Build.BUILT, "");
         }
-        runner.say("waiting for JitPack to build " + what + " ...");
+        return waitFor(GROUP, module.directory(), version.tag(), runner::say, () -> runner.stopping(), sleeper, probe);
+    }
+
+    /**
+     * The same poll for any coordinate: what {@code plugin publish} waits on after tagging an author's plugin
+     * (2026-10-24), so the release library and the author's publish share one reading of JitPack.
+     *
+     * @param say      each progress line
+     * @param stopping whether the caller asked to stop
+     */
+    public static Waited waitFor(String groupId, String artifactId, String tag, Consumer<String> say,
+                                 BooleanSupplier stopping, Sleeper sleeper, Probe probe) {
+        String what = artifactId + ":" + tag;
+        say.accept("waiting for JitPack to build " + what + " ...");
         for (int attempt = 0; attempt < TRIES; attempt++) {
             // The build API first: asking it is also the nudge that starts a build nobody requested yet.
-            Optional<String> failure = probe.failure(buildUrl(module, version));
+            Optional<String> failure = probe.failure(buildUrl(groupId, artifactId, tag));
             if (failure.isPresent()) {
                 // No "error: " prefix: that line closes a module's segment for the dashboard's board, which
                 // would then never see this one. The chain's own error line follows.
-                runner.say("JitPack failed to build " + what + ": " + failure.get());
+                say.accept("JitPack failed to build " + what + ": " + failure.get());
                 return new Waited(Build.FAILED, failure.get());
             }
-            if (probe.built(pomUrl(module, version))) {
-                runner.say("JitPack build of " + what + " is ready.");
+            if (probe.built(pomUrl(groupId, artifactId, tag))) {
+                say.accept("JitPack build of " + what + " is ready.");
                 return new Waited(Build.BUILT, "");
             }
-            if (runner.stopping() || !sleeper.sleep(EVERY)) {
-                runner.say("Stopped waiting for JitPack to build " + what + ".");
+            if (stopping.getAsBoolean() || !sleeper.sleep(EVERY)) {
+                say.accept("Stopped waiting for JitPack to build " + what + ".");
                 return new Waited(Build.STOPPED, "");
             }
         }
-        runner.say("warn: " + what + " not built on JitPack after 10 min"
-                + " — check https://jitpack.io/#" + CleanRoom.COORDINATE_OWNER + "/" + module.directory());
+        say.accept("warn: " + what + " not built on JitPack after 10 min"
+                + " — check " + SITE + "#" + groupId.substring(groupId.lastIndexOf('.') + 1) + "/" + artifactId);
         return new Waited(Build.TIMEOUT, "");
     }
 
