@@ -95,7 +95,7 @@ class PublishTest {
 
     private Publish.Outcome publish(EntryPath.Kind kind, Optional<String> tag, boolean dryRun) {
         return new Publish(facts, catalog, checks, jitpack, duration -> true).run(new PublishRequest(dir, kind,
-                Level.PATCH, tag, Optional.empty(), dryRun, "botmaker plugin publish"), FakeRunner.QUIET, runner);
+                Level.PATCH, tag, Optional.empty(), dryRun, "botmaker plugin publish"), FakeRunner.QUIET, runner.host(dir));
     }
 
     private Publish.Outcome publish() {
@@ -281,7 +281,7 @@ class PublishTest {
 
     private Optional<Publish.Outcome> listRelease(String tag, Jitpack.Sleeper sleeper) {
         return new Publish(facts, catalog, Checks.LEFT_TO_THE_CATALOG, jitpack, sleeper)
-                .listRelease(dir, REPO, tag, "botmaker release", FakeRunner.QUIET, runner);
+                .listRelease(dir, REPO, tag, "botmaker release", FakeRunner.QUIET, runner.host(dir));
     }
 
     private void catalogLists(String repo) {
@@ -344,7 +344,7 @@ class PublishTest {
         FakeRunner.repository(dir, ORIGIN);
         Publish.Outcome outcome = new Publish(facts, catalog, Checks.LEFT_TO_THE_CATALOG, jitpack, duration -> true)
                 .run(new PublishRequest(dir, EntryPath.Kind.PLUGIN, Level.PATCH, Optional.empty(), Optional.empty(),
-                        false, "test"), FakeRunner.QUIET, runner);
+                        false, "test"), FakeRunner.QUIET, runner.host(dir));
         assertInstanceOf(Publish.Outcome.Refused.class, outcome);
         assertEquals(List.of(), runner.changes);
     }

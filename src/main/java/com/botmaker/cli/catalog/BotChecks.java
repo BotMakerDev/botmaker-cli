@@ -100,8 +100,8 @@ public final class BotChecks {
         return checkClasses(dir.resolve("target/classes"), path);
     }
 
-    /** Rule 6. */
-    static List<Finding> checkPom(Path pom, String path, Map<String, String> pluginIds) throws IOException {
+    /** Rule 6. Public for a host that compiles the bot its own way (Studio). */
+    public static List<Finding> checkPom(Path pom, String path, Map<String, String> pluginIds) throws IOException {
         if (!Files.isRegularFile(pom, LinkOption.NOFOLLOW_LINKS)) {
             return List.of(Finding.error(path, "no pom.xml at this tag: a bot is a Maven project."));
         }
@@ -116,8 +116,8 @@ public final class BotChecks {
                 .toList();
     }
 
-    /** Rule 8. */
-    static List<Finding> checkClasses(Path classes, String path) throws IOException {
+    /** Rule 8, on the compiled classes. Public for a host that compiles the bot its own way (Studio). */
+    public static List<Finding> checkClasses(Path classes, String path) throws IOException {
         if (Files.isDirectory(classes)) {
             try (Stream<Path> files = Files.walk(classes)) {
                 for (Path file : files.filter(f -> f.toString().endsWith(".class")

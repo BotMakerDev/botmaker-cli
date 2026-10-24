@@ -49,7 +49,8 @@ public final class ReleaseListing implements CatalogStep {
     public Optional<Listed> list(Module module, Version version, Path dir, Consumer<String> say) {
         Listener listener = listener(say);
         String repo = CleanRoom.COORDINATE_OWNER + "/" + module.directory();
-        return publish.listRelease(dir, repo, version.tag(), command, listener, StepRunner.system(listener))
+        return publish.listRelease(dir, repo, version.tag(), command, listener,
+                        PublishHost.commands(dir, StepRunner.system(listener), listener))
                 .map(outcome -> switch (outcome) {
                     case Publish.Outcome.Opened opened -> new Listed(opened.pullRequest().isPresent()
                             ? "pull request opened" : "listed already", opened.pullRequest().orElse(""), "");

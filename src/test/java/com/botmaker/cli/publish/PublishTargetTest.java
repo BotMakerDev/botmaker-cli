@@ -35,18 +35,18 @@ class PublishTargetTest {
     void repo_must_agree_with_origin() throws Exception {
         FakeRunner.repository(dir, "git@github.com:alice/farmbot.git");
         assertEquals("alice/farmbot", PublishTarget.of(dir, EntryPath.Kind.BOT, Optional.of("Alice/FarmBot"), "alice",
-                runner).repo());
+                runner.host(dir)).repo());
         Refusal refusal = assertThrows(Refusal.class,
-                () -> PublishTarget.of(dir, EntryPath.Kind.BOT, Optional.of("alice/other"), "alice", runner));
+                () -> PublishTarget.of(dir, EntryPath.Kind.BOT, Optional.of("alice/other"), "alice", runner.host(dir)));
         assertTrue(refusal.getMessage().contains("alice/other"), refusal.getMessage());
     }
 
     @Test
     void a_folder_that_is_not_a_repository_is_a_new_bot_or_a_refused_plugin() throws Exception {
-        PublishTarget bot = PublishTarget.of(dir, EntryPath.Kind.BOT, Optional.empty(), "alice", runner);
+        PublishTarget bot = PublishTarget.of(dir, EntryPath.Kind.BOT, Optional.empty(), "alice", runner.host(dir));
         assertTrue(bot.fresh() && bot.create(), bot.toString());
         assertEquals("alice/" + dir.getFileName(), bot.repo());
         assertThrows(Refusal.class, () -> PublishTarget.of(dir, EntryPath.Kind.PLUGIN, Optional.empty(), "alice",
-                runner));
+                runner.host(dir)));
     }
 }

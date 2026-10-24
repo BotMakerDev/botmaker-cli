@@ -28,7 +28,7 @@ class NextVersionTest {
     private final FakeRunner runner = new FakeRunner(facts);
 
     private NextVersion decide(Level bump, Optional<String> tag, Optional<Entry> listed) throws Refusal {
-        return NextVersion.decide(dir, bump, tag, listed, REPO, facts, runner);
+        return NextVersion.decide(bump, tag, listed, REPO, facts, runner.host(dir));
     }
 
     private NextVersion decide(Level bump) throws Refusal {

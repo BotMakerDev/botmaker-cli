@@ -4,7 +4,6 @@ import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryPath;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,7 +11,8 @@ import java.util.regex.Pattern;
 /**
  * What is published and where: the folder, its kind and its GitHub repository.
  *
- * <p><b>The repository is the folder's {@code origin}</b> (2026-10-24), so the author names nothing; {@code --repo}
+ * <p><b>The repository is the folder's {@code origin}</b> (2026-10-24; the host's remote, {@link PublishHost#remoteUrl},
+ * which is Studio's {@code mine}), so the author names nothing; {@code --repo}
  * is an override, and one that disagrees with {@code origin} is refused rather than chosen between. A bot with no
  * {@code origin} has its repository created, named after the folder under the signed-in account; a plugin with
  * none is refused, since JitPack builds it from GitHub and there is nothing there yet.
@@ -32,18 +32,17 @@ public record PublishTarget(Path dir, EntryPath.Kind kind, String repo, boolean 
      * @param login    the signed-in account, which owns a repository this publish creates
      */
     public static PublishTarget of(Path dir, EntryPath.Kind kind, Optional<String> override, String login,
-                                   StepRunner runner) throws Refusal {
+                                   PublishHost host) throws Refusal {
         Optional<String> named = override.map(String::strip).filter(s -> !s.isEmpty());
         if (named.isPresent() && !Entry.isSlug(named.get())) {
             throw new Refusal("--repo wants owner/name on GitHub; " + named.get() + " is not.");
         }
-        boolean fresh = runner.read(dir, List.of("git", "rev-parse", "--git-dir")).isEmpty();
+        boolean fresh = !host.isRepository();
         if (fresh && kind == EntryPath.Kind.PLUGIN) {
             throw new Refusal(dir + " is not a git repository. Push the plugin to GitHub first: JitPack builds it"
                     + " from there.");
         }
-        Optional<String> origin = fresh ? Optional.empty()
-                : runner.read(dir, List.of("git", "remote", "get-url", "origin")).filter(s -> !s.isBlank());
+        Optional<String> origin = fresh ? Optional.empty() : host.remoteUrl();
         if (origin.isPresent()) {
             String repo = slugOf(origin.get()).orElseThrow(() -> new Refusal("origin is " + origin.get()
                     + ", not a GitHub repository; the catalog lists repositories on GitHub."));

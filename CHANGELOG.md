@@ -32,6 +32,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   `CatalogStep`; `ReleaseListing` is the publish library's). The result is the release log's `## Catalog` section;
   a refusal is a `catalog` error and stops nothing. `--dry-run` only names them.
 - **An admin in `publishers.json` passes the publish's own rule 4**, as the catalog's check lets them.
+- **A publish runs through a `PublishHost`**, the folder's git and GitHub as the signed-in account: the cli's is
+  `PublishHost.commands` (`git` and `gh`), and Studio's Publish brings its own (JGit and its sign-in). `Publish.run`,
+  `NextVersion.decide` and `PublishTarget.of` take the host; `CatalogPr.unpublish` takes its pull-request opener.
+- **A cli release forces a Studio release**: Studio's pom pins the cli's main jar.
 
 ### Added
 

@@ -113,6 +113,9 @@ public record Forcing(Module upstream, Module downstream, String reason) {
                     + "version, which this release moves"),
             new Forcing(Module.PLUGIN_HOST, Module.STUDIO, "Studio's pom pins plugin-host at a released "
                     + "version, which this release moves"),
+            // Since 2026-10-24: Studio's Publish runs the cli's publish library, from the cli's main jar.
+            new Forcing(Module.CLI, Module.STUDIO, "Studio's pom pins the cli's main jar, whose publish library its "
+                    + "Publish runs, at a released version, which this release moves"),
 
             // This last one is the interesting case, and the reason is NOT the old one. The SDK is not a
             // Studio dependency any more — it left botmaker-studio/pom.xml on 2026-09-02 and is not

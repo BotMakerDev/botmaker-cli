@@ -6,6 +6,7 @@ import com.botmaker.cli.publish.CatalogPr;
 import com.botmaker.cli.publish.Listener;
 import com.botmaker.cli.publish.NextVersion;
 import com.botmaker.cli.publish.Publish;
+import com.botmaker.cli.publish.PublishHost;
 import com.botmaker.cli.publish.PublishRequest;
 import com.botmaker.cli.publish.Refusal;
 import com.botmaker.cli.publish.StepRunner;
@@ -14,6 +15,7 @@ import com.botmaker.cli.release.Level;
 import com.botmaker.cli.validate.CheckResult;
 import picocli.CommandLine;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,7 +44,8 @@ final class PublishCommands {
         CatalogPr.Reader catalog = CatalogPr.Reader.of(facts);
         Publish publish = new Publish(facts, catalog, new CliChecks(main, catalog), Jitpack.Probe.real(),
                 Jitpack.Sleeper.real());
-        return switch (publish.run(request, listener, StepRunner.system(listener))) {
+        return switch (publish.run(request, listener,
+                PublishHost.commands(request.dir(), StepRunner.system(listener), listener))) {
             case Publish.Outcome.Opened opened -> {
                 opened.pullRequest().ifPresent(console::out);
                 console.step(opened.entry().repo() + " " + opened.tag()
@@ -70,12 +73,13 @@ final class PublishCommands {
     static int unpublish(Main main, EntryPath path, Optional<String> release, String command) {
         Console console = main.console();
         Listener listener = listener(console);
-        StepRunner runner = StepRunner.system(listener);
+        PublishHost host = PublishHost.commands(Path.of("."), StepRunner.system(listener), listener);
         GitHubFacts facts = GitHubFacts.anonymousOrToken();
         try {
-            String login = CatalogPr.login(runner)
+            PublishHost.Account account = host.account()
                     .orElseThrow(() -> new Refusal("`gh` is not signed in; run `gh auth login` first."));
-            CatalogPr.unpublish(path, release, login, command, facts, CatalogPr.Reader.of(facts), runner, listener)
+            CatalogPr.unpublish(path, release, account, command, facts, CatalogPr.Reader.of(facts), host::pullRequest,
+                            listener)
                     .ifPresent(console::out);
         } catch (Refusal e) {
             console.error(e.getMessage());

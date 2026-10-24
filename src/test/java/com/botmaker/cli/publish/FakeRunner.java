@@ -147,4 +147,9 @@ final class FakeRunner implements StepRunner {
         @Override
         public void checks(List<CheckResult> results) {}
     };
+
+    /** The cli's host over this runner, in {@code dir}. */
+    PublishHost host(Path dir) {
+        return PublishHost.commands(dir, this, QUIET);
+    }
 }

@@ -23,7 +23,8 @@ import java.util.Optional;
 
 /**
  * The one pull request a publish or an unpublish opens on {@code BotMakerDev/botmaker-catalog}: one entry file
- * written or removed, on a branch of its own, through {@code gh}. The catalog's own checks run on it and merge it
+ * written or removed, on a branch of its own, through the host ({@link PublishHost#pullRequest}: the cli's is
+ * {@link #open}, through {@code gh}; Studio's the GitHub API). The catalog's own checks run on it and merge it
  * when they pass; nobody reviews it by hand.
  *
  * <p>The checks the catalog runs first on an entry (rules 2–5: the repository, the release, who made it) run before
@@ -131,7 +132,7 @@ public final class CatalogPr {
         }
 
         /** {@code entry/<path>}: one branch per entry, so a second publish of the same entry replaces the first. */
-        String branch() {
+        public String branch() {
             return "entry/" + path.path();
         }
 
@@ -191,7 +192,7 @@ public final class CatalogPr {
      *
      * @return the pull request's URL, or empty when the catalog already reads so and there is nothing to open
      */
-    public static Optional<String> open(Change change, String login, StepRunner runner, Listener listener)
+    static Optional<String> open(Change change, String login, StepRunner runner, Listener listener)
             throws Refusal {
         Path work;
         try {
@@ -261,9 +262,10 @@ public final class CatalogPr {
      *
      * @return the pull request's URL, or empty when there was nothing to open
      */
-    public static Optional<String> unpublish(EntryPath path, Optional<String> release, String login, String command,
-                                             EntryFacts facts, Reader catalog, StepRunner runner, Listener listener)
-            throws Refusal {
+    public static Optional<String> unpublish(EntryPath path, Optional<String> release, PublishHost.Account account,
+                                             String command, EntryFacts facts, Reader catalog, Opener host,
+                                             Listener listener) throws Refusal {
+        String login = account.login();
         Entry held = catalog.listed(path).orElseThrow(() -> new Refusal(path.key() + " is not listed in the catalog ("
                 + path.path() + "), or GitHub did not answer."));
         String newest = held.newest().tag();
@@ -275,7 +277,7 @@ public final class CatalogPr {
         } catch (UncheckedIOException e) {
             throw new Refusal("could not reach GitHub to check the entry: " + e.getCause().getMessage());
         }
-        if (release.isEmpty()) return open(Change.remove(path, command), login, runner, listener);
+        if (release.isEmpty()) return host.open(Change.remove(path, command), account, listener);
         String tag = release.get().strip();
         if (held.release(tag).isEmpty()) {
             throw new Refusal(path.key() + " lists no release " + tag + "; it lists "
@@ -284,28 +286,22 @@ public final class CatalogPr {
         List<ApprovedRelease> kept = held.releases().stream().filter(r -> !r.tag().equals(tag)).toList();
         if (kept.isEmpty()) {
             listener.step(tag + " is " + path.key() + "'s only release, so the entry is removed.");
-            return open(Change.remove(path, command), login, runner, listener);
+            return host.open(Change.remove(path, command), account, listener);
         }
-        return open(Change.withdraw(held.withReleases(kept), tag, command), login, runner, listener);
+        return host.open(Change.withdraw(held.withReleases(kept), tag, command), account, listener);
     }
 
-    /** The login {@code gh} is signed in as, or empty. */
-    public static Optional<String> login(StepRunner runner) {
-        return runner.read(Path.of("."), List.of("gh", "api", "user", "--jq", ".login")).filter(s -> !s.isBlank());
+    /** What carries a pull request: a host's {@link PublishHost#pullRequest}, all an unpublish needs of it. */
+    @FunctionalInterface
+    public interface Opener {
+        Optional<String> open(Change change, PublishHost.Account account, Listener listener) throws Refusal;
     }
 
     /**
-     * Whether the signed-in account is an admin in the catalog's {@code publishers.json}, by its account id as the
-     * catalog's check reads it. Unreadable is no: the exception is lost, never granted.
+     * Whether {@code account} is an admin in the catalog's {@code publishers.json}, by its account id as the catalog's
+     * check reads it. Unreadable is no: the exception is lost, never granted.
      */
-    public static boolean admin(StepRunner runner, Reader catalog) {
-        Optional<Long> id = runner.read(Path.of("."), List.of("gh", "api", "user", "--jq", ".id")).flatMap(s -> {
-            try {
-                return Optional.of(Long.parseLong(s.strip()));
-            } catch (NumberFormatException e) {
-                return Optional.empty();
-            }
-        });
-        return id.isPresent() && catalog.publishers().map(p -> p.isAdmin(id.get())).orElse(false);
+    public static boolean admin(PublishHost.Account account, Reader catalog) {
+        return account.id() > 0 && catalog.publishers().map(p -> p.isAdmin(account.id())).orElse(false);
     }
 }

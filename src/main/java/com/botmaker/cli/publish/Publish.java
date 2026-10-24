@@ -12,9 +12,7 @@ import com.botmaker.cli.catalog.PluginEntry;
 import com.botmaker.cli.release.Jitpack;
 import com.botmaker.cli.release.Level;
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -33,7 +31,7 @@ import java.util.function.Supplier;
  *       {@link Checks#folder checks}, and the entry's owner (a listed entry belongs to whoever controls it). A
  *       failure tags nothing. {@code --dry-run} stops here.</li>
  *   <li><b>Release</b>: {@code HEAD} pushed (the repository created first for a bot with no {@code origin}), the
- *       tag made and pushed, {@code gh release create} as the signed-in user. Each part is skipped when already
+ *       tag made and pushed, the GitHub Release made as the signed-in user. Each part is skipped when already
  *       done, so a re-run after a failure finishes it.</li>
  *   <li><b>A plugin waits for JitPack</b> (the release library's poll; a build that failed is broken for good) and
  *       its jar is {@link Checks#published checked} as the catalog's check will build it.</li>
@@ -41,8 +39,9 @@ import java.util.function.Supplier;
  *       the catalog's rules 2–5 run on it here, then {@link CatalogPr#open}.</li>
  * </ol>
  *
- * <p>Prints nothing: progress goes to the {@link Listener}, every program and file write through the
- * {@link StepRunner}, and a refusal is the {@link Outcome} returned.
+ * <p>Prints nothing: progress goes to the {@link Listener}, every side effect through the {@link PublishHost} (the
+ * cli's runs {@code git} and {@code gh}, Studio's JGit and its own sign-in), and a refusal is the {@link Outcome}
+ * returned.
  */
 public final class Publish {
 
@@ -85,9 +84,9 @@ public final class Publish {
         this.sleeper = sleeper;
     }
 
-    public Outcome run(PublishRequest request, Listener listener, StepRunner runner) {
+    public Outcome run(PublishRequest request, Listener listener, PublishHost host) {
         try {
-            return steps(request, listener, runner);
+            return steps(request, listener, host);
         } catch (Refusal e) {
             return new Outcome.Refused(e.getMessage());
         } catch (UncheckedIOException e) {
@@ -104,7 +103,7 @@ public final class Publish {
      * @return empty when the catalog lists no plugin of {@code repo}: a release lists no plugin by itself
      */
     public Optional<Outcome> listRelease(Path dir, String repo, String tag, String command, Listener listener,
-                                         StepRunner runner) {
+                                         PublishHost host) {
         Optional<Catalog> index = catalog.catalog();
         if (index.isEmpty()) {
             return Optional.of(new Outcome.Refused("the catalog's " + Catalog.FILE + " did not read, so whether it"
@@ -117,7 +116,7 @@ public final class Publish {
                     + " --tag " + tag + "` in " + dir + "."));
         }
         return Optional.of(run(new PublishRequest(dir, EntryPath.Kind.PLUGIN, Level.DEFAULT, Optional.of(tag),
-                Optional.of(repo), false, command), listener, runner));
+                Optional.of(repo), false, command), listener, host));
     }
 
     private static final Duration RELEASE_WAIT = Duration.ofMinutes(20);
@@ -137,23 +136,22 @@ public final class Publish {
         }
     }
 
-    private Outcome steps(PublishRequest request, Listener listener, StepRunner runner) throws Refusal {
-        String login = CatalogPr.login(runner)
-                .orElseThrow(() -> new Refusal("`gh` is not signed in; run `gh auth login` first."));
-        PublishTarget target = PublishTarget.of(request.dir(), request.kind(), request.repo(), login, runner);
+    private Outcome steps(PublishRequest request, Listener listener, PublishHost host) throws Refusal {
+        PublishHost.Account account = host.account()
+                .orElseThrow(() -> new Refusal("nobody is signed in to GitHub (`gh auth login`, or Studio's Sign in)."));
+        String login = account.login();
+        PublishTarget target = PublishTarget.of(request.dir(), request.kind(), request.repo(), login, host);
         String repo = target.repo();
         if (!target.create() && facts.repo(repo).isEmpty()) {
             throw new Refusal(repo + " is not a public repository on GitHub, and the catalog lists public ones.");
         }
-        if (target.create() && runner.read(request.dir(), List.of("gh", "repo", "view", repo, "--json", "name"))
-                .isPresent()) {
+        if (target.create() && host.repositoryExists(repo)) {
             throw new Refusal(repo + " already exists, and this folder has no origin pointing at it. Set origin to it"
                     + " if it is yours (`git remote add origin …`), or pass another --repo.");
         }
         Optional<EntryPath> path = knownPath(target);
         Optional<Entry> listed = path.flatMap(catalog::listed);
-        NextVersion version = NextVersion.decide(request.dir(), request.bump(), request.tag(), listed, repo, facts,
-                runner);
+        NextVersion version = NextVersion.decide(request.bump(), request.tag(), listed, repo, facts, host);
         String tag = version.tag();
         if (lists(listed, tag)) return new Outcome.AlreadyListed(repo, tag);
         boolean fresh = version.listing() == NextVersion.Listing.NEW;
@@ -161,8 +159,7 @@ public final class Publish {
                 + " listing it.");
 
         if (fresh) {
-            if (!target.fresh() && !runner.read(request.dir(), List.of("git", "status", "--porcelain"))
-                    .map(String::isBlank).orElse(false)) {
+            if (!target.fresh() && !host.clean()) {
                 throw new Refusal("the working tree has uncommitted changes, and what gets published is a commit."
                         + " Commit or stash them, then re-run.");
             }
@@ -178,13 +175,13 @@ public final class Publish {
                     if (lists(listed, tag)) return new Outcome.AlreadyListed(repo, tag);
                 }
             }
-            owner(path.orElseThrow(), listed, repo, login, runner);
+            owner(path.orElseThrow(), listed, repo, account);
         }
         if (request.dryRun()) {
             return new Outcome.WouldList(repo, tag, version.listing(),
                     path.filter(p -> p.kind() == EntryPath.Kind.PLUGIN).map(EntryPath::key));
         }
-        if (fresh) release(target, tag, runner);
+        if (fresh) release(target, tag, host);
 
         Optional<ApprovedRelease> pinned;
         if (target.kind() == EntryPath.Kind.PLUGIN) {
@@ -215,7 +212,7 @@ public final class Publish {
                 : new BotEntry(repo, List.of(release), false));
 
         List<Finding> findings = EntryGate.checkEntry(entry, EntryPath.of(entry), login,
-                listed.isPresent() && CatalogPr.admin(runner, catalog), listed, facts);
+                listed.isPresent() && CatalogPr.admin(account, catalog), listed, facts);
         findings.stream().filter(f -> f.severity() != Finding.Severity.ERROR).forEach(f -> listener.warn(f.message()));
         List<String> errors = findings.stream().filter(f -> f.severity() == Finding.Severity.ERROR)
                 .map(Finding::message).toList();
@@ -223,7 +220,7 @@ public final class Publish {
             throw new Refusal("released " + tag + ", but the catalog would refuse the entry; no pull request opened:\n"
                     + String.join("\n", errors));
         }
-        Optional<String> url = CatalogPr.open(CatalogPr.Change.put(entry, request.command()), login, runner, listener);
+        Optional<String> url = host.pullRequest(CatalogPr.Change.put(entry, request.command()), account, listener);
         return new Outcome.Opened(entry, tag, url);
     }
 
@@ -256,60 +253,32 @@ public final class Publish {
      * Rule 4 before anything is tagged: a listed entry keeps its repository and belongs to whoever controls it, or to
      * an admin (the catalog's own exception).
      */
-    private void owner(EntryPath path, Optional<Entry> listed, String repo, String login, StepRunner runner)
+    private void owner(EntryPath path, Optional<Entry> listed, String repo, PublishHost.Account account)
             throws Refusal {
         if (listed.isEmpty()) return;
+        String login = account.login();
         Entry held = listed.get();
         if (!held.repo().equalsIgnoreCase(repo)) {
             throw new Refusal("the catalog lists " + path.key() + " for " + held.repo() + ", not " + repo + ", and a"
                     + " listed entry keeps its repository. Nothing was tagged.");
         }
-        if (!EntryGate.controls(login, held.repo(), held.newest().tag(), facts) && !CatalogPr.admin(runner, catalog)) {
+        if (!EntryGate.controls(login, held.repo(), held.newest().tag(), facts) && !CatalogPr.admin(account, catalog)) {
             throw new Refusal(path.key() + "'s entry belongs to whoever controls " + held.repo() + ", and " + login
                     + " neither made its release " + held.newest().tag() + " nor owns it. Nothing was tagged.");
         }
     }
 
     /** Step 4. Each part skipped when it is done already, so a re-run after a failure finishes the release. */
-    private static void release(PublishTarget target, String tag, StepRunner runner) throws Refusal {
-        Path dir = target.dir();
+    private static void release(PublishTarget target, String tag, PublishHost host) throws Refusal {
         String repo = target.repo();
-        if (target.fresh()) {
-            // The local check just built target/, and the repository is public: never commit the build.
-            Path ignore = dir.resolve(".gitignore");
-            if (!Files.exists(ignore)) {
-                try {
-                    runner.write(ignore, "target/\n");
-                } catch (IOException e) {
-                    throw new Refusal("could not write " + ignore + ": " + e.getMessage());
-                }
-            }
-            must(runner, dir, "could not make the first commit in " + dir + ".",
-                    List.of("git", "init", "-q", "-b", "main"), List.of("git", "add", "-A"),
-                    List.of("git", "commit", "-qm", "Initial commit"));
-        }
+        if (target.fresh()) host.firstCommit();
         if (target.create()) {
-            must(runner, dir, "could not create " + repo + ".",
-                    List.of("gh", "repo", "create", repo, "--source", ".", "--push", "--public"));
+            host.createRepository(repo);
         } else {
-            must(runner, dir, "could not push HEAD to origin.", List.of("git", "push", "origin", "HEAD"));
+            host.pushHead();
         }
-        if (runner.read(dir, List.of("git", "rev-parse", "-q", "--verify", "refs/tags/" + tag)).isEmpty()) {
-            must(runner, dir, "could not tag HEAD " + tag + ".", List.of("git", "tag", tag));
-        }
-        must(runner, dir, "could not push the tag " + tag + ".", List.of("git", "push", "origin", "refs/tags/" + tag));
-        if (runner.read(dir, List.of("gh", "release", "view", tag, "--repo", repo)).isEmpty()) {
-            must(runner, dir, "could not create the release " + tag + " on " + repo + ".",
-                    List.of("gh", "release", "create", tag, "--repo", repo, "--title", tag, "--notes",
-                            repo + " " + tag + ".", "--verify-tag"));
-        }
-    }
-
-    @SafeVarargs
-    private static void must(StepRunner runner, Path dir, String failure, List<String>... commands) throws Refusal {
-        for (List<String> command : commands) {
-            if (!runner.change(dir, command).ok()) throw new Refusal(failure + " Its output is above.");
-        }
+        host.tag(tag);
+        if (!host.releaseExists(repo, tag)) host.release(repo, tag);
     }
 
     /** Step 5's wait: only a built jar goes on. A build that failed is broken for good; its log says why. */

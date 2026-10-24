@@ -29,7 +29,8 @@ from `release.sh`.
 ## Rules
 
 - **`com.botmaker.cli.validate`, `com.botmaker.cli.release` and `com.botmaker.cli.publish` print nothing, spawn
-  no UI and know no command line.** A publish runs every program through its `StepRunner`. A rule added to `ValidateCommand` is a rule the catalog will not enforce: put it in
+  no UI and know no command line.** A publish does every side effect through its `PublishHost` (the cli's runs every program through a `StepRunner`;
+  Studio brings its own). A rule added to `ValidateCommand` is a rule the catalog will not enforce: put it in
   `PluginValidator`, as a `Check` (`two-artifacts.md`).
 - **picocli stays `optional`**, so a consumer of the main artifact resolves no parser.
 - **Every release side effect goes through `Runner`**; a direct write on a write path ignores `--dry-run`. The

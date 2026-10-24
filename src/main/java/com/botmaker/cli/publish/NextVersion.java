@@ -7,7 +7,6 @@ import com.botmaker.cli.catalog.EntryGate;
 import com.botmaker.cli.release.Level;
 import com.botmaker.cli.release.Version;
 
-import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -51,11 +50,11 @@ public record NextVersion(String tag, Listing listing) {
      * @param listed the catalog's entry for this repository, whose approved tags are never published again
      * @param repo   the repository, {@code owner/name}, whose GitHub Releases say what is published
      */
-    public static NextVersion decide(Path dir, Level bump, Optional<String> tag, Optional<? extends Entry> listed,
-                                     String repo, EntryFacts facts, StepRunner runner) throws Refusal {
+    public static NextVersion decide(Level bump, Optional<String> tag, Optional<? extends Entry> listed,
+                                     String repo, EntryFacts facts, PublishHost host) throws Refusal {
         Set<String> approved = listed.map(e -> e.releases().stream().map(ApprovedRelease::tag)
                 .collect(Collectors.toSet())).orElse(Set.of());
-        Optional<String> head = runner.read(dir, List.of("git", "rev-parse", "HEAD"));
+        Optional<String> head = host.head();
         if (tag.isPresent()) {
             String named = tag.get().strip();
             if (!EntryGate.TAG.matcher(named).matches()) {
@@ -63,7 +62,7 @@ public record NextVersion(String tag, Listing listing) {
                         + " '+' and '-').");
             }
             if (published(facts, repo, named)) return new NextVersion(named, Listing.EXISTING);
-            Optional<String> at = commitOf(dir, named, runner);
+            Optional<String> at = host.tagCommit(named);
             if (at.isPresent() && !at.equals(head)) {
                 throw new Refusal("tag " + named + " exists at " + at.get() + ", not at HEAD, and has no published"
                         + " release. Check it out to publish it, or name another tag.");
@@ -71,7 +70,7 @@ public record NextVersion(String tag, Listing listing) {
             return new NextVersion(named, Listing.NEW);
         }
         // Only vX.Y.Z: a tag such as `latest` or `deploy` on HEAD was made for something else.
-        List<String> atHead = lines(runner.read(dir, List.of("git", "tag", "--points-at", "HEAD"))).stream()
+        List<String> atHead = host.tagsAtHead().stream()
                 .filter(NextVersion::isVersion).sorted(NEWEST_FIRST).toList();
         for (String carried : atHead) {
             if (!approved.contains(carried)) {
@@ -82,20 +81,18 @@ public record NextVersion(String tag, Listing listing) {
             throw new Refusal("HEAD is " + atHead.getFirst() + ", which the catalog lists already. Commit a change to"
                     + " publish a new version, or name one with --tag.");
         }
-        Optional<String> newest = runner.read(dir, List.of("git", "describe", "--tags", "--abbrev=0"))
-                .filter(s -> !s.isBlank());
-        if (newest.isEmpty()) return fresh(dir, FIRST, repo, facts, runner);
+        Optional<String> newest = host.nearestTag();
+        if (newest.isEmpty()) return fresh(FIRST, repo, facts, host);
         if (!isVersion(newest.get())) {
             throw new Refusal("the newest tag, " + newest.get() + ", is not vX.Y.Z, so there is no number to bump."
                     + " Name the version with --tag <tag>.");
         }
         // The highest vX.Y.Z reachable from HEAD or approved, not the nearest: a hotfix tag nearer HEAD than a
         // higher release would otherwise bump to a version older than one already out.
-        Version highest = Stream.concat(lines(runner.read(dir, List.of("git", "tag", "--merged", "HEAD"))).stream(),
-                        approved.stream())
+        Version highest = Stream.concat(host.tagsMerged().stream(), approved.stream())
                 .filter(NextVersion::isVersion).map(t -> Version.parse(t).orElseThrow())
                 .max(Comparator.naturalOrder()).orElseThrow();
-        return fresh(dir, highest.bump(bump).tag(), repo, facts, runner);
+        return fresh(highest.bump(bump).tag(), repo, facts, host);
     }
 
     /** {@code vX.Y.Z}, what a bump reads and writes. */
@@ -103,14 +100,9 @@ public record NextVersion(String tag, Listing listing) {
         return tag.startsWith("v") && Version.parse(tag).isPresent();
     }
 
-    private static List<String> lines(Optional<String> out) {
-        return out.map(text -> text.lines().map(String::strip).filter(s -> !s.isEmpty()).toList()).orElse(List.of());
-    }
-
     /** A bumped tag, refused when it exists already elsewhere: tagging it would move nothing or clash. */
-    private static NextVersion fresh(Path dir, String tag, String repo, EntryFacts facts, StepRunner runner)
-            throws Refusal {
-        if (commitOf(dir, tag, runner).isPresent() || published(facts, repo, tag)) {
+    private static NextVersion fresh(String tag, String repo, EntryFacts facts, PublishHost host) throws Refusal {
+        if (host.tagCommit(tag).isPresent() || published(facts, repo, tag)) {
             throw new Refusal("the next version, " + tag + ", is tagged already on another commit. Name the version"
                     + " with --tag <tag>.");
         }
@@ -120,12 +112,6 @@ public record NextVersion(String tag, Listing listing) {
     /** Whether {@code repo} has a published (not draft) GitHub Release at {@code tag}. */
     private static boolean published(EntryFacts facts, String repo, String tag) {
         return facts.release(repo, tag).filter(r -> !r.draft()).isPresent();
-    }
-
-    /** The commit the folder's tag points at, or empty when the folder has no such tag. */
-    private static Optional<String> commitOf(Path dir, String tag, StepRunner runner) {
-        return runner.read(dir, List.of("git", "rev-parse", "-q", "--verify", "refs/tags/" + tag + "^{commit}"))
-                .filter(s -> !s.isBlank());
     }
 
     /** {@code vX.Y.Z} tags, newest first. */

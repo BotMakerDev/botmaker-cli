@@ -47,6 +47,11 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
         return new GitHubFacts(System.getenv("GH_TOKEN"));
     }
 
+    /** With a host's own sign-in, Studio's: anonymous when {@code token} is blank. */
+    public static GitHubFacts withToken(String token) {
+        return new GitHubFacts(token);
+    }
+
     @Override
     public Optional<Repo> repo(String repo) {
         return repos.computeIfAbsent(repo, r -> api(API + r).map(json -> new Repo(

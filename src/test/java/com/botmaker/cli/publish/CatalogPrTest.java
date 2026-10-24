@@ -9,6 +9,7 @@ import com.botmaker.cli.catalog.FakeFacts;
 import com.botmaker.cli.catalog.PluginEntry;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,22 +86,28 @@ class CatalogPrTest {
         CatalogPr.Reader catalog = reader(held);
 
         FakeRunner runner = new FakeRunner(facts);
-        CatalogPr.unpublish(path, Optional.of("v1"), "somedev", "test", facts, catalog, runner, FakeRunner.QUIET);
+        CatalogPr.unpublish(path, Optional.of("v1"), SOMEDEV, "test", facts, catalog, runner.host(HERE)::pullRequest,
+                FakeRunner.QUIET);
         assertTrue(runner.commands().contains("git add -- plugins/com.example.thing.json"), runner.commands().toString());
         assertTrue(runner.commands().getLast().contains("plugin: somedev/thing remove v1"), runner.commands().getLast());
 
         held.put(path.path(), new PluginEntry("com.example.thing", "somedev/thing",
                 List.of(FakeFacts.pluginRelease("v2"))));
         FakeRunner last = new FakeRunner(facts);
-        CatalogPr.unpublish(path, Optional.of("v2"), "somedev", "test", facts, catalog, last, FakeRunner.QUIET);
+        CatalogPr.unpublish(path, Optional.of("v2"), SOMEDEV, "test", facts, catalog, last.host(HERE)::pullRequest,
+                FakeRunner.QUIET);
         assertTrue(last.commands().contains("git rm --quiet -- plugins/com.example.thing.json"), last.commands().toString());
 
-        Refusal unknown = assertThrows(Refusal.class, () -> CatalogPr.unpublish(path, Optional.of("v9"), "somedev",
-                "test", facts, catalog, new FakeRunner(facts), FakeRunner.QUIET));
+        Refusal unknown = assertThrows(Refusal.class, () -> CatalogPr.unpublish(path, Optional.of("v9"), SOMEDEV,
+                "test", facts, catalog, new FakeRunner(facts).host(HERE)::pullRequest, FakeRunner.QUIET));
         assertTrue(unknown.getMessage().contains("lists no release v9"), unknown.getMessage());
-        assertThrows(Refusal.class, () -> CatalogPr.unpublish(path, Optional.empty(), "otherdev", "test", facts,
-                catalog, new FakeRunner(facts), FakeRunner.QUIET), "only whoever controls the entry");
+        assertThrows(Refusal.class, () -> CatalogPr.unpublish(path, Optional.empty(),
+                new PublishHost.Account("otherdev", 8), "test", facts, catalog, new FakeRunner(facts).host(HERE)::pullRequest,
+                FakeRunner.QUIET), "only whoever controls the entry");
     }
+
+    private static final PublishHost.Account SOMEDEV = new PublishHost.Account("somedev", 7);
+    private static final Path HERE = Path.of(".");
 
     private static CatalogPr.Reader reader(Map<String, Entry> held) {
         return new CatalogPr.Reader() {

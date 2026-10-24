@@ -39,8 +39,13 @@ just pushed, listed only when `catalog.json` lists a plugin of the repository, o
 `Checks.LEFT_TO_THE_CATALOG` is for a host that loads no plugin (the dashboard): it checks no jar, the known entry
 path stands, and it refuses to publish a new version.
 
-`Publish` prints nothing: progress goes to a `Listener`, every `git` and `gh` through a `StepRunner` (which tells
-`gh` never to prompt), and a refusal is the `Outcome` it returns. A plugin's id names its entry and is read off
+`Publish` prints nothing: progress goes to a `Listener`, every side effect through a `PublishHost`, and a refusal is
+the `Outcome` it returns. **The host is the port (2026-10-24)**: the folder's git questions (`head`, tags, `clean`,
+the remote) and changes (`pushHead`, `tag`, `release`, `pullRequest`), as the signed-in `Account` (login and id).
+The cli's is `PublishHost.commands`, `git` and `gh` through a `StepRunner` (which tells `gh` never to prompt);
+Studio's is its own `StudioPublishHost`, JGit and Studio's sign-in, pushing to the project's `mine` — so Studio runs
+these steps and rules without the `gh` program, and the rules stay in one place. `CatalogPr.unpublish` takes only
+the host's pull-request opener (`CatalogPr.Opener`). A plugin's id names its entry and is read off
 the loaded jar, so a plugin's entry path is known up front only from `catalog.json`'s row for its repository.
 
 ## The version is a git tag, not the pom's `<version>`

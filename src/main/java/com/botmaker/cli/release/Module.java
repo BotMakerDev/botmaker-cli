@@ -176,10 +176,10 @@ public enum Module {
      *
      * <p>Each pin is that upstream's own {@code -SNAPSHOT} on {@code main} and its released version on a tag
      * ({@link PomVersions}, umbrella {@code docs/refactor/43-real-versions.md}); {@link VersionsGate} holds the
-     * pom to this list. <b>The empties are as deliberate as the entries.</b> Studio pins four and not six: it
+     * pom to this list. <b>The empties are as deliberate as the entries.</b> Studio pins no SDK and no toolkit: it
      * has had no {@code botmaker-sdk} dependency since 2026-09-02, and the toolkit is a <i>plugin's</i>
-     * dependency, never the host's. The dashboard pins shared and the cli's main jar, whose own pins it
-     * excludes. {@code botmaker-studio-api} pins nothing: it has no upstream of ours.
+     * dependency, never the host's; it pins the cli's main jar too since 2026-10-24 (five now). The dashboard pins
+     * shared and the cli's main jar, whose own pins it excludes. {@code botmaker-studio-api} pins nothing: it has no upstream of ours.
      */
     public List<Module> upstreams() {
         return switch (this) {
@@ -192,7 +192,8 @@ public enum Module {
             case CLI -> List.of(STUDIO_API, PLUGIN_HOST, PLUGIN_ARCHETYPE);
             case SESSION -> List.of(SHARED);
             case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS);
-            case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_HOST);
+            // The cli's main jar since 2026-10-24: Studio's Publish runs the cli's publish library.
+            case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_HOST, CLI);
             case DASHBOARD -> List.of(SHARED, CLI);
             default -> List.of();
         };
