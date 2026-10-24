@@ -91,13 +91,15 @@ class CatalogBuilderTest {
         facts.repo(basicsRepo, 1, "Basics.", null).release(basicsRepo, "v0.5.0", "LiQiyeDev");
         DerivedFacts.Pin basics = new DerivedFacts.Pin(basicsId, "v0.5.0");
         DerivedFacts.PluginFacts sdk = new DerivedFacts.PluginFacts("BotMaker SDK", "v0.11.0", List.of(),
-                List.of(new DerivedFacts.Pin(SDK_ID, "v2.1.0"), new DerivedFacts.Pin("no.such", "v1"), basics));
+                List.of(new DerivedFacts.Pin(SDK_ID, "v2.1.0"), new DerivedFacts.Pin("no.such", "v1"),
+                        new DerivedFacts.Pin(basicsId, "${unresolved}"), basics));
         DerivedFacts withPins = new DerivedFacts(Map.of(SDK_ID, Map.of("v2.1.0", sdk),
                 basicsId, Map.of("v0.5.0", new DerivedFacts.PluginFacts("BotMaker Basics", "v0.11.0", List.of()))),
                 derived.botPlugins());
         Catalog catalog = CatalogBuilder.build(root, publishers, facts, withPins, NOW);
         Catalog.Plugin built = catalog.plugins().stream().filter(p -> p.id().equals(SDK_ID)).findFirst().orElseThrow();
-        assertEquals(List.of(basics), built.newest().plugins(), "itself and an unknown id are left out");
+        assertEquals(List.of(basics), built.newest().plugins(),
+                "itself, an unknown id and a version of another shape are left out");
     }
 
     @Test

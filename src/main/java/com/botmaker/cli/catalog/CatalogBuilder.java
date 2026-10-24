@@ -55,9 +55,7 @@ public final class CatalogBuilder {
                 .collect(Collectors.toMap(Catalog.Bot::repo, Function.identity(), (a, b) -> a))).orElse(Map.of());
 
         List<Catalog.Plugin> plugins = new ArrayList<>();
-        List<PluginEntry> pluginEntries = read(root, EntryPath.PLUGINS, PluginEntry::read, PluginEntry::id);
-        Set<String> entryIds = pluginEntries.stream().map(PluginEntry::id).collect(Collectors.toSet());
-        for (PluginEntry entry : pluginEntries) {
+        for (PluginEntry entry : read(root, EntryPath.PLUGINS, PluginEntry::read, PluginEntry::id)) {
             Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
             if (repo.isEmpty()) continue;
             Catalog.Plugin before = previousPlugins.get(entry.id());
@@ -80,11 +78,8 @@ public final class CatalogBuilder {
                     continue;
                 }
                 if (name == null) name = jar.name();
-                // Only another entry of this catalog: a pin naming itself or an unknown id would lock nothing real.
-                List<DerivedFacts.Pin> brings = jar.plugins().stream()
-                        .filter(p -> entryIds.contains(p.id()) && !p.id().equals(entry.id())).toList();
                 releases.add(new Catalog.Plugin.Release(release.tag(), release.commit(), release.jarSha256(),
-                        release.pomSha256(), jar.minContractVersion(), jar.editorDependencies(), brings));
+                        release.pomSha256(), jar.minContractVersion(), jar.editorDependencies(), jar.plugins()));
             }
             if (releases.isEmpty()) continue;
             plugins.add(new Catalog.Plugin(entry.id(), entry.repo(), publishers.rankOf(repo.get().ownerId()),
@@ -93,6 +88,7 @@ public final class CatalogBuilder {
         }
         plugins.sort(Comparator.comparing(Catalog.Plugin::id));
         Set<String> listed = plugins.stream().map(Catalog.Plugin::id).collect(Collectors.toSet());
+        plugins.replaceAll(plugin -> withListedPins(plugin, listed));
 
         List<Catalog.Bot> bots = new ArrayList<>();
         for (BotEntry entry : read(root, EntryPath.BOTS, BotEntry::read, b -> b.repo().toLowerCase(Locale.ROOT))) {
@@ -131,6 +127,24 @@ public final class CatalogBuilder {
     }
 
     /** A released version as a pom pins it: digits and dots, an optional {@code v}, no {@code -SNAPSHOT}. */
+    /**
+     * {@code plugin} with each release's {@code plugins} cut to pins a reader can trust: another plugin this
+     * catalog lists, at a version {@link #VERSION} accepts. The pom is the author's, so a pin naming the plugin
+     * itself, an id not listed or a version of any other shape is dropped — checked here, after the list is built,
+     * so a pin kept from the previous catalog is checked too.
+     */
+    private static Catalog.Plugin withListedPins(Catalog.Plugin plugin, Set<String> listed) {
+        List<Catalog.Plugin.Release> releases = plugin.releases().stream()
+                .map(r -> new Catalog.Plugin.Release(r.tag(), r.commit(), r.jarSha256(), r.pomSha256(),
+                        r.minContractVersion(), r.editorDependencies(), r.plugins().stream()
+                        .filter(p -> listed.contains(p.id()) && !p.id().equals(plugin.id())
+                                && VERSION.matcher(p.version() == null ? "" : p.version()).matches())
+                        .toList()))
+                .toList();
+        return new Catalog.Plugin(plugin.id(), plugin.repo(), plugin.rank(), plugin.coordinate(), plugin.name(),
+                plugin.description(), plugin.tags(), plugin.stars(), releases);
+    }
+
     static final Pattern VERSION =Pattern.compile("v?\\d+(\\.\\d+){0,3}");
 
     /** At most this long, no control characters: a name Studio shows as a label. */
