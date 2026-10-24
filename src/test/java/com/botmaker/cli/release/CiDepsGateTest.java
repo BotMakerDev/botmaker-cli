@@ -38,6 +38,15 @@ class CiDepsGateTest {
         assertEquals("  sdk: ci.yml checks out every -SNAPSHOT upstream — ok", verdict.line());
     }
 
+    /** 2026-10-24: Studio's ci.yml named botmaker-cli in a comment only, passed, and its CI was red. */
+    @Test
+    void aRepositoryNamedOnlyInACommentIsMissing() {
+        String ci = "steps:\n  # what botmaker-shared's check enforces\n  - run: git clone …/botmaker-studio-api # ok\n";
+        GateVerdict verdict = CiDepsGate.check(Module.SDK, POM, Optional.of(ci), false);
+        assertTrue(verdict.refusal().startsWith("botmaker-sdk: pom.xml resolves botmaker-shared at a -SNAPSHOT"),
+                verdict.refusal());
+    }
+
     @Test
     void theRefusalNamesEveryMissingRepositoryInTheScriptsOrder() {
         GateVerdict verdict = CiDepsGate.check(Module.SDK, POM, Optional.of("steps: []"), false);

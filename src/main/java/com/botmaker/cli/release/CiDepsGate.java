@@ -39,6 +39,9 @@ public final class CiDepsGate {
     private static final Pattern SNAPSHOT_PIN =
             Pattern.compile("<botmaker\\.([a-z]*)\\.version>[^<]*-SNAPSHOT<");
 
+    /** A YAML line that is only a comment; a trailing {@code #} on a step line is left, it may be in a string. */
+    private static final Pattern WHOLE_LINE_COMMENT = Pattern.compile("(?m)^[ \\t]*#.*$");
+
     private CiDepsGate() {
     }
 
@@ -58,6 +61,8 @@ public final class CiDepsGate {
         if (ci.isEmpty()) {
             return GateVerdict.skipped("  " + module.shortName() + ": no ci.yml — skipped");
         }
+        // A comment that names a repository checks nothing out (2026-10-24: Studio's named the cli so, and passed).
+        String steps = WHOLE_LINE_COMMENT.matcher(ci.get()).replaceAll("");
         Set<String> missing = new TreeSet<>();
         for (String key : keys(pom)) {
             String repo = repositoryFor(key)
@@ -66,7 +71,7 @@ public final class CiDepsGate {
                             + " know which\n     repository that is. Add it to Module.propertyKey() in"
                             + " botmaker-cli — an upstream nothing maps is\n     exactly the case this gate"
                             + " exists for."));
-            if (!ci.get().contains(repo)) {
+            if (!steps.contains(repo)) {
                 missing.add(repo);
             }
         }

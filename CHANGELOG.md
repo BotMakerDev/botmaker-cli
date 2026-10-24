@@ -15,6 +15,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   left out. Studio's New Project uses it to lock a plugin another one brings. The schema stays 4: older readers
   ignore the field.
 
+### Fixed
+
+- **The release's CI-checkout gate no longer counts a repository named only in a `ci.yml` comment.** Studio's
+  workflow mentioned `botmaker-cli` in a comment, so the gate passed while Studio's CI could not resolve the cli
+  snapshot it depends on.
+
 ## [0.6.0] — 2026-10-24
 
 ### Changed
