@@ -12,7 +12,7 @@
     -->
     <groupId>com.github.BotMakerDev</groupId>
     <artifactId>botmaker-cli</artifactId>
-    <version>0.5.1-SNAPSHOT</version>
+    <version>0.6.0</version>
 
     <name>BotMaker CLI</name>
     <description>
@@ -59,9 +59,9 @@
         -->
         <botmaker.cli.version>dev</botmaker.cli.version>
         <!-- Each upstream's main version; a release commit sets the released ones (doc 43). -->
-        <botmaker.studioapi.version>0.11.1-SNAPSHOT</botmaker.studioapi.version>
-        <botmaker.pluginhost.version>0.7.1-SNAPSHOT</botmaker.pluginhost.version>
-        <botmaker.pluginarchetype.version>0.4.1-SNAPSHOT</botmaker.pluginarchetype.version>
+        <botmaker.studioapi.version>v0.11.0</botmaker.studioapi.version>
+        <botmaker.pluginhost.version>v0.7.0</botmaker.pluginhost.version>
+        <botmaker.pluginarchetype.version>v0.4.0</botmaker.pluginarchetype.version>
     </properties>
 
     <repositories>
