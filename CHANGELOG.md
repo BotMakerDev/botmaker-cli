@@ -5,6 +5,16 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **`catalog.json` lists, for each plugin release, the other catalog plugins its pom declares** (`plugins`, the
+  same `{id, version}` pins a bot release carries; omitted when there are none). Read from the pom at the pinned
+  commit as data, like the rest of a plugin's facts; a pin naming the plugin itself or an id the catalog lacks is
+  left out. Studio's New Project uses it to lock a plugin another one brings. The schema stays 4: older readers
+  ignore the field.
+
 ## [0.6.0] — 2026-10-24
 
 ### Changed

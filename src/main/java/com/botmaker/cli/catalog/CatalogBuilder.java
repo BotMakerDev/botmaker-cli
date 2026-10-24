@@ -55,7 +55,9 @@ public final class CatalogBuilder {
                 .collect(Collectors.toMap(Catalog.Bot::repo, Function.identity(), (a, b) -> a))).orElse(Map.of());
 
         List<Catalog.Plugin> plugins = new ArrayList<>();
-        for (PluginEntry entry : read(root, EntryPath.PLUGINS, PluginEntry::read, PluginEntry::id)) {
+        List<PluginEntry> pluginEntries = read(root, EntryPath.PLUGINS, PluginEntry::read, PluginEntry::id);
+        Set<String> entryIds = pluginEntries.stream().map(PluginEntry::id).collect(Collectors.toSet());
+        for (PluginEntry entry : pluginEntries) {
             Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
             if (repo.isEmpty()) continue;
             Catalog.Plugin before = previousPlugins.get(entry.id());
@@ -69,7 +71,7 @@ public final class CatalogBuilder {
                         : Optional.empty();
                 if (jar == null && kept.isPresent()) {
                     jar = new DerivedFacts.PluginFacts(name == null ? before.name() : name,
-                            kept.get().minContractVersion(), kept.get().editorDependencies());
+                            kept.get().minContractVersion(), kept.get().editorDependencies(), kept.get().plugins());
                 }
                 if (jar == null) continue;
                 String refusal = refusal(jar);
@@ -78,8 +80,11 @@ public final class CatalogBuilder {
                     continue;
                 }
                 if (name == null) name = jar.name();
+                // Only another entry of this catalog: a pin naming itself or an unknown id would lock nothing real.
+                List<DerivedFacts.Pin> brings = jar.plugins().stream()
+                        .filter(p -> entryIds.contains(p.id()) && !p.id().equals(entry.id())).toList();
                 releases.add(new Catalog.Plugin.Release(release.tag(), release.commit(), release.jarSha256(),
-                        release.pomSha256(), jar.minContractVersion(), jar.editorDependencies()));
+                        release.pomSha256(), jar.minContractVersion(), jar.editorDependencies(), brings));
             }
             if (releases.isEmpty()) continue;
             plugins.add(new Catalog.Plugin(entry.id(), entry.repo(), publishers.rankOf(repo.get().ownerId()),

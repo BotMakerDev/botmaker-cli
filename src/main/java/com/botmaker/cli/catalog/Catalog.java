@@ -44,13 +44,24 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
          *
          * @param minContractVersion the oldest contract its pom accepts
          * @param editorDependencies {@code groupId:artifactId:version} it needs on the editor's classpath
+         * @param plugins            the other catalog plugins its pom declares, which a project adding it gets too
+         *                           (2026-10-24: New Project locks them)
          */
         @JsonInclude(JsonInclude.Include.NON_EMPTY)
-        @JsonPropertyOrder({"tag", "commit", "jarSha256", "pomSha256", "minContractVersion", "editorDependencies"})
+        @JsonPropertyOrder({"tag", "commit", "jarSha256", "pomSha256", "minContractVersion", "editorDependencies",
+                "plugins"})
         public record Release(String tag, String commit, String jarSha256, String pomSha256,
-                              String minContractVersion, List<String> editorDependencies) {
+                              String minContractVersion, List<String> editorDependencies,
+                              List<DerivedFacts.Pin> plugins) {
             public Release {
                 editorDependencies = editorDependencies == null ? List.of() : List.copyOf(editorDependencies);
+                plugins = plugins == null ? List.of() : List.copyOf(plugins);
+            }
+
+            /** A release that brings no other catalog plugin. */
+            public Release(String tag, String commit, String jarSha256, String pomSha256,
+                           String minContractVersion, List<String> editorDependencies) {
+                this(tag, commit, jarSha256, pomSha256, minContractVersion, editorDependencies, List.of());
             }
         }
 

@@ -84,6 +84,23 @@ class CatalogBuilderTest {
     }
 
     @Test
+    void a_plugin_release_keeps_only_the_other_catalog_plugins_it_brings() throws IOException {
+        String basicsId = "com.botmaker.basics";
+        String basicsRepo = "BotMakerDev/botmaker-plugin-basics";
+        entry("plugins/" + basicsId + ".json", pluginJson(basicsId, basicsRepo, "v0.5.0"));
+        facts.repo(basicsRepo, 1, "Basics.", null).release(basicsRepo, "v0.5.0", "LiQiyeDev");
+        DerivedFacts.Pin basics = new DerivedFacts.Pin(basicsId, "v0.5.0");
+        DerivedFacts.PluginFacts sdk = new DerivedFacts.PluginFacts("BotMaker SDK", "v0.11.0", List.of(),
+                List.of(new DerivedFacts.Pin(SDK_ID, "v2.1.0"), new DerivedFacts.Pin("no.such", "v1"), basics));
+        DerivedFacts withPins = new DerivedFacts(Map.of(SDK_ID, Map.of("v2.1.0", sdk),
+                basicsId, Map.of("v0.5.0", new DerivedFacts.PluginFacts("BotMaker Basics", "v0.11.0", List.of()))),
+                derived.botPlugins());
+        Catalog catalog = CatalogBuilder.build(root, publishers, facts, withPins, NOW);
+        Catalog.Plugin built = catalog.plugins().stream().filter(p -> p.id().equals(SDK_ID)).findFirst().orElseThrow();
+        assertEquals(List.of(basics), built.newest().plugins(), "itself and an unknown id are left out");
+    }
+
+    @Test
     void a_release_gone_from_github_is_left_out_and_an_entry_with_none_left_too() throws IOException {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
         entry(SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));

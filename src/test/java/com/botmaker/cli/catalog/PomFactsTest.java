@@ -74,6 +74,24 @@ class PomFactsTest {
     }
 
     @Test
+    void a_plugin_pom_gives_the_catalog_plugins_it_brings() {
+        FakeFacts poms = new FakeFacts().pom("somedev/thing", "v1", """
+                <project>
+                  <properties><botmaker.basics.version>v0.5.0</botmaker.basics.version></properties>
+                  <dependencies>
+                    <dependency><groupId>com.github.BotMakerDev</groupId><artifactId>botmaker-plugin-basics</artifactId>
+                      <version>${botmaker.basics.version}</version></dependency>
+                    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId><version>2.0</version></dependency>
+                  </dependencies>
+                </project>
+                """);
+        Map<String, String> ids = Map.of(PomFacts.key("com.github.somedev", "thing"), THING.id(),
+                PomFacts.key("com.github.BotMakerDev", "botmaker-plugin-basics"), "com.botmaker.basics");
+        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, ids).plugin(THING.id(), "v1");
+        assertEquals(List.of(new DerivedFacts.Pin("com.botmaker.basics", "v0.5.0")), facts.plugins());
+    }
+
+    @Test
     void a_pom_with_a_doctype_or_none_at_all_gives_no_facts() {
         FakeFacts poms = new FakeFacts().pom("somedev/thing", "v1", """
                 <?xml version="1.0"?>

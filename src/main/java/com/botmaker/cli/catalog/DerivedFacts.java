@@ -26,10 +26,18 @@ public record DerivedFacts(Map<String, Map<String, PluginFacts>> plugins,
      * @param minContractVersion the oldest contract its pom accepts
      * @param editorDependencies {@code groupId:artifactId:version} it needs on the editor's classpath and does not
      *                           bring (its {@code optional} dependencies)
+     * @param plugins            the catalog plugins its pom declares, at the versions it pins
      */
-    public record PluginFacts(String name, String minContractVersion, List<String> editorDependencies) {
+    public record PluginFacts(String name, String minContractVersion, List<String> editorDependencies,
+                              List<Pin> plugins) {
         public PluginFacts {
             editorDependencies = editorDependencies == null ? List.of() : List.copyOf(editorDependencies);
+            plugins = plugins == null ? List.of() : List.copyOf(plugins);
+        }
+
+        /** A plugin whose pom declares no other catalog plugin. */
+        public PluginFacts(String name, String minContractVersion, List<String> editorDependencies) {
+            this(name, minContractVersion, editorDependencies, List.of());
         }
     }
 

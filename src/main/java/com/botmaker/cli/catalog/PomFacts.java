@@ -51,7 +51,7 @@ public final class PomFacts {
                         // Read before the maps are touched: a pom that does not parse leaves no empty row.
                         switch (entry) {
                             case PluginEntry plugin -> {
-                                DerivedFacts.PluginFacts read = plugin(pom, plugin);
+                                DerivedFacts.PluginFacts read = plugin(pom, plugin, pluginIds);
                                 plugins.computeIfAbsent(plugin.id(), k -> new HashMap<>()).put(release.tag(), read);
                             }
                             case BotEntry bot -> {
@@ -71,14 +71,19 @@ public final class PomFacts {
         return new DerivedFacts(plugins, bots);
     }
 
-    /** A plugin's name (its pom's {@code <name>}, else the repository name), contract floor and editor dependencies. */
-    static DerivedFacts.PluginFacts plugin(Path pom, PluginEntry entry) throws IOException {
+    /**
+     * A plugin's name (its pom's {@code <name>}, else the repository name), contract floor, editor dependencies and
+     * the catalog plugins it declares.
+     */
+    static DerivedFacts.PluginFacts plugin(Path pom, PluginEntry entry, Map<String, String> pluginIds)
+            throws IOException {
         Map<String, String> properties = Poms.properties(pom);
         String name = resolved(Poms.name(pom), properties).orElse(entry.name());
         List<Poms.Dependency> declared = Poms.dependencies(pom);
         String contract = Poms.find(declared, PluginValidator.CONTRACT_GROUP, PluginValidator.CONTRACT_ARTIFACT)
                 .flatMap(d -> resolved(d.version(), properties)).orElse(null);
-        return new DerivedFacts.PluginFacts(name, contract, editorDependencies(declared, properties));
+        return new DerivedFacts.PluginFacts(name, contract, editorDependencies(declared, properties),
+                pins(pom, pluginIds));
     }
 
     /**
