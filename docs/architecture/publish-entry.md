@@ -82,3 +82,8 @@ a space, no device name (`NUL`, `CON.txt`), and is one of the allowed entries; n
 Windows and macOS); `bot.json` names a format this reader knows (a newer one says to update BotMaker); each
 `lib/` jar matches its listed sha256, and none is unlisted or missing. It extracts into a staging folder beside
 the target, with a size cap, then moves it into place, so a refused file leaves nothing behind.
+
+`BotFile.peek` reads only `bot.json`, with the same name and format checks, and refuses an owner, repository or tag
+that is not one plain folder name (a host files the bot under `<owner>/<repo>/<tag>`); Studio peeks to find the
+catalog's `bmkSha256` and ask for trust before unpacking anything (2026-10-25). `BotFiles.head` is the one reading of
+the pom and sources (`maven.compiler.release`, `main`, the name) that `bot export` and Studio's export share.

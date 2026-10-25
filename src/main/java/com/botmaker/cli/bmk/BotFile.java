@@ -32,6 +32,7 @@ import java.util.TreeMap;
 import java.util.regex.Pattern;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
@@ -60,6 +61,11 @@ public final class BotFile {
 
     /** A Windows device name, alone or before an extension. */
     private static final Pattern DEVICE = Pattern.compile("(?i)(con|prn|aux|nul|com[0-9]|lpt[0-9])(\\..*)?");
+
+    /** An owner, a repository, a tag, a coordinate's part: one plain name, not starting with a dot. */
+    private static final Pattern FOLDER_NAME = Pattern.compile("[A-Za-z0-9_-][A-Za-z0-9._-]{0,99}");
+
+    private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 
     /** How a file Git LFS stores begins in the commit: a pointer, not the file. */
     private static final byte[] LFS_POINTER = "version https://git-lfs.github.com/spec/".getBytes(StandardCharsets.UTF_8);
@@ -162,31 +168,7 @@ public final class BotFile {
         if (Files.exists(into, LinkOption.NOFOLLOW_LINKS)) throw new IOException(into + " exists already.");
         try (ZipFile zip = new ZipFile(bmk.toFile(), StandardCharsets.UTF_8)) {
             List<? extends ZipEntry> all = Collections.list(zip.entries());
-            Set<String> seen = new HashSet<>();
-            for (ZipEntry entry : all) {
-                String name = entry.getName();
-                if (!isSafe(name) || !(isSource(name) || name.equals(BOT_JSON) || isLibEntry(name))) {
-                    throw new Refused("this file holds " + name + ", which no .bmk holds; it was not made by BotMaker.");
-                }
-                if (!seen.add(name.toLowerCase(Locale.ROOT))) {
-                    throw new Refused("this file holds " + name + " twice; it was not made by BotMaker.");
-                }
-            }
-            ZipEntry jsonEntry = zip.getEntry(BOT_JSON);
-            if (jsonEntry == null) throw new Refused("this file has no bot.json; it is not a .bmk.");
-            BotJson bot;
-            try (InputStream in = zip.getInputStream(jsonEntry)) {
-                bot = JSON.readValue(bounded(in, 1 << 20), BotJson.class);
-            } catch (Refused e) {
-                throw e;
-            } catch (IOException e) {
-                throw new Refused("this file's bot.json cannot be read: " + e.getMessage());
-            }
-            if (bot.format() > BotJson.FORMAT) {
-                throw new Refused("this bot was made by a newer BotMaker (format " + bot.format()
-                        + "). Update BotMaker to open it.");
-            }
-            if (bot.format() < 1) throw new Refused("this file's bot.json is incomplete.");
+            BotJson bot = botJson(zip, all);
 
             Map<String, String> listed = new HashMap<>();
             for (BotJson.Lib lib : bot.libs()) lib.packed().ifPresent(path -> listed.put(path, lib.sha256()));
@@ -229,8 +211,75 @@ public final class BotFile {
         }
     }
 
+    /**
+     * {@code bmk}'s {@code bot.json}, read without unpacking anything: who made the bot and which tag it is, for a
+     * host to decide where it goes and whether to trust it before {@link #read}. The entries' names and the format
+     * are checked as {@link #read} checks them; the jars are not.
+     */
+    public static BotJson peek(Path bmk) throws IOException {
+        try (ZipFile zip = new ZipFile(bmk.toFile(), StandardCharsets.UTF_8)) {
+            return botJson(zip, Collections.list(zip.entries()));
+        } catch (ZipException e) {
+            throw new Refused("this file is not a .bmk: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Every entry's name checked, then {@code bot.json} read and checked: a format this reader knows, and an owner,
+     * repository and tag that are each one plain folder name, since a host files the bot under them.
+     */
+    private static BotJson botJson(ZipFile zip, List<? extends ZipEntry> all) throws IOException {
+        Set<String> seen = new HashSet<>();
+        for (ZipEntry entry : all) {
+            String name = entry.getName();
+            if (!isSafe(name) || !(isSource(name) || name.equals(BOT_JSON) || isLibEntry(name))) {
+                throw new Refused("this file holds " + name + ", which no .bmk holds; it was not made by BotMaker.");
+            }
+            if (!seen.add(name.toLowerCase(Locale.ROOT))) {
+                throw new Refused("this file holds " + name + " twice; it was not made by BotMaker.");
+            }
+        }
+        ZipEntry jsonEntry = zip.getEntry(BOT_JSON);
+        if (jsonEntry == null) throw new Refused("this file has no bot.json; it is not a .bmk.");
+        BotJson bot;
+        try (InputStream in = zip.getInputStream(jsonEntry)) {
+            bot = JSON.readValue(bounded(in, 1 << 20), BotJson.class);
+        } catch (Refused e) {
+            throw e;
+        } catch (IOException e) {
+            throw new Refused("this file's bot.json cannot be read: " + e.getMessage());
+        }
+        if (bot.format() > BotJson.FORMAT) {
+            throw new Refused("this bot was made by a newer BotMaker (format " + bot.format()
+                    + "). Update BotMaker to open it.");
+        }
+        if (bot.format() < 1 || !isFolderName(bot.owner()) || !isFolderName(bot.repo()) || !isFolderName(bot.tag())
+                || isBlank(bot.main()) || isBlank(bot.name()) || isBlank(bot.commit())) {
+            throw new Refused("this file's bot.json is incomplete.");
+        }
+        // A host fetches each listed jar by its coordinate into a local repository: every part one plain name.
+        for (BotJson.Lib lib : bot.libs()) {
+            if (lib == null || lib.coordinate() == null || lib.sha256() == null || !SHA256.matcher(lib.sha256()).matches()
+                    || !Arrays.stream(lib.coordinate().split(":", -1)).allMatch(BotFile::isFolderName)
+                    || lib.coordinate().split(":", -1).length < 3 || lib.coordinate().split(":", -1).length > 4) {
+                throw new Refused("this file's bot.json lists a jar it does not name properly"
+                        + (lib == null || lib.coordinate() == null ? "." : ": " + lib.coordinate() + "."));
+            }
+        }
+        return bot;
+    }
+
+    private static boolean isBlank(String text) {
+        return text == null || text.isBlank();
+    }
+
+    /** One plain folder name: letters, digits, {@code . _ -}, not starting with a dot. */
+    static boolean isFolderName(String part) {
+        return part != null && FOLDER_NAME.matcher(part).matches() && isSafe(part);
+    }
+
     /** A source entry: what {@link #write} takes from the folder. */
-    static boolean isSource(String name) {
+    public static boolean isSource(String name) {
         return name.equals("pom.xml") || name.equals("icon.png")
                 || (name.startsWith("src/main/java/") || name.startsWith("src/main/resources/")) && !name.endsWith("/");
     }

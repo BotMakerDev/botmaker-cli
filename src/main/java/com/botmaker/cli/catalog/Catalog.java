@@ -93,13 +93,20 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
          * One approved release.
          *
          * @param commit  what Studio installs
-         * @param plugins the catalog plugins its pom declares
+         * @param plugins   the catalog plugins its pom declares
+         * @param bmkSha256 the sha256 of the release's {@code .bmk} (spec 2026-10-24 § 3), which Studio checks a file
+         *                  against before it opens one; {@code null} for a release that has none (2026-10-25)
          */
         @JsonInclude(JsonInclude.Include.NON_EMPTY)
-        @JsonPropertyOrder({"tag", "commit", "plugins"})
-        public record Release(String tag, String commit, List<DerivedFacts.Pin> plugins) {
+        @JsonPropertyOrder({"tag", "commit", "plugins", "bmkSha256"})
+        public record Release(String tag, String commit, List<DerivedFacts.Pin> plugins, String bmkSha256) {
             public Release {
                 plugins = plugins == null ? List.of() : List.copyOf(plugins);
+            }
+
+            /** A release with no {@code .bmk}. */
+            public Release(String tag, String commit, List<DerivedFacts.Pin> plugins) {
+                this(tag, commit, plugins, null);
             }
         }
 

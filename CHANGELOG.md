@@ -13,7 +13,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   is made from a tagged commit with a clean tree, packs the pom, icon, sources, resources and the JitPack-built
   jars, and lists the Maven Central jars with their sha256 for the first open to fetch. The same commit gives
   the same bytes on any machine; the command prints the path and the sha256. `com.botmaker.cli.bmk` writes and
-  opens the file (each entry and jar checked before anything is written).
+  opens the file (each entry and jar checked before anything is written). `BotFile.peek` reads a file's
+  `bot.json` without unpacking it (its owner, repository and tag must each be a plain folder name), and
+  `BotFiles.head` is the one reading of the pom and sources that every writer of a `.bmk` uses.
+- **A bot release in `catalog.json` may carry `bmkSha256`**, the sha256 of its `.bmk`, which Studio checks an
+  opened file against. Optional: no release has one until publishing attaches the file.
 
 - **`catalog.json` lists, for each plugin release, the other catalog plugins its pom declares** (`plugins`, the
   same `{id, version}` pins a bot release carries; omitted when there are none). Read from the pom at the pinned

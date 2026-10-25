@@ -3,7 +3,6 @@ package com.botmaker.cli;
 import com.botmaker.cli.bmk.BotFile;
 import com.botmaker.cli.bmk.BotFiles;
 import com.botmaker.cli.bmk.BotJson;
-import com.botmaker.cli.project.Poms;
 import com.botmaker.cli.publish.PublishTarget;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -95,19 +94,7 @@ final class BotExportCommand implements Callable<Integer> {
             }
             Map<String, byte[]> sources = BotFiles.contents(blobs, Files.readAllBytes(batch));
 
-            Path pom = dir.resolve("pom.xml");
-            String release = Poms.properties(pom).getOrDefault("maven.compiler.release", "");
-            if (!release.matches("[1-9][0-9]{0,2}")) {
-                throw new BotFile.Refused("the pom names no maven.compiler.release: a .bmk says which Java it needs.");
-            }
-            String main = BotFiles.mainClass(sources).orElseThrow(() -> new BotFile.Refused(
-                    "no source under src/main/java declares public static void main(String[]), which is how a bot "
-                            + "is started."));
-            String name = Poms.name(pom);
-            if (name.isBlank()) name = Poms.coordinate(pom).artifactId();
-            String[] ownerRepo = slug.split("/", 2);
-            BotJson.Head head = new BotJson.Head(name.strip(), ownerRepo[0], ownerRepo[1], tag, commit,
-                    Integer.parseInt(release), main);
+            BotJson.Head head = BotFiles.head(dir.resolve("pom.xml"), sources, tag, commit, slug);
 
             Mvn.Result listed = mvn.run(dir, "-q", "dependency:list", "-DoutputAbsoluteArtifactFilename=true",
                     "-DoutputFile=" + list, "-DappendOutput=false");
@@ -117,7 +104,7 @@ final class BotExportCommand implements Callable<Integer> {
             List<BotFile.Jar> jars = BotFiles.jars(Files.readString(list));
 
             Files.createDirectories(outDir);
-            Path target = outDir.resolve(BotFiles.fileName(name, tag));
+            Path target = outDir.resolve(BotFiles.fileName(head.name(), tag));
             Path next = Files.createTempFile(outDir, ".bmk", ".next");
             try {
                 try (OutputStream stream = Files.newOutputStream(next)) {

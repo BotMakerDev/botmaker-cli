@@ -1,5 +1,7 @@
 package com.botmaker.cli.bmk;
 
+import com.botmaker.cli.project.Poms;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -110,6 +112,41 @@ public final class BotFiles {
         return out;
     }
 
+    /**
+     * Everything {@code bot.json} says but the jars, for the bot whose {@code pom} and commit {@code sources} these
+     * are, at {@code tag} and {@code commit} of the GitHub repository {@code slug} ({@code owner/repo}). Refused
+     * when the pom names no {@code maven.compiler.release} or no source holds {@code main}. The name is the pom's
+     * {@code <name>}, else its artifactId. A tag that is no plain folder name is refused, as opening would refuse
+     * it. One reading for every host that writes a {@code .bmk}.
+     */
+    public static BotJson.Head head(Path pom, Map<String, byte[]> sources, String tag, String commit, String slug)
+            throws IOException {
+        String release = Poms.properties(pom).getOrDefault("maven.compiler.release", "");
+        if (!release.matches("[1-9][0-9]{0,2}")) {
+            throw new BotFile.Refused("the pom names no maven.compiler.release: a .bmk says which Java it needs.");
+        }
+        String main = mainClass(sources).orElseThrow(() -> new BotFile.Refused(
+                "no source under src/main/java declares public static void main(String[]), which is how a bot "
+                        + "is started."));
+        String name = Poms.name(pom);
+        if (name.isBlank()) name = Poms.coordinate(pom).artifactId();
+        String[] ownerRepo = slug.split("/", 2);
+        if (ownerRepo.length != 2 || !BotFile.isFolderName(ownerRepo[0]) || !BotFile.isFolderName(ownerRepo[1])) {
+            throw new BotFile.Refused(slug + " is not owner/repo.");
+        }
+        // Opening files the bot under its tag, a folder: refused here rather than by every reader of the file.
+        if (!BotFile.isFolderName(tag)) {
+            throw new BotFile.Refused("the tag " + tag + " is not a plain name (letters, digits, . _ -), which a "
+                    + ".bmk needs. Tag the commit vX.Y.Z.");
+        }
+        return new BotJson.Head(name.strip(), ownerRepo[0], ownerRepo[1], tag, commit, Integer.parseInt(release), main);
+    }
+
+    /** Whether a jar's {@code classifier} names a system ({@link #NATIVE}), so no {@code .bmk} lists it. */
+    public static boolean isNative(String classifier) {
+        return classifier != null && !classifier.isEmpty() && NATIVE.matcher(classifier).matches();
+    }
+
     private static int indexOf(byte[] bytes, byte b, int from) {
         for (int i = from; i < bytes.length; i++) if (bytes[i] == b) return i;
         return -1;
@@ -126,7 +163,7 @@ public final class BotFiles {
             Matcher m = LISTED.matcher(line);
             if (!m.matches() || !m.group(3).equals("jar") || m.group(6).equals("test")) continue;
             String classifier = m.group(4);
-            if (classifier != null && NATIVE.matcher(classifier).matches()) continue;
+            if (isNative(classifier)) continue;
             String coordinate = m.group(1) + ":" + m.group(2) + ":" + m.group(5)
                     + (classifier == null ? "" : ":" + classifier);
             out.putIfAbsent(coordinate, new BotFile.Jar(coordinate, Path.of(m.group(7).strip())));
