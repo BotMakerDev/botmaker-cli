@@ -49,8 +49,12 @@ import java.util.zip.ZipOutputStream;
  */
 public final class BotFile {
 
-    /** Every entry's time: the earliest a zip can record. */
-    static final LocalDateTime ENTRY_TIME = LocalDateTime.of(1980, 1, 1, 0, 0);
+    /**
+     * Every entry's time. Not 1980-01-01 00:00, the earliest a zip records: that local time is before 1980 in UTC
+     * east of Greenwich, and the JDK then adds a UT extra field in this machine's time zone (2026-10-25: Firestone
+     * 1.0.3, written in Paris, did not match the catalog's rebuild in UTC).
+     */
+    static final LocalDateTime ENTRY_TIME = LocalDateTime.of(1980, 2, 1, 0, 0);
 
     /** The file's {@code bot.json} entry. */
     public static final String BOT_JSON = "bot.json";

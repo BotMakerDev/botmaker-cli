@@ -5,6 +5,16 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- **A `.bmk` has the same bytes in every time zone** (2026-10-25): its entries were dated 1980-01-01 00:00, which
+  east of Greenwich is before 1980 in UTC, so Java added a timestamp in the computer's own time zone. A file
+  written in Paris did not match the catalog's rebuild, which runs in UTC (Firestone 1.0.3: "The .bmk on the
+  release is not the one its commit builds"). Entries are dated 1980-02-01 now, and every `.bmk`'s sha256 changes
+  once.
+
 ## [0.8.0] — 2026-10-25
 
 ### Added

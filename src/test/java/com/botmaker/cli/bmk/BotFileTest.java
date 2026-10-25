@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -74,6 +75,22 @@ class BotFileTest {
         Path b = written(tmp, new Fixture(reordered, f.jars().reversed()), "b.bmk");
         assertArrayEquals(Files.readAllBytes(a), Files.readAllBytes(b));
         assertEquals(BotFiles.sha256(a), BotFiles.sha256(b));
+    }
+
+    /** The catalog's check runs in UTC: at 1980-01-01 00:00 the JDK added a time-zone-dependent UT field (Firestone 1.0.3). */
+    @Test
+    void sameBytesInEveryTimeZone() throws IOException {
+        Fixture f = fixture(tmp);
+        TimeZone was = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            Path utc = written(tmp, f, "utc.bmk");
+            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Paris"));
+            Path paris = written(tmp, f, "paris.bmk");
+            assertArrayEquals(Files.readAllBytes(utc), Files.readAllBytes(paris));
+        } finally {
+            TimeZone.setDefault(was);
+        }
     }
 
     @Test
