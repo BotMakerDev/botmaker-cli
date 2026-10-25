@@ -2,6 +2,7 @@ package com.botmaker.cli;
 
 import com.botmaker.cli.bmk.BotFile;
 import com.botmaker.cli.bmk.BotFiles;
+import com.botmaker.cli.bmk.Central;
 import com.botmaker.cli.publish.PublishTarget;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -13,6 +14,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.function.Function;
 
 /**
  * {@code botmaker bot export} — writes the bot at its tagged {@code HEAD} as a {@code .bmk} ({@link BotFile}), the
@@ -24,7 +26,8 @@ import java.util.concurrent.Callable;
 @Command(name = "export",
         header = "Write this bot as a .bmk file, for people who only run bots.",
         description = "Run in the bot's folder, at a tagged commit. Packs the pom, icon, sources and resources, and "
-                + "the JitPack-built jars it runs with; the Maven Central jars are listed and fetched on first open.",
+                + "every jar it runs with that Maven Central does not serve byte for byte; Central's jars are listed "
+                + "and fetched on first open.",
         mixinStandardHelpOptions = true)
 final class BotExportCommand implements Callable<Integer> {
 
@@ -68,12 +71,23 @@ final class BotExportCommand implements Callable<Integer> {
             throw new BotFile.Refused("HEAD has several tags (" + String.join(", ", tags) + "); a .bmk names one "
                     + "version. Delete the others.");
         }
-        // origin from the command line, mine from Studio (its publish pushes there)
-        String slug = git(dir, "remote", "get-url", "origin").or(() -> git(dir, "remote", "get-url", "mine"))
-                .flatMap(PublishTarget::slugOf)
-                .orElseThrow(() -> new BotFile.Refused("neither origin nor mine is a GitHub repository: a .bmk "
-                        + "names the repository it was made from."));
-        return BotExport.write(dir, tags.getFirst(), slug, outDir, BotExport.maven(mvn).of(dir));
+        String slug = slug(remote -> git(dir, "remote", "get-url", remote))
+                .orElseThrow(() -> new BotFile.Refused("none of the remotes " + String.join(", ", REMOTES)
+                        + " is a GitHub repository: a .bmk names the repository it was made from."));
+        return BotExport.write(dir, tags.getFirst(), slug, outDir, BotExport.maven(mvn).of(dir), Central.maven());
+    }
+
+    /**
+     * The remotes a .bmk's repository is read from, in order: yours ({@code origin}; {@code mine} in a project Studio
+     * has not renamed yet), then the author's ({@code upstream}; {@code original} before the rename), for a clone
+     * never published (2026-10-25, finding N2).
+     */
+    static final List<String> REMOTES = List.of("origin", "mine", "upstream", "original");
+
+    /** The first of {@link #REMOTES} whose url is a GitHub repository, as {@code owner/repo}. */
+    static Optional<String> slug(Function<String, Optional<String>> url) {
+        return REMOTES.stream().map(url).flatMap(Optional::stream).map(PublishTarget::slugOf)
+                .flatMap(Optional::stream).findFirst();
     }
 
     private static Optional<String> git(Path dir, String... args) {

@@ -1,5 +1,7 @@
 package com.botmaker.cli.catalog;
 
+import com.botmaker.cli.bmk.Central;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -70,4 +72,7 @@ public interface EntryFacts {
      * or empty when it serves none.
      */
     Optional<String> jitpackSha256(String coordinate, String tag, Artifact artifact);
+
+    /** Maven Central, which decides the jars a bot's {@code .bmk} lists rather than packs; one per check. */
+    Central central();
 }

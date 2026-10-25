@@ -1,5 +1,6 @@
 package com.botmaker.cli.catalog;
 
+import com.botmaker.cli.bmk.Central;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
@@ -106,6 +107,11 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
         } catch (IOException e) {
             return Optional.empty();
         }
+    }
+
+    @Override
+    public Central central() {
+        return Central.maven();
     }
 
     /** Downloaded from the release's own link and hashed; a failure other than a 404 stops the run. */

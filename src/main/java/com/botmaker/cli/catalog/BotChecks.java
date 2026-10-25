@@ -4,6 +4,8 @@ import com.botmaker.cli.BotExport;
 import com.botmaker.cli.Mvn;
 import com.botmaker.cli.bmk.BotFile;
 import com.botmaker.cli.bmk.BotFiles;
+import com.botmaker.cli.bmk.BotJson;
+import com.botmaker.cli.bmk.Central;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -70,8 +72,8 @@ public final class BotChecks {
             if (Finding.refused(found)) return found;
             // The build ran the bot's own plugins, which may have rewritten the clone, its .git and the list: the
             // .bmk is written again from a second fetch the build never saw, and every jar it packs is checked
-            // against JitPack (checkBmk). A listed Maven Central jar needs no check here: Studio fetches it from
-            // Central and refuses one whose sha256 is not bot.json's.
+            // against JitPack (checkBmk). A jar Central serves byte for byte is listed, not packed: Studio fetches
+            // it from Central and refuses one whose sha256 is not bot.json's.
             Path pristine = Files.createDirectories(clone.resolveSibling("pristine"));
             failure = fetch(pristine, repo, release);
             if (failure != null) return List.of(Finding.error(path, failure));
@@ -100,15 +102,18 @@ public final class BotChecks {
     /**
      * Rule 9 (2026-10-25): the {@code .bmk} on the GitHub Release is the one the pinned commit builds — the clone
      * written again with {@code jars} ({@link BotExport}) gives the same sha256 as the file GitHub serves, and both
-     * are the entry's {@code bmkSha256}. A catalog plugin among the jars must be the jar its own release pins, and
-     * every jar the file packs ({@code com.github.}) the one JitPack serves.
+     * are the entry's {@code bmkSha256}. A catalog plugin among the jars must be the jar its own release pins; a jar
+     * Maven Central serves with the same bytes is listed and fetched from there, and every other jar, which the file
+     * packs, must be the one JitPack serves (2026-10-25: by Central's checksum, not by groupId).
      *
      * @param clone a checkout of the commit no build ran in
      */
     static List<Finding> checkBmk(Path clone, String repo, ApprovedRelease release, String path,
                                   List<BotFile.Jar> jars, Optional<Catalog> catalog, EntryFacts facts)
             throws IOException {
+        Central central = facts.central();
         for (BotFile.Jar jar : jars) {
+            byte[] bytes = Files.readAllBytes(jar.file());
             String sha = BotFiles.sha256(jar.file());
             Optional<String> pinned = pinnedJar(jar.coordinate(), catalog);
             if (pinned.isPresent() && !pinned.get().equals(sha)) {
@@ -116,13 +121,14 @@ public final class BotChecks {
                         + " plugin release."));
             }
             // A jar the .bmk packs is the one JitPack serves, whatever the build put in its repository.
-            if (jar.coordinate().startsWith("com.github.")) {
+            if (!central.serves(new BotJson.Lib(null, jar.coordinate(), sha), bytes)) {
                 String[] parts = jar.coordinate().split(":");
                 Optional<String> served = parts.length == 3 ? facts.jitpackSha256(parts[0] + ":" + parts[1],
                         parts[2], EntryFacts.Artifact.JAR) : Optional.empty();
                 if (!served.equals(Optional.of(sha))) {
                     return List.of(Finding.error(path, jar.coordinate() + " is not the jar JitPack serves"
-                            + (parts.length == 3 ? "" : " (a jar with a classifier cannot be checked)") + "."));
+                            + (parts.length == 3 ? "" : " (a jar with a classifier cannot be checked)")
+                            + ", nor one Maven Central serves: a bot runs only with jars from either."));
                 }
             }
         }
@@ -130,7 +136,7 @@ public final class BotChecks {
         Path rebuilt = null;
         try {
             try {
-                rebuilt = BotExport.write(clone, release.tag(), repo, out, jars);
+                rebuilt = BotExport.write(clone, release.tag(), repo, out, jars, central);
             } catch (BotFile.Refused e) {
                 return List.of(Finding.error(path, "the .bmk cannot be made from this commit: " + e.getMessage()));
             }

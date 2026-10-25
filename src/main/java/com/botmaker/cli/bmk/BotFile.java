@@ -38,7 +38,8 @@ import java.util.zip.ZipOutputStream;
 
 /**
  * Writes and reads a {@code .bmk} (spec 2026-10-24 § 2): the bot's {@code pom.xml}, {@code icon.png}, sources and
- * resources, its {@code bot.json}, and in {@code lib/} the JitPack-built jars it runs with. Nothing compiled and
+ * resources, its {@code bot.json}, and in {@code lib/} every jar it runs with that Maven Central does not serve byte
+ * for byte ({@link Central}; 2026-10-25, was every {@code com.github.} jar). Nothing compiled and
  * nothing system-specific, so one commit and one set of resolved jars always make the same bytes.
  *
  * <p><b>Reproducible:</b> entries sorted by path, each dated {@link #ENTRY_TIME} (local DOS time, so no time zone
@@ -96,12 +97,12 @@ public final class BotFile {
      *
      * @param sources the commit's files by path, relative with {@code /}; only {@code pom.xml}, {@code icon.png} and
      *                those under {@code src/main/java/} and {@code src/main/resources/} are taken
-     * @param jars    the bot's resolved classpath; a jar whose groupId starts {@code com.github.} is packed, every
-     *                other is listed in {@code bot.json} only
+     * @param jars    the bot's resolved classpath; a jar {@code central} serves with the same bytes is listed in
+     *                {@code bot.json} only, every other is packed
      * @return the {@code bot.json} written
      */
-    public static BotJson write(Map<String, byte[]> sources, BotJson.Head head, List<Jar> jars, OutputStream out)
-            throws IOException {
+    public static BotJson write(Map<String, byte[]> sources, BotJson.Head head, List<Jar> jars, Central central,
+                                OutputStream out) throws IOException {
         Map<String, byte[]> entries = new TreeMap<>();
         Set<String> seen = new HashSet<>();
         for (Map.Entry<String, byte[]> source : sources.entrySet()) {
@@ -125,7 +126,7 @@ public final class BotFile {
             byte[] bytes = Files.readAllBytes(jar.file());   // read once: the sha listed is of the bytes packed
             String sha = HexFormat.of().formatHex(digest().digest(bytes));
             BotJson.Lib unpacked = new BotJson.Lib(null, jar.coordinate(), sha);
-            if (!isPacked(unpacked)) {
+            if (central.serves(unpacked, bytes)) {
                 libs.add(unpacked);
                 continue;
             }
@@ -306,11 +307,6 @@ public final class BotFile {
 
     private static boolean startsWith(byte[] bytes, byte[] prefix) {
         return bytes.length >= prefix.length && Arrays.equals(bytes, 0, prefix.length, prefix, 0, prefix.length);
-    }
-
-    /** Whether {@code lib} is packed in {@code lib/}: a JitPack-built jar (the user's call, 2026-10-24). */
-    static boolean isPacked(BotJson.Lib lib) {
-        return lib.groupId().startsWith("com.github.");
     }
 
     private static String libPath(BotJson.Lib lib) {

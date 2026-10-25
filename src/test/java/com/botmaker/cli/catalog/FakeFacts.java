@@ -1,5 +1,6 @@
 package com.botmaker.cli.catalog;
 
+import com.botmaker.cli.bmk.Central;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.nio.charset.StandardCharsets;
@@ -27,6 +28,13 @@ public final class FakeFacts implements EntryFacts, PomFacts.Source {
     public final Set<String> jitpack = new HashSet<>();
     final Map<String, String> hashes = new HashMap<>();
     final Map<String, String> poms = new HashMap<>();
+    /** The coordinates Maven Central serves, each as the very bytes asked about. */
+    public final Set<String> central = new HashSet<>();
+
+    @Override
+    public Central central() {
+        return (lib, bytes) -> central.contains(lib.coordinate());
+    }
 
     /** The pom of {@code slug} at {@code tag}'s commit. */
     FakeFacts pom(String slug, String tag, String xml) {

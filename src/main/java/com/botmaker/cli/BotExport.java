@@ -3,6 +3,7 @@ package com.botmaker.cli;
 import com.botmaker.cli.bmk.BotFile;
 import com.botmaker.cli.bmk.BotFiles;
 import com.botmaker.cli.bmk.BotJson;
+import com.botmaker.cli.bmk.Central;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -51,9 +52,9 @@ public final class BotExport {
      * {@code dir}'s {@code HEAD}, released as {@code tag} of the GitHub repository {@code slug}, written into
      * {@code outDir} under {@link BotFiles#fileName}; its path. The files are the commit's bytes, not the checkout's:
      * no line-ending conversion, filter or skipped file reaches the {@code .bmk}, so the catalog's rebuild of the
-     * commit on another machine gives the same file.
+     * commit on another machine gives the same file. {@code central} says which jars are listed, not packed.
      */
-    public static Path write(Path dir, String tag, String slug, Path outDir, List<BotFile.Jar> jars)
+    public static Path write(Path dir, String tag, String slug, Path outDir, List<BotFile.Jar> jars, Central central)
             throws IOException {
         String commit = git(dir, "rev-parse", "HEAD").orElseThrow(() -> new BotFile.Refused("git rev-parse failed."));
         Path ids = Files.createTempFile("botmaker-blobs", ".txt");
@@ -73,7 +74,7 @@ public final class BotExport {
             Path next = Files.createTempFile(outDir, ".bmk", ".next");
             try {
                 try (OutputStream stream = Files.newOutputStream(next)) {
-                    BotFile.write(sources, head, jars, stream);
+                    BotFile.write(sources, head, jars, central, stream);
                 }
                 Files.move(next, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } finally {

@@ -13,6 +13,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   sandbox folder given, and `BOTMAKER_MCP_UI=1` when `ui` is true, so a client can try a dev Studio on a sandbox
   and drive its windows with Studio's `ui` tool. With no `project`, Studio opens on the bot list.
 
+### Fixed
+
+- **A `.bmk` packs the jars Maven Central does not serve, whatever their groupId** (2026-10-25). It packed every
+  `com.github.*` jar, so a Central jar under that groupId (`com.github.jai-imageio:jai-imageio-core`) was packed,
+  and the catalog's check refused the release because JitPack does not serve it (Firestone 1.0.2). Now Central is
+  asked once per jar (its `.jar.sha256`, else its `.sha1`): a jar it serves with the same bytes is listed, every
+  other is packed, and the catalog's check asks the same. Writing a `.bmk` needs Maven Central to answer.
+- **A bot whose pom has no `<name>` is named after its repository**, not its artifactId (Firestone's `.bmk` was
+  `gamebot-1.0.2.bmk`).
+- **`botmaker bot export` finds the repository in a clone never published**: it reads `origin`, `mine`,
+  `upstream`, then `original`, and refused a clone that had only `original`.
+
 ## [0.7.0] — 2026-10-25
 
 ### Added

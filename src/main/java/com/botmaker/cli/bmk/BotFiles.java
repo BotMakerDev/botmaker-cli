@@ -115,9 +115,9 @@ public final class BotFiles {
     /**
      * Everything {@code bot.json} says but the jars, for the bot whose {@code pom} and commit {@code sources} these
      * are, at {@code tag} and {@code commit} of the GitHub repository {@code slug} ({@code owner/repo}). Refused
-     * when the pom names no {@code maven.compiler.release} or no source holds {@code main}. The name is the pom's
-     * {@code <name>}, else its artifactId. A tag that is no plain folder name is refused, as opening would refuse
-     * it. One reading for every host that writes a {@code .bmk}.
+     * when the pom names no {@code maven.compiler.release} or no source holds {@code main}. The name is
+     * {@link #name}'s. A tag that is no plain folder name is refused, as opening would refuse it. One reading for
+     * every host that writes a {@code .bmk}.
      */
     public static BotJson.Head head(Path pom, Map<String, byte[]> sources, String tag, String commit, String slug)
             throws IOException {
@@ -128,18 +128,27 @@ public final class BotFiles {
         String main = mainClass(sources).orElseThrow(() -> new BotFile.Refused(
                 "no source under src/main/java declares public static void main(String[]), which is how a bot "
                         + "is started."));
-        String name = Poms.name(pom);
-        if (name.isBlank()) name = Poms.coordinate(pom).artifactId();
         String[] ownerRepo = slug.split("/", 2);
         if (ownerRepo.length != 2 || !BotFile.isFolderName(ownerRepo[0]) || !BotFile.isFolderName(ownerRepo[1])) {
             throw new BotFile.Refused(slug + " is not owner/repo.");
         }
+        String name = name(pom, ownerRepo[1]);
         // Opening files the bot under its tag, a folder: refused here rather than by every reader of the file.
         if (!BotFile.isFolderName(tag)) {
             throw new BotFile.Refused("the tag " + tag + " is not a plain name (letters, digits, . _ -), which a "
                     + ".bmk needs. Tag the commit vX.Y.Z.");
         }
         return new BotJson.Head(name.strip(), ownerRepo[0], ownerRepo[1], tag, commit, Integer.parseInt(release), main);
+    }
+
+    /**
+     * A bot's name: the pom's {@code <name>}, else its GitHub repository's name {@code repo} (2026-10-25: Firestone's
+     * pom has none, and its artifactId, {@code gamebot}, is a cloned blank's). Never the folder: the catalog rebuilds
+     * the file from a clone in a folder of its own, and the two files must be the same.
+     */
+    static String name(Path pom, String repo) throws IOException {
+        String name = Poms.name(pom);
+        return name.isBlank() ? repo : name;
     }
 
     /** Whether a jar's {@code classifier} names a system ({@link #NATIVE}), so no {@code .bmk} lists it. */

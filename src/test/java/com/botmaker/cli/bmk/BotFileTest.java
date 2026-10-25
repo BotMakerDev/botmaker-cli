@@ -51,9 +51,13 @@ class BotFileTest {
 
     record Fixture(Map<String, byte[]> sources, List<BotFile.Jar> jars) {}
 
+    /** Maven Central serving opencv and jai-imageio, each as the bytes asked about. */
+    static final Central CENTRAL = (lib, bytes) -> lib.artifactId().equals("opencv")
+            || lib.artifactId().equals("jai-imageio-core");
+
     static Path written(Path tmp, Fixture f, String name) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        BotFile.write(f.sources(), HEAD, f.jars(), out);
+        BotFile.write(f.sources(), HEAD, f.jars(), CENTRAL, out);
         return Files.write(tmp.resolve(name), out.toByteArray());
     }
 
@@ -92,6 +96,42 @@ class BotFileTest {
         assertEquals("firestone.Main", bot.main());
     }
 
+    /** Central decides, not the groupId: a com.github jar on Central is listed, an org one it lacks is packed. */
+    @Test
+    void whatCentralServesIsListedWhateverTheGroupId() throws IOException {
+        Fixture f = fixture(tmp);
+        Path imageio = Files.write(tmp.resolve("jai.jar"), new byte[]{1});
+        Path own = Files.write(tmp.resolve("own.jar"), new byte[]{2});
+        List<BotFile.Jar> jars = List.of(new BotFile.Jar("com.github.jai-imageio:jai-imageio-core:1.4.0", imageio),
+                new BotFile.Jar("org.example:own:1.0", own));
+        BotJson bot = BotFile.write(f.sources(), HEAD, jars, CENTRAL, new ByteArrayOutputStream());
+        assertEquals(List.of(Optional.empty(), Optional.of("lib/own-1.0.jar")),
+                bot.libs().stream().map(BotJson.Lib::packed).toList());
+    }
+
+    @Test
+    void centralsChecksumIsOfTheJarsBytes() {
+        BotJson.Lib lib = new BotJson.Lib(null, "com.github.jai-imageio:jai-imageio-core:1.4.0", "x");
+        assertEquals("https://repo1.maven.org/maven2/com/github/jai-imageio/jai-imageio-core/1.4.0/"
+                + "jai-imageio-core-1.4.0.jar", Central.jarUrl(lib));
+        assertTrue(Central.jarUrl(new BotJson.Lib(null, "a.b:c:1:natives", "x")).endsWith("/a/b/c/1/c-1-natives.jar"));
+        byte[] bytes = bytes("abc");
+        assertTrue(Central.matches(new String[]{"sha1", "a9993e364706816aba3e25717850c26c9cd0d89d"}, bytes));
+        assertTrue(Central.matches(new String[]{"sha256",
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}, bytes));
+        assertFalse(Central.matches(new String[]{"sha1", "0".repeat(40)}, bytes));
+    }
+
+    /** The pom's name, else the repository's: never the artifactId a cloned blank keeps (gamebot). */
+    @Test
+    void aBotWithNoNameIsNamedAfterItsRepository() throws IOException {
+        Path named = Files.writeString(tmp.resolve("named.xml"),
+                "<project><artifactId>gamebot</artifactId><name>Fire Stone</name></project>");
+        Path bare = Files.writeString(tmp.resolve("bare.xml"), "<project><artifactId>gamebot</artifactId></project>");
+        assertEquals("Fire Stone", BotFiles.name(named, "Firestone"));
+        assertEquals("Firestone", BotFiles.name(bare, "Firestone"));
+    }
+
     @Test
     void excludesTarget() throws IOException {
         Path bmk = written(tmp, fixture(tmp), "f.bmk");
@@ -113,7 +153,7 @@ class BotFileTest {
                 Map.entry("src/main/resources/big.png", bytes("version https://git-lfs.github.com/spec/v1\n")))) {
             Map<String, byte[]> sources = new TreeMap<>(f.sources());
             sources.put(extra.getKey(), extra.getValue());
-            assertThrows(BotFile.Refused.class, () -> BotFile.write(sources, HEAD, f.jars(),
+            assertThrows(BotFile.Refused.class, () -> BotFile.write(sources, HEAD, f.jars(), CENTRAL,
                     new ByteArrayOutputStream()), extra.getKey());
         }
     }

@@ -70,14 +70,28 @@ class BotChecksTest {
 
     private static final String REPO = "somedev/firestone";
     private static final String SDK_JAR = "com.github.BotMakerDev:botmaker-sdk:v2.1.0";
+    private static final String IMAGEIO_JAR = "com.github.jai-imageio:jai-imageio-core:1.4.0";
 
-    /** The release's .bmk is the one the commit builds, GitHub serves it, and the entry pins it. */
+    /**
+     * The release's .bmk is the one the commit builds, GitHub serves it, and the entry pins it; the jar Central
+     * serves is listed, so JitPack is never asked for it.
+     */
     @Test
     void bmkMatches() throws IOException {
         Bot bot = bot();
         facts.assets.put(REPO + "@v1.2.0/" + bot.name, bot.sha);
         assertEquals(List.of(), BotChecks.checkBmk(bot.folder, REPO, bot.pinned(bot.sha), PATH, bot.jars,
                 catalog(bot.jarSha), facts));
+    }
+
+    /** A jar Central does not serve is packed, so it must be the one JitPack serves, whatever its groupId. */
+    @Test
+    void aJarCentralDoesNotServeIsCheckedAgainstJitPack() throws IOException {
+        Bot bot = bot();
+        facts.assets.put(REPO + "@v1.2.0/" + bot.name, bot.sha);
+        facts.central.remove(IMAGEIO_JAR);
+        assertRefused(BotChecks.checkBmk(bot.folder, REPO, bot.pinned(bot.sha), PATH, bot.jars, catalog(bot.jarSha),
+                facts), IMAGEIO_JAR + " is not the jar JitPack serves");
     }
 
     @Test
@@ -154,9 +168,12 @@ class BotChecksTest {
             }
         }
         Path jar = Files.write(dir.resolve("botmaker-sdk.jar"), new byte[]{'P', 'K', 3, 4});
-        List<BotFile.Jar> jars = List.of(new BotFile.Jar(SDK_JAR, jar));
+        // a com.github groupId that is a Maven Central jar, which JitPack does not serve (Firestone 1.0.2, PR #19)
+        Path imageio = Files.write(dir.resolve("jai-imageio-core.jar"), new byte[]{'P', 'K', 3, 5});
+        List<BotFile.Jar> jars = List.of(new BotFile.Jar(SDK_JAR, jar), new BotFile.Jar(IMAGEIO_JAR, imageio));
+        facts.central.add(IMAGEIO_JAR);
         Path out = Files.createDirectories(dir.resolve("out"));
-        Path bmk = BotExport.write(clone, "v1.2.0", REPO, out, jars);
+        Path bmk = BotExport.write(clone, "v1.2.0", REPO, out, jars, facts.central());
         facts.jitpack.add(SDK_JAR);
         facts.hashes.put("com.github.BotMakerDev:botmaker-sdk:jar:v2.1.0", BotFiles.sha256(jar));
         return new Bot(clone, jars, bmk.getFileName().toString(), BotFiles.sha256(bmk), BotFiles.sha256(jar));

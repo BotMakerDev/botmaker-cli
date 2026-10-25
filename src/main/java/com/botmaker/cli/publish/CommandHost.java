@@ -1,6 +1,7 @@
 package com.botmaker.cli.publish;
 
 import com.botmaker.cli.BotExport;
+import com.botmaker.cli.bmk.Central;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -138,7 +139,7 @@ final class CommandHost implements PublishHost {
     @Override
     public Path bmk(String repo, String tag, Path outDir) throws Refusal {
         try {
-            return BotExport.write(dir, tag, repo, outDir, jars.of(dir));
+            return BotExport.write(dir, tag, repo, outDir, jars.of(dir), Central.maven());
         } catch (IOException e) {
             throw new Refusal("could not write the bot's .bmk: " + e.getMessage());
         }

@@ -214,7 +214,8 @@ class PublishTest {
         facts.repo("somedev/farmbot", 2, "", null);  // what GitHub shows once `gh repo create` made it
         Publish.Outcome.Opened opened = assertInstanceOf(Publish.Outcome.Opened.class,
                 publish(EntryPath.Kind.BOT, Optional.empty(), false));
-        String bmk = facts.assets.get("somedev/farmbot@v0.1.0/thing-0.1.0.bmk");
+        // the pom has no <name>: the file is named after the repository, not the artifactId
+        String bmk = facts.assets.get("somedev/farmbot@v0.1.0/farmbot-0.1.0.bmk");
         assertEquals(new BotEntry("somedev/farmbot", List.of(ApprovedRelease.ofBot("v0.1.0",
                 FakeFacts.commitOf("v0.1.0"), bmk)), false), opened.entry());
         assertEquals("gh repo create somedev/farmbot --source . --push --public", runner.commands().getFirst());
