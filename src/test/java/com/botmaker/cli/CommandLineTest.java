@@ -206,6 +206,17 @@ class CommandLineTest {
         assertEquals("list", parse("bot", "list").subcommand().subcommand().commandSpec().name());
     }
 
+    /** {@code bot export} writes a .bmk from the folder; its help names the file it makes. */
+    @Test
+    void bot_export_parses_and_helps() {
+        Captured captured = capture(() -> Main.run(new String[]{"bot", "export", "--help"}));
+        assertEquals(0, captured.exitCode);
+        assertTrue(captured.out.contains(".bmk"), captured.out);
+        ParseResult export = parse("bot", "export", "--out", "dist").subcommand().subcommand();
+        assertEquals("dist", export.matchedOptionValue("--out", ""));
+        assertEquals(".", applied(export, "--dir"));
+    }
+
     /** The catalog's verbs for a plugin: unpublish names the entry by id, list takes nothing. */
     @Test
     void plugin_has_unpublish_and_list() {

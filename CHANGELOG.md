@@ -9,6 +9,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`botmaker bot export` writes the bot as a `.bmk`**, the file someone who only runs bots opens in BotMaker. It
+  is made from a tagged commit with a clean tree, packs the pom, icon, sources, resources and the JitPack-built
+  jars, and lists the Maven Central jars with their sha256 for the first open to fetch. The same commit gives
+  the same bytes on any machine; the command prints the path and the sha256. `com.botmaker.cli.bmk` writes and
+  opens the file (each entry and jar checked before anything is written).
+
 - **`catalog.json` lists, for each plugin release, the other catalog plugins its pom declares** (`plugins`, the
   same `{id, version}` pins a bot release carries; omitted when there are none). Read from the pom at the pinned
   commit as data, like the rest of a plugin's facts; a pin naming the plugin itself or an id the catalog lacks is

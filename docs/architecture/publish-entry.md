@@ -57,3 +57,28 @@ equal the tag, and `botmaker plugin new` generates `0.1.0-SNAPSHOT`, which JitPa
 refusal went with `project/Tags`.
 
 `--tag`, not `--version`: `mixinStandardHelpOptions` already declares `-V, --version` on every command.
+
+## The `.bmk` (2026-10-25)
+
+`botmaker bot export` writes the bot at a clean `HEAD` that exactly one tag names as one file
+(`com.botmaker.cli.bmk.BotFile`), which someone who only runs bots opens in BotMaker. It holds `bot.json`,
+`pom.xml`, `icon.png`, `src/main/java/**` and `src/main/resources/**` as the commit holds them (read with `git
+ls-tree` and `git cat-file --batch`, never from the checkout: `core.autocrlf`, a filter or a skip-worktree file
+would make another machine's file differ; a symlink, a submodule or a Git LFS pointer is refused), and under `lib/` the `com.github.` jars the build resolves (JitPack
+builds them on demand and may lose a tag; the user's call). Every other runtime jar is listed in `bot.json` with
+its coordinate and sha256, and fetched from Maven Central on first open. Native-classifier jars (JavaFX's
+`linux`, `win`, `mac`…) are left out: the opening machine fetches its own. The repository is `origin`'s, else
+`mine`'s (Studio's).
+
+The file is reproducible, because the catalog rebuilds it from the tag's commit on another machine and compares
+sha256: entries are sorted, carry the time 1980-01-01 00:00 (DOS local time, so no time zone), no directory
+entry, no extra field and no unix mode (`ZipOutputStream` cannot set one). Every entry is **STORED** with its
+CRC, not deflated: deflate output depends on the zlib the JDK links (Fedora's is zlib-ng), so two machines could
+compress the same bytes differently. `bot.json` is pretty-printed with `\n` whatever the system's line separator.
+
+Opening (`BotFile.read`) checks everything before it writes, and writing refuses the same names first: each name is
+relative with no `.`/`..` segment, none of Windows' forbidden or control characters, no segment ending in `.` or
+a space, no device name (`NUL`, `CON.txt`), and is one of the allowed entries; no two names differ only by case (one file on
+Windows and macOS); `bot.json` names a format this reader knows (a newer one says to update BotMaker); each
+`lib/` jar matches its listed sha256, and none is unlisted or missing. It extracts into a staging folder beside
+the target, with a size cap, then moves it into place, so a refused file leaves nothing behind.

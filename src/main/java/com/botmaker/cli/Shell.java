@@ -42,6 +42,24 @@ final class Shell {
     }
 
     /**
+     * Runs it with stdin read from {@code in} and stdout written to {@code out}, bytes untouched, stderr discarded;
+     * whether it succeeded. For answers that are not text ({@code git cat-file --batch}).
+     */
+    static boolean pipe(Path dir, Path in, Path out, String... argv) {
+        try {
+            return new ProcessBuilder(argv).directory(dir.toFile())
+                    .redirectInput(in.toFile()).redirectOutput(out.toFile())
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start().waitFor() == 0;
+        } catch (IOException e) {
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /**
      * The command's stdout when it succeeded, empty otherwise — a question, not an action.
      *
      * <p>A non-zero exit is an answer here rather than an error: "no such repository", "not a git working
