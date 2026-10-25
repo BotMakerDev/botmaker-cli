@@ -26,6 +26,10 @@
 5. **A plugin waits for JitPack** (`Jitpack.waitFor` by coordinate, the release library's poll). A build JitPack
    ran `Error` stops the run with its log's URL and opens nothing: that tag stays broken, the next version repairs
    it. Then `PluginValidator` on the jar Maven resolves (`Checks.published`), the subject `validate.yml` builds.
+   **A bot attaches its `.bmk`** (2026-10-25): `PublishHost.bmk` writes `HEAD` at the tag (the cli's with
+   `BotExport` and the author's Maven, Studio's with `BmkExport` and its resolver), `uploadAsset` attaches it to the
+   release (replacing one of the same name: a re-run writes the same bytes), and its sha256 is pinned as
+   `bmkSha256`. A folder past the tag lists the release without one, with a warning.
 6. **Pull request**: the release pinned (`ApprovedRelease.pinPlugin`/`pinBot`, retried a little since GitHub's API
    can lag a tag just pushed), appended to the entry or a new one, the catalog's rules 2–5 run here
    (`EntryGate.checkEntry`), then `CatalogPr.open`.
@@ -87,3 +91,5 @@ the target, with a size cap, then moves it into place, so a refused file leaves 
 that is not one plain folder name (a host files the bot under `<owner>/<repo>/<tag>`); Studio peeks to find the
 catalog's `bmkSha256` and ask for trust before unpacking anything (2026-10-25). `BotFiles.head` is the one reading of
 the pom and sources (`maven.compiler.release`, `main`, the name) that `bot export` and Studio's export share.
+`com.botmaker.cli.BotExport` is the cli's one writer of a folder's `.bmk` (`bot export`, the publish, the catalog's
+rebuild, `catalog-gate.md`); it runs `git`, so it sits beside `Mvn`, not in the program-free `bmk` package.

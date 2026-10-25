@@ -8,6 +8,7 @@ import com.botmaker.cli.release.Module;
 import com.botmaker.cli.release.Version;
 import com.botmaker.cli.validate.CheckResult;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -50,7 +51,10 @@ public final class ReleaseListing implements CatalogStep {
         Listener listener = listener(say);
         String repo = CleanRoom.COORDINATE_OWNER + "/" + module.directory();
         return publish.listRelease(dir, repo, version.tag(), command, listener,
-                        PublishHost.commands(dir, StepRunner.system(listener), listener))
+                        // a plugin's listing: no bot, so no .bmk to resolve jars for
+                        PublishHost.commands(dir, StepRunner.system(listener), listener, folder -> {
+                            throw new IOException("the release library lists plugins only, which have no .bmk");
+                        }))
                 .map(outcome -> switch (outcome) {
                     case Publish.Outcome.Opened opened -> new Listed(opened.pullRequest().isPresent()
                             ? "pull request opened" : "listed already", opened.pullRequest().orElse(""), "");

@@ -2,22 +2,17 @@ package com.botmaker.cli;
 
 import com.botmaker.cli.bmk.BotFile;
 import com.botmaker.cli.bmk.BotFiles;
-import com.botmaker.cli.bmk.BotJson;
 import com.botmaker.cli.publish.PublishTarget;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 /**
  * {@code botmaker bot export} — writes the bot at its tagged {@code HEAD} as a {@code .bmk} ({@link BotFile}), the
@@ -73,53 +68,12 @@ final class BotExportCommand implements Callable<Integer> {
             throw new BotFile.Refused("HEAD has several tags (" + String.join(", ", tags) + "); a .bmk names one "
                     + "version. Delete the others.");
         }
-        String tag = tags.getFirst();
-        String commit = git(dir, "rev-parse", "HEAD").orElseThrow(() -> new BotFile.Refused("git rev-parse failed."));
         // origin from the command line, mine from Studio (its publish pushes there)
         String slug = git(dir, "remote", "get-url", "origin").or(() -> git(dir, "remote", "get-url", "mine"))
                 .flatMap(PublishTarget::slugOf)
                 .orElseThrow(() -> new BotFile.Refused("neither origin nor mine is a GitHub repository: a .bmk "
                         + "names the repository it was made from."));
-        Path list = Files.createTempFile("botmaker-deps", ".txt");
-        Path ids = Files.createTempFile("botmaker-blobs", ".txt");
-        Path batch = Files.createTempFile("botmaker-blobs", ".bin");
-        try {
-            // the commit's bytes, not the checkout's: no line-ending conversion, filter or skipped file reaches the
-            // .bmk, so the catalog's rebuild of this commit on another machine gives the same file
-            Map<String, String> blobs = BotFiles.sources(git(dir, "ls-tree", "-r", "-z", "HEAD")
-                    .orElseThrow(() -> new BotFile.Refused("git ls-tree failed.")));
-            Files.writeString(ids, blobs.values().stream().map(id -> id + "\n").collect(Collectors.joining()));
-            if (!Shell.pipe(dir, ids, batch, "git", "cat-file", "--batch")) {
-                throw new BotFile.Refused("git cat-file failed.");
-            }
-            Map<String, byte[]> sources = BotFiles.contents(blobs, Files.readAllBytes(batch));
-
-            BotJson.Head head = BotFiles.head(dir.resolve("pom.xml"), sources, tag, commit, slug);
-
-            Mvn.Result listed = mvn.run(dir, "-q", "dependency:list", "-DoutputAbsoluteArtifactFilename=true",
-                    "-DoutputFile=" + list, "-DappendOutput=false");
-            if (!listed.ok()) {
-                throw new BotFile.Refused("could not resolve the bot's dependencies:\n" + listed.tail(15));
-            }
-            List<BotFile.Jar> jars = BotFiles.jars(Files.readString(list));
-
-            Files.createDirectories(outDir);
-            Path target = outDir.resolve(BotFiles.fileName(head.name(), tag));
-            Path next = Files.createTempFile(outDir, ".bmk", ".next");
-            try {
-                try (OutputStream stream = Files.newOutputStream(next)) {
-                    BotFile.write(sources, head, jars, stream);
-                }
-                Files.move(next, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } finally {
-                Files.deleteIfExists(next);
-            }
-            return target;
-        } finally {
-            Files.deleteIfExists(list);
-            Files.deleteIfExists(ids);
-            Files.deleteIfExists(batch);
-        }
+        return BotExport.write(dir, tags.getFirst(), slug, outDir, BotExport.maven(mvn).of(dir));
     }
 
     private static Optional<String> git(Path dir, String... args) {

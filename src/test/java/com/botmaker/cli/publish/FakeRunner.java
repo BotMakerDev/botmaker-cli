@@ -1,5 +1,6 @@
 package com.botmaker.cli.publish;
 
+import com.botmaker.cli.bmk.BotFiles;
 import com.botmaker.cli.catalog.FakeFacts;
 import com.botmaker.cli.validate.CheckResult;
 
@@ -74,6 +75,15 @@ final class FakeRunner implements StepRunner {
         if (argv.subList(0, 3).equals(List.of("gh", "release", "create"))) {
             facts.release(argv.get(argv.indexOf("--repo") + 1), argv.get(3), login);
         }
+        if (argv.subList(0, 3).equals(List.of("gh", "release", "upload"))) {
+            Path file = Path.of(argv.get(4));
+            try {
+                facts.assets.put(argv.get(argv.indexOf("--repo") + 1) + "@" + argv.get(3) + "/" + file.getFileName(),
+                        BotFiles.sha256(file));
+            } catch (IOException e) {
+                return new Ran(1, e.getMessage());
+            }
+        }
         if (argv.subList(0, 3).equals(List.of("gh", "pr", "create"))) return new Ran(0, PR_URL + "\n");
         boolean local = argv.getFirst().equals("git") && !argv.get(1).equals("push")
                 && !dir.endsWith("botmaker-catalog");
@@ -111,7 +121,7 @@ final class FakeRunner implements StepRunner {
 
     /** A git repository in {@code dir} with one commit, an identity, and {@code origin} (when not null). */
     static Path repository(Path dir, String origin) throws IOException {
-        Files.writeString(dir.resolve("pom.xml"), "<project/>\n");
+        botFiles(dir);
         git(dir, "init", "-q", "-b", "main");
         git(dir, "config", "user.email", "test@example.invalid");
         git(dir, "config", "user.name", "test");
@@ -121,6 +131,15 @@ final class FakeRunner implements StepRunner {
         git(dir, "commit", "-qm", "one");
         if (origin != null) git(dir, "remote", "add", "origin", origin);
         return dir;
+    }
+
+    /** Enough of a bot in {@code dir} for its {@code .bmk}: a pom naming its Java, and a main. */
+    static void botFiles(Path dir) throws IOException {
+        Files.writeString(dir.resolve("pom.xml"), "<project><artifactId>thing</artifactId><properties>"
+                + "<maven.compiler.release>25</maven.compiler.release></properties></project>\n");
+        Files.createDirectories(dir.resolve("src/main/java/a"));
+        Files.writeString(dir.resolve("src/main/java/a/Main.java"),
+                "package a; public class Main { public static void main(String[] args) {} }\n");
     }
 
     /** A new commit on {@code dir}'s branch. */
@@ -148,8 +167,8 @@ final class FakeRunner implements StepRunner {
         public void checks(List<CheckResult> results) {}
     };
 
-    /** The cli's host over this runner, in {@code dir}. */
+    /** The cli's host over this runner, in {@code dir}; a bot resolves no jars. */
     PublishHost host(Path dir) {
-        return PublishHost.commands(dir, this, QUIET);
+        return PublishHost.commands(dir, this, QUIET, folder -> List.of());
     }
 }

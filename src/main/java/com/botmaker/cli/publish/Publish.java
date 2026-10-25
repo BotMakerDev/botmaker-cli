@@ -9,10 +9,13 @@ import com.botmaker.cli.catalog.EntryGate;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.Finding;
 import com.botmaker.cli.catalog.PluginEntry;
+import com.botmaker.cli.bmk.BotFiles;
 import com.botmaker.cli.release.Jitpack;
 import com.botmaker.cli.release.Level;
 
+import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -34,7 +37,9 @@ import java.util.function.Supplier;
  *       tag made and pushed, the GitHub Release made as the signed-in user. Each part is skipped when already
  *       done, so a re-run after a failure finishes it.</li>
  *   <li><b>A plugin waits for JitPack</b> (the release library's poll; a build that failed is broken for good) and
- *       its jar is {@link Checks#published checked} as the catalog's check will build it.</li>
+ *       its jar is {@link Checks#published checked} as the catalog's check will build it. <b>A bot attaches its
+ *       {@code .bmk}</b> to the release ({@link PublishHost#bmk}, {@link PublishHost#uploadAsset}), pinned as
+ *       {@code bmkSha256}; the catalog's check rebuilds it from the commit.</li>
  *   <li><b>Pull request</b>: the release pinned ({@link ApprovedRelease}), appended to the entry or a new one,
  *       the catalog's rules 2–5 run on it here, then {@link CatalogPr#open}.</li>
  * </ol>
@@ -202,7 +207,8 @@ public final class Publish {
             }
             pinned = pin(() -> ApprovedRelease.pinPlugin(facts, repo, tag));
         } else {
-            pinned = pin(() -> ApprovedRelease.pinBot(facts, repo, tag));
+            Optional<String> bmk = attachBmk(repo, tag, listener, host);
+            pinned = pin(() -> ApprovedRelease.pinBot(facts, repo, tag, bmk));
         }
         ApprovedRelease release = pinned.orElseThrow(() -> new Refusal("released " + tag + ", but GitHub or JitPack"
                 + " does not show it yet, so it cannot be pinned. Re-run in a minute: the run lists " + tag + "."));
@@ -279,6 +285,48 @@ public final class Publish {
         }
         host.tag(tag);
         if (!host.releaseExists(repo, tag)) host.release(repo, tag);
+    }
+
+    /**
+     * Step 5 for a bot (2026-10-25): its {@code .bmk} written from {@code HEAD} and attached to the release, its
+     * sha256 what the release pins. Replaced when a re-run attaches it again: the same commit writes the same bytes.
+     * A folder past the tag lists it without one, since a {@code .bmk} is made from the tagged commit.
+     */
+    private static Optional<String> attachBmk(String repo, String tag, Listener listener, PublishHost host)
+            throws Refusal {
+        if (!host.tagsAtHead().contains(tag)) {
+            listener.warn(tag + " is listed without a .bmk: the folder is past that tag, and a .bmk is made from the"
+                    + " tagged commit.");
+            return Optional.empty();
+        }
+        // Its jars are resolved from the folder's pom, its files read from the commit: a changed pom would give a
+        // file the catalog's rebuild of the commit refuses.
+        if (!host.clean()) {
+            throw new Refusal("released " + tag + ", but the working tree has uncommitted changes, and the .bmk is"
+                    + " made from the commit. Commit or stash them, then re-run: the run lists " + tag + ".");
+        }
+        listener.step("Attaching the bot's .bmk to " + tag + ".");
+        Path out = null;
+        Path file = null;
+        try {
+            out = Files.createTempDirectory("botmaker-bmk");
+            file = host.bmk(repo, tag, out);
+            String sha = BotFiles.sha256(file);
+            host.uploadAsset(repo, tag, file);
+            return Optional.of(sha);
+        } catch (Refusal e) {
+            throw new Refusal("released " + tag + ", but " + e.getMessage() + " No pull request was opened; re-run"
+                    + " once it is fixed (a fix that needs a commit goes in the next version).");
+        } catch (IOException e) {
+            throw new Refusal("released " + tag + ", but its .bmk could not be written: " + e.getMessage());
+        } finally {
+            try {
+                if (file != null) Files.deleteIfExists(file);
+                if (out != null) Files.deleteIfExists(out);
+            } catch (IOException ignored) {
+                // a temporary folder left behind
+            }
+        }
     }
 
     /** Step 5's wait: only a built jar goes on. A build that failed is broken for good; its log says why. */

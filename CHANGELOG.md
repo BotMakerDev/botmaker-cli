@@ -18,6 +18,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   `BotFiles.head` is the one reading of the pom and sources that every writer of a `.bmk` uses.
 - **A bot release in `catalog.json` may carry `bmkSha256`**, the sha256 of its `.bmk`, which Studio checks an
   opened file against. Optional: no release has one until publishing attaches the file.
+- **`botmaker bot publish` attaches the bot's `.bmk` to its GitHub Release** and pins its sha256 in the catalog
+  entry (`bmkSha256`, after `commit`). A folder that moved past the tag lists the release without one.
+  `PublishHost` gains `bmk` and `uploadAsset` (the cli's: `gh release upload --clobber`).
+- **The catalog's check rebuilds a pinned `.bmk`** from the release's commit, in the same untrusted build that
+  compiles it, and refuses a release whose attached file is missing or differs ("The .bmk on the release is not the
+  one its commit builds."), or that packs a catalog plugin jar other than the pinned one. **`icon.png`**, when a
+  bot has one, must be a PNG of at most 512 KB, in the catalog's check and the author's own.
+- `com.botmaker.cli.BotExport`: the one writer of a folder's `.bmk` for `bot export`, the publish and the check.
+  `EntryFacts.releaseAssetSha256` hashes a release's file as GitHub serves it.
 
 - **`catalog.json` lists, for each plugin release, the other catalog plugins its pom declares** (`plugins`, the
   same `{id, version}` pins a bot release carries; omitted when there are none). Read from the pom at the pinned

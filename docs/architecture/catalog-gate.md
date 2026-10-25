@@ -16,7 +16,7 @@ writes the entry), so a refusal is met on the author's own machine first.
 
 An entry lists **every release the catalog approved**, oldest first (`releases`; the name `tags` is taken in
 `catalog.json` by a repository's topics). A plugin's is `{id, repo, releases: [{tag, commit, jarSha256,
-pomSha256}]}`, a bot's `{repo, releases: [{tag, commit}], detached?}` (`ApprovedRelease`). A tag pushed with errors
+pomSha256}]}`, a bot's `{repo, releases: [{tag, commit, bmkSha256?}], detached?}` (`ApprovedRelease`). A tag pushed with errors
 is never approved, so Studio offers only what passed.
 
 Each release is **pinned**: the commit its tag pointed at when it was approved and, for a plugin, the sha256 of the
@@ -48,6 +48,18 @@ fetched by the pinned commit (6: the pom declares a catalog plugin at a released
 8: a class holds `main`) and `PluginChecks` (6: `PluginValidator` passes and the jar's id is the entry's; 7: JitPack
 serves the coordinate, and its jar and pom hash to the pins). `--part rules|kind` splits them so the step that runs
 an entry's code holds no token at all (`Mvn.runUntrusted` clears its environment too); both need `--base`.
+
+**A bot's `.bmk` is rebuilt (2026-10-25).** A bot release may pin `bmkSha256`, the sha256 of the `.bmk` its publish
+attached to the GitHub Release (`Publish.attachBmk`; an author's folder past the tag lists it without one). Rule 9
+(`BotChecks.checkBmk`): the same untrusted build that compiles the clone also runs `dependency:list`; the commit is
+fetched a second time (the build ran the bot's own plugins, which could rewrite the first clone, its `.git` and the
+list) and written again with those jars (`com.botmaker.cli.BotExport`, the writer `bot export` and the cli's publish
+use); the file GitHub serves under `BotFiles.fileName` must hash to the pin and to the rebuild — "The .bmk on the
+release is not the one its commit builds." otherwise. Every jar the file packs must be the one JitPack serves, and a
+catalog plugin its release's pinned jar; a listed Maven Central jar is checked by Studio when it fetches it. Rule
+10 (`BotChecks.checkIcon`, also in the author's own check): `icon.png`, when present, is a plain PNG file of at most
+512 KB. The real Firestone commit rebuilt in a fresh HOME gave its author's bytes. Studio's resolver collects test
+dependencies before leaving them out, as Maven does, so its publish attaches the same file the check rebuilds.
 
 **An admin changes anyone's entry.** When `--author-id` is an admin in the base `publishers.json`, rules 3 and 4
 pass; 1, 2, 5 and the kind's rules still run, so an admin lists only a published release that builds. The

@@ -45,7 +45,8 @@ final class PublishCommands {
         Publish publish = new Publish(facts, catalog, new CliChecks(main, catalog), Jitpack.Probe.real(),
                 Jitpack.Sleeper.real());
         return switch (publish.run(request, listener,
-                PublishHost.commands(request.dir(), StepRunner.system(listener), listener))) {
+                PublishHost.commands(request.dir(), StepRunner.system(listener), listener,
+                        BotExport.maven(main.mvn())))) {
             case Publish.Outcome.Opened opened -> {
                 opened.pullRequest().ifPresent(console::out);
                 console.step(opened.entry().repo() + " " + opened.tag()
@@ -73,7 +74,8 @@ final class PublishCommands {
     static int unpublish(Main main, EntryPath path, Optional<String> release, String command) {
         Console console = main.console();
         Listener listener = listener(console);
-        PublishHost host = PublishHost.commands(Path.of("."), StepRunner.system(listener), listener);
+        PublishHost host = PublishHost.commands(Path.of("."), StepRunner.system(listener), listener,
+                BotExport.maven(main.mvn()));
         GitHubFacts facts = GitHubFacts.anonymousOrToken();
         try {
             PublishHost.Account account = host.account()

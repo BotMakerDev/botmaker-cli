@@ -105,7 +105,7 @@ public final class CatalogBuilder {
                 }
                 if (pins == null || pins.isEmpty() || !pins.stream().allMatch(p -> listed.contains(p.id())
                         && VERSION.matcher(p.version() == null ? "" : p.version()).matches())) continue;
-                releases.add(new Catalog.Bot.Release(release.tag(), release.commit(), pins));
+                releases.add(new Catalog.Bot.Release(release.tag(), release.commit(), pins, release.bmkSha256()));
             }
             if (releases.isEmpty()) continue;
             bots.add(new Catalog.Bot(entry.repo(), publishers.rankOf(repo.get().ownerId()),

@@ -73,6 +73,14 @@ public final class FakeFacts implements EntryFacts, PomFacts.Source {
         return jitpack.contains(coordinate + ":" + tag);
     }
 
+    /** The sha256 of each release file, keyed {@code repo@tag/name}. */
+    public final Map<String, String> assets = new HashMap<>();
+
+    @Override
+    public Optional<String> releaseAssetSha256(String repo, String tag, String name) {
+        return Optional.ofNullable(assets.get(repo + "@" + tag + "/" + name));
+    }
+
     @Override
     public Optional<String> tagCommit(String repo, String tag) {
         return Optional.ofNullable(commits.get(repo + "@" + tag));

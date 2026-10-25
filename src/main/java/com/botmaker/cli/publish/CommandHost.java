@@ -1,5 +1,7 @@
 package com.botmaker.cli.publish;
 
+import com.botmaker.cli.BotExport;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,11 +17,13 @@ final class CommandHost implements PublishHost {
     private final Path dir;
     private final StepRunner runner;
     private final Listener listener;
+    private final BotExport.Jars jars;
 
-    CommandHost(Path dir, StepRunner runner, Listener listener) {
+    CommandHost(Path dir, StepRunner runner, Listener listener, BotExport.Jars jars) {
         this.dir = dir;
         this.runner = runner;
         this.listener = listener;
+        this.jars = jars;
     }
 
     @Override
@@ -125,6 +129,25 @@ final class CommandHost implements PublishHost {
     public void release(String repo, String tag) throws Refusal {
         must("could not create the release " + tag + " on " + repo + ".", List.of("gh", "release", "create", tag,
                 "--repo", repo, "--title", tag, "--notes", repo + " " + tag + ".", "--verify-tag"));
+    }
+
+    /**
+     * {@link BotExport}, outside the {@link StepRunner}: it only reads the folder and writes into {@code outDir}, as
+     * the folder's check builds it; the upload that publishes the file goes through the runner.
+     */
+    @Override
+    public Path bmk(String repo, String tag, Path outDir) throws Refusal {
+        try {
+            return BotExport.write(dir, tag, repo, outDir, jars.of(dir));
+        } catch (IOException e) {
+            throw new Refusal("could not write the bot's .bmk: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void uploadAsset(String repo, String tag, Path file) throws Refusal {
+        must("could not attach " + file.getFileName() + " to the release " + tag + ".", List.of("gh", "release",
+                "upload", tag, file.toString(), "--repo", repo, "--clobber"));
     }
 
     @Override

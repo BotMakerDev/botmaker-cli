@@ -1,5 +1,7 @@
 package com.botmaker.cli.publish;
 
+import com.botmaker.cli.BotExport;
+
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -67,6 +69,16 @@ public interface PublishHost {
     void release(String repo, String tag) throws Refusal;
 
     /**
+     * A bot's {@code HEAD}, which {@code tag} of {@code repo} names, written as a {@code .bmk} in {@code outDir}: its
+     * path, named {@code BotFiles.fileName}. The jars are the ones the bot resolves on this machine; the catalog's
+     * check rebuilds the file from the commit and compares (2026-10-25).
+     */
+    Path bmk(String repo, String tag, Path outDir) throws Refusal;
+
+    /** {@code file} attached to {@code repo}'s GitHub Release at {@code tag}, replacing one of the same name. */
+    void uploadAsset(String repo, String tag, Path file) throws Refusal;
+
+    /**
      * {@code change}'s pull request on the catalog, opened as {@code account} or updated in place.
      *
      * @return its URL, or empty when the catalog already reads so and there is nothing to open
@@ -77,7 +89,7 @@ public interface PublishHost {
      * The programs themselves: {@code git} in {@code dir}, pushing to {@code origin}, and {@code gh} as the account it
      * is signed in to.
      */
-    static PublishHost commands(Path dir, StepRunner runner, Listener listener) {
-        return new CommandHost(dir, runner, listener);
+    static PublishHost commands(Path dir, StepRunner runner, Listener listener, BotExport.Jars jars) {
+        return new CommandHost(dir, runner, listener, jars);
     }
 }

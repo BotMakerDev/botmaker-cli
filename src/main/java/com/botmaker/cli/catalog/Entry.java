@@ -85,9 +85,9 @@ public sealed interface Entry permits BotEntry, PluginEntry {
             if (release == null) throw new IllegalArgumentException("a null release");
             if (!tags.add(release.tag())) throw new IllegalArgumentException("tag " + release.tag() + " twice");
             boolean any = release.jarSha256() != null || release.pomSha256() != null;
-            if (hashed ? !release.hashed() : any) {
+            if (hashed ? !release.hashed() || release.bmkSha256() != null : any) {
                 throw new IllegalArgumentException(hashed ? "a plugin release carries \"jarSha256\" and \"pomSha256\""
-                        : "a bot release carries no hashes");
+                        + " and no \"bmkSha256\"" : "a bot release carries no jar or pom hashes");
             }
         }
         return List.copyOf(releases);

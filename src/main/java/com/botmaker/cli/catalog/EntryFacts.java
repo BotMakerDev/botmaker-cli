@@ -41,6 +41,12 @@ public interface EntryFacts {
     /** Whether JitPack serves {@code coordinate} (no version) at {@code tag}. */
     boolean jitpackServes(String coordinate, String tag);
 
+    /**
+     * The sha256 (lower-case hex) of the file {@code name} attached to {@code repo}'s GitHub Release at {@code tag},
+     * as GitHub serves it now; empty when there is no such release or file. A bot's {@code .bmk} (2026-10-25).
+     */
+    Optional<String> releaseAssetSha256(String repo, String tag, String name);
+
     /** The commit {@code tag} points at now (an annotated tag peeled), or empty when there is no such tag. */
     Optional<String> tagCommit(String repo, String tag);
 

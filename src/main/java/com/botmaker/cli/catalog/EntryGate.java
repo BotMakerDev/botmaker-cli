@@ -306,7 +306,8 @@ public final class EntryGate {
         } catch (IOException | IllegalArgumentException e) {
             return List.of(Finding.error(path, "not an entry of this schema: "
                     + (named.kind() == EntryPath.Kind.BOT
-                    ? "{\"repo\", \"releases\": [{\"tag\", \"commit\"}, …]} and an optional \"detached\""
+                    ? "{\"repo\", \"releases\": [{\"tag\", \"commit\"[, \"bmkSha256\"]}, …]} and an optional"
+                    + " \"detached\""
                     : "{\"id\", \"repo\", \"releases\": [{\"tag\", \"commit\", \"jarSha256\", \"pomSha256\"}, …]}")
                     + ", no tag twice, nothing else."));
         }
@@ -407,7 +408,8 @@ public final class EntryGate {
         if (!ApprovedRelease.COMMIT.matcher(release.commit()).matches()) {
             return "\"commit\" of " + release.tag() + " is not a full commit hash (40 lower-case hex digits).";
         }
-        for (String hash : Stream.of(release.jarSha256(), release.pomSha256()).filter(h -> h != null).toList()) {
+        for (String hash : Stream.of(release.jarSha256(), release.pomSha256(), release.bmkSha256())
+                .filter(h -> h != null).toList()) {
             if (!ApprovedRelease.SHA256.matcher(hash).matches()) {
                 return "a sha256 of " + release.tag() + " is not 64 lower-case hex digits.";
             }
@@ -488,7 +490,8 @@ public final class EntryGate {
             Optional<Catalog> catalog = Catalog.read(request.head().resolve(Catalog.FILE));
             Mvn mvn = new Mvn(console);
             return switch (entry) {
-                case BotEntry bot -> BotChecks.checkRelease(bot.repo(), release, path, pluginIds(catalog), mvn);
+                case BotEntry bot -> BotChecks.checkRelease(bot.repo(), release, path, pluginIds(catalog), catalog,
+                        facts, mvn);
                 case PluginEntry plugin -> PluginChecks.check(plugin, release, path, facts,
                         new Subjects(console, mvn), claimedIds(request.head(), plugin.id()));
             };

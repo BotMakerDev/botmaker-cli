@@ -101,22 +101,44 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
 
     @Override
     public Optional<String> jitpackSha256(String coordinate, String tag, Artifact artifact) {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(jitpackUrl(coordinate, tag, artifact)))
-                .timeout(Duration.ofMinutes(10)).GET().build();
+        try {
+            return sha256Of(jitpackUrl(coordinate, tag, artifact));
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** Downloaded from the release's own link and hashed; a failure other than a 404 stops the run. */
+    @Override
+    public Optional<String> releaseAssetSha256(String repo, String tag, String name) {
+        Optional<String> url = api(API + repo + "/releases/tags/" + encode(tag)).flatMap(json ->
+                StreamSupport.stream(json.path("assets").spliterator(), false)
+                        .filter(asset -> name.equals(asset.path("name").asText()))
+                        .map(asset -> asset.path("browser_download_url").asText()).findFirst());
+        if (url.isEmpty()) return Optional.empty();
+        try {
+            return sha256Of(url.get());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** The sha256 of what {@code url} serves, streamed; empty on a 404. */
+    private Optional<String> sha256Of(String url) throws IOException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(10)).GET().build();
         try {
             HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {
-                if (response.statusCode() != 200) return Optional.empty();
+                if (response.statusCode() == 404) return Optional.empty();
+                if (response.statusCode() != 200) throw new IOException(url + " answered " + response.statusCode());
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
                 byte[] buffer = new byte[64 * 1024];
                 for (int n; (n = body.read(buffer)) > 0; ) digest.update(buffer, 0, n);
                 return Optional.of(HexFormat.of().formatHex(digest.digest()));
             }
-        } catch (IOException e) {
-            return Optional.empty();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return Optional.empty();
+            throw new IOException("interrupted while fetching " + url, e);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("no SHA-256 in this JDK", e);
         }

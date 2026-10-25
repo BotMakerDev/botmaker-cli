@@ -15,10 +15,12 @@ import java.util.regex.Pattern;
  * @param commit    40 lower-case hex digits
  * @param jarSha256 64 lower-case hex digits; a plugin's only, absent for a bot
  * @param pomSha256 likewise; the pom names the dependencies Studio downloads with the jar
+ * @param bmkSha256 a bot's only, and optional (2026-10-25): the sha256 of the {@code .bmk} on its GitHub Release,
+ *                  which the catalog's check rebuilt from {@code commit} and Studio checks a file it opens against
  */
-@JsonPropertyOrder({"tag", "commit", "jarSha256", "pomSha256"})
+@JsonPropertyOrder({"tag", "commit", "jarSha256", "pomSha256", "bmkSha256"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record ApprovedRelease(String tag, String commit, String jarSha256, String pomSha256) {
+public record ApprovedRelease(String tag, String commit, String jarSha256, String pomSha256, String bmkSha256) {
 
     static final Pattern COMMIT = Pattern.compile("[0-9a-f]{40}");
     static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
@@ -28,9 +30,19 @@ public record ApprovedRelease(String tag, String commit, String jarSha256, Strin
         Entry.required(commit, "commit");
     }
 
-    /** A bot's release: a commit, no hashes. */
+    /** A plugin's release: no {@code .bmk}. */
+    public ApprovedRelease(String tag, String commit, String jarSha256, String pomSha256) {
+        this(tag, commit, jarSha256, pomSha256, null);
+    }
+
+    /** A bot's release with no {@code .bmk}: a commit, no hashes. */
     public static ApprovedRelease ofBot(String tag, String commit) {
-        return new ApprovedRelease(tag, commit, null, null);
+        return ofBot(tag, commit, null);
+    }
+
+    /** A bot's release, its {@code .bmk}'s sha256 or {@code null}. */
+    public static ApprovedRelease ofBot(String tag, String commit, String bmkSha256) {
+        return new ApprovedRelease(tag, commit, null, null, bmkSha256);
     }
 
     /** Whether it carries a plugin's two hashes; a bot's release carries neither. */
@@ -38,9 +50,13 @@ public record ApprovedRelease(String tag, String commit, String jarSha256, Strin
         return jarSha256 != null && pomSha256 != null;
     }
 
-    /** The pins of {@code repo}'s bot release at {@code tag} as GitHub says now, or empty when the tag is gone. */
-    public static Optional<ApprovedRelease> pinBot(EntryFacts facts, String repo, String tag) {
-        return facts.tagCommit(repo, tag).map(commit -> ofBot(tag, commit));
+    /**
+     * The pins of {@code repo}'s bot release at {@code tag} as GitHub says now, with the {@code .bmk} the publish
+     * attached, or empty when the tag is gone.
+     */
+    public static Optional<ApprovedRelease> pinBot(EntryFacts facts, String repo, String tag,
+                                                   Optional<String> bmkSha256) {
+        return facts.tagCommit(repo, tag).map(commit -> ofBot(tag, commit, bmkSha256.orElse(null)));
     }
 
     /**

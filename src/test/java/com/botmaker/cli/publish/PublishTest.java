@@ -214,8 +214,37 @@ class PublishTest {
         facts.repo("somedev/farmbot", 2, "", null);  // what GitHub shows once `gh repo create` made it
         Publish.Outcome.Opened opened = assertInstanceOf(Publish.Outcome.Opened.class,
                 publish(EntryPath.Kind.BOT, Optional.empty(), false));
-        assertEquals(new BotEntry("somedev/farmbot", List.of(FakeFacts.botRelease("v0.1.0")), false), opened.entry());
+        String bmk = facts.assets.get("somedev/farmbot@v0.1.0/thing-0.1.0.bmk");
+        assertEquals(new BotEntry("somedev/farmbot", List.of(ApprovedRelease.ofBot("v0.1.0",
+                FakeFacts.commitOf("v0.1.0"), bmk)), false), opened.entry());
         assertEquals("gh repo create somedev/farmbot --source . --push --public", runner.commands().getFirst());
+    }
+
+    /** A bot's release step writes its .bmk from the tagged HEAD, attaches it, and pins what it attached. */
+    @Test
+    void aBotReleaseUploadsItsBmk() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        Publish.Outcome.Opened opened = assertInstanceOf(Publish.Outcome.Opened.class,
+                publish(EntryPath.Kind.BOT, Optional.empty(), false));
+        List<String> commands = runner.commands();
+        int release = commands.indexOf("gh release create v0.1.0 --repo somedev/thing --title v0.1.0 --notes"
+                + " somedev/thing v0.1.0. --verify-tag");
+        String upload = commands.get(release + 1);
+        assertTrue(upload.startsWith("gh release upload v0.1.0 ") && upload.endsWith("thing-0.1.0.bmk --repo"
+                + " somedev/thing --clobber"), upload);
+        String sha = facts.assets.get(REPO + "@v0.1.0/thing-0.1.0.bmk");
+        assertTrue(sha != null && sha.matches("[0-9a-f]{64}"), String.valueOf(sha));
+        assertEquals(sha, opened.entry().newest().bmkSha256());
+        assertFalse(Files.exists(Path.of(upload.split(" ")[4])), "the written file is not left behind");
+
+        // a folder past the tag lists the release without one
+        facts.assets.clear();
+        listed.clear();
+        FakeRunner.commit(dir, "later");
+        opened = assertInstanceOf(Publish.Outcome.Opened.class,
+                publish(EntryPath.Kind.BOT, Optional.of("v0.1.0"), false));
+        assertEquals(null, opened.entry().newest().bmkSha256());
+        assertEquals(Map.of(), facts.assets);
     }
 
     @Test
@@ -242,7 +271,7 @@ class PublishTest {
     @Test
     void a_bot_folder_that_is_no_repository_is_committed_without_its_build() throws Exception {
         Path bot = Files.createDirectories(dir.resolve("farmbot"));
-        Files.writeString(bot.resolve("pom.xml"), "<project/>\n");
+        FakeRunner.botFiles(bot);
         Files.createDirectories(bot.resolve("target/classes"));
         Files.writeString(bot.resolve("target/classes/Main.class"), "built");
         dir = bot;
