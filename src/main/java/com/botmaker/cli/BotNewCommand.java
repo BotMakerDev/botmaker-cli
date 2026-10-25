@@ -21,18 +21,18 @@ import java.util.concurrent.Callable;
  *
  * <p><b>{@code --from} is a linked clone</b> (2026-10-23, the same path as Studio's Browse Bots and New
  * Project): the author's repository cloned at a release tag, branch {@code main} started there, and the
- * remote renamed {@code original}. Nothing is renamed, so the author's later releases merge in (Studio's
- * <i>Get vX.Y</i>); the remote is the whole record of where the bot came from.
+ * remote renamed {@code upstream} ({@code original} until 2026-10-25). Nothing is renamed, so the author's later
+ * releases merge in (Studio's <i>Get vX.Y</i>); the remote is the whole record of where the bot came from.
  */
 @Command(name = "new",
         header = "Create a bot project — blank, or from a published bot.",
         description = "With no --from this writes a blank project: a pom and one main(). With --from it clones "
-                + "that bot at its newest release, linked to its author by the remote `original`.",
+                + "that bot at its newest release, linked to its author by the remote `upstream`.",
         mixinStandardHelpOptions = true)
 final class BotNewCommand implements Callable<Integer> {
 
     /** The remote a project started from a bot names its author's repository by, as Studio does. */
-    static final String ORIGINAL = "original";
+    static final String UPSTREAM = "upstream";
 
     @ParentCommand
     private BotCommand parent;
@@ -103,13 +103,13 @@ final class BotNewCommand implements Callable<Integer> {
         }
         // -B: a --tag naming the branch main has the clone on main already.
         if (Shell.run(console, projectDir, "git", "checkout", "-q", "-B", "main") != 0
-                || Shell.run(console, projectDir, "git", "remote", "rename", "origin", ORIGINAL) != 0) {
+                || Shell.run(console, projectDir, "git", "remote", "rename", "origin", UPSTREAM) != 0) {
             console.error("cloned into " + projectDir + ", but could not start branch main or name the remote "
-                    + ORIGINAL);
+                    + UPSTREAM);
             return 1;
         }
         console.step("Started from " + slug + "@" + release + " in " + projectDir + ", linked to its author as "
-                + "the remote `" + ORIGINAL + "`.");
+                + "the remote `" + UPSTREAM + "`.");
         console.step("A bot runs its author's code on your computer: read it before you run it.");
         return 0;
     }

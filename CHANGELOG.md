@@ -25,6 +25,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **`botmaker bot export` finds the repository in a clone never published**: it reads `origin`, `mine`,
   `upstream`, then `original`, and refused a clone that had only `original`.
 
+### Changed
+
+- **`botmaker bot new --from` names the author's remote `upstream`** (2026-10-25), git's usual name and Studio's
+  since the same day; it was `original`. Studio renames an older clone's `original` when it opens it.
+
 ## [0.7.0] — 2026-10-25
 
 ### Added

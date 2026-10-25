@@ -1,7 +1,7 @@
 # Two nouns, and the duplication under `bot` is deliberate
 
 > **2026-10-23: no templates, no gallery.** `bot new --from` clones a published bot linked to its author (remote
-> `original`, nothing renamed). `GalleryEntry`, `--template` and the gallery pull request below are history.
+> `original`, `upstream` since 2026-10-25; nothing renamed). `GalleryEntry`, `--template` and the gallery pull request below are history.
 > **Later that day, the catalog:** `bot publish` and `plugin publish` open an entry pull request on
 > `botmaker-catalog` (`CatalogPr`), `bot`/`plugin unpublish` a removal, `bot`/`plugin list` read `catalog.json`;
 > no topic is written.
