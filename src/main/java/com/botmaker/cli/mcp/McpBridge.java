@@ -26,7 +26,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -70,6 +72,10 @@ public final class McpBridge {
 
     /** The bridge's own tool, listed beside Studio's: it answers while Studio is down. */
     static final String START = "start_studio";
+    /** Studio's sandbox home ({@code AppPaths.HOME_ENV}). */
+    static final String HOME_ENV = "BOTMAKER_HOME";
+    /** Studio's flag for its {@code ui} tool ({@code UiTools.FLAG_ENV}). */
+    static final String UI_ENV = "BOTMAKER_MCP_UI";
     /** How long start_studio waits for Studio's endpoint; a dev Studio compiles first. */
     private static final Duration STARTING = Duration.ofMinutes(3);
 
@@ -96,6 +102,8 @@ public final class McpBridge {
     private final AtomicLong ids = new AtomicLong();
 
     private volatile ObjectNode clientInit;
+    /** The environment of the Studio this bridge last started; null before it started one. */
+    private volatile Map<String, String> launchedWith;
     /** The client said it is initialized: it may be told the tools changed. */
     private volatile boolean initialized;
     private volatile Connection connection;
@@ -194,7 +202,9 @@ public final class McpBridge {
             } else if (method.equals("ping")) {
                 reply(message, json.createObjectNode());
             } else if (method.equals("tools/call") && START.equals(message.path("params").path("name").asText())) {
-                reply(message, start(message.path("params").path("arguments").path("project").asText("")));
+                JsonNode arguments = message.path("params").path("arguments");
+                reply(message, start(arguments.path("project").asText(""), arguments.path("home").asText(""),
+                        arguments.path("ui").asBoolean(false)));
             } else {
                 forward(message);
             }
@@ -266,14 +276,35 @@ public final class McpBridge {
         ObjectNode tool = json.createObjectNode().put("name", START).put("description", "Start BotMaker Studio on "
                 + "this computer and wait until its tools answer; quit_studio closes it. Says so when it runs already.");
         ObjectNode schema = tool.putObject("inputSchema").put("type", "object");
-        schema.putObject("properties").putObject("project").put("type", "string")
-                .put("description", "a project under ~/BotMakerProjects to open; left out, Studio opens as it would");
+        ObjectNode properties = schema.putObject("properties");
+        properties.putObject("project").put("type", "string")
+                .put("description", "a project under ~/BotMakerProjects to open; left out, the bot list");
+        properties.putObject("home").put("type", "string")
+                .put("description", "a sandbox folder for Studio's projects, settings and bots (BOTMAKER_HOME)");
+        properties.putObject("ui").put("type", "boolean")
+                .put("description", "serve the ui tool over Studio's own windows (BOTMAKER_MCP_UI)");
         return tool;
     }
 
+    /** The environment start_studio adds for {@code home} and {@code ui}: nothing for neither. */
+    static Map<String, String> environment(String home, boolean ui) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (!home.isBlank()) out.put(HOME_ENV, Path.of(home.strip()).toAbsolutePath().normalize().toString());
+        if (ui) out.put(UI_ENV, "1");
+        return out;
+    }
+
     /** start_studio: Studio started, or found running, and its tools listed again once its endpoint answers. */
-    private ObjectNode start(String project) {
-        if (connect() != null) return toolText("Studio runs already.", false);
+    private ObjectNode start(String project, String home, boolean ui) {
+        Map<String, String> asked = environment(home, ui);
+        if (connect() != null) {
+            // A sandbox asked of a Studio this bridge did not start with it would be the user's real folders.
+            if (!asked.isEmpty() && !asked.equals(launchedWith)) {
+                return toolText("Studio runs already, but not with that home and ui: quit_studio, then start_studio "
+                        + "again.", true);
+            }
+            return toolText("Studio runs already.", false);
+        }
         if (launch.isEmpty()) {
             return toolText("The bridge was not told how to start Studio: give mcp-bridge --umbrella <checkout> (a "
                     + "dev Studio, through javafx:run) or --studio <command>, or set BOTMAKER_UMBRELLA or "
@@ -287,8 +318,11 @@ public final class McpBridge {
         try {
             Files.createDirectories(log.getParent());
             // Never this process's stdout: that is the protocol.
-            process = new ProcessBuilder(argv).directory(how.dir() == null ? null : how.dir().toFile())
-                    .redirectErrorStream(true).redirectOutput(log.toFile()).start();
+            ProcessBuilder builder = new ProcessBuilder(argv).directory(how.dir() == null ? null : how.dir().toFile())
+                    .redirectErrorStream(true).redirectOutput(log.toFile());
+            builder.environment().putAll(asked);
+            process = builder.start();
+            launchedWith = asked;
         } catch (IOException failed) {
             return toolText("Studio did not start: " + failed.getMessage(), true);
         }

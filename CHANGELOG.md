@@ -5,6 +5,14 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **`start_studio` takes `home` and `ui`** (2026-10-25): the bridge starts Studio with `BOTMAKER_HOME` set to the
+  sandbox folder given, and `BOTMAKER_MCP_UI=1` when `ui` is true, so a client can try a dev Studio on a sandbox
+  and drive its windows with Studio's `ui` tool. With no `project`, Studio opens on the bot list.
+
 ## [0.7.0] — 2026-10-25
 
 ### Added

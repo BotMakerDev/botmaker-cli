@@ -16,9 +16,11 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -41,6 +43,7 @@ class McpBridgeTest {
     @AfterEach
     void stop() throws IOException {
         if (studio != null) studio.stop();
+        if (toBridge == null) return;    // a test that started no bridge
         toBridge.close();
         bridge.interrupt();
     }
@@ -84,6 +87,10 @@ class McpBridgeTest {
 
         send("{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"start_studio\"}}");
         assertEquals("Studio runs already.", answer(6).at("/result/content/0/text").asText());
+        // A Studio this bridge did not start on a sandbox is the user's own: a sandbox asked of it is refused.
+        send("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"start_studio\","
+                + "\"arguments\":{\"home\":\"/tmp/sandbox\"}}}");
+        assertTrue(answer(7).at("/result/isError").asBoolean());
     }
 
     @Test
@@ -97,6 +104,29 @@ class McpBridgeTest {
         JsonNode stopped = answer(1);
         assertTrue(stopped.at("/result/isError").asBoolean());
         assertTrue(stopped.at("/result/content/0/text").asText().startsWith("Studio stopped as it started (exit 1)"));
+    }
+
+    @Test
+    void startStudioHandsStudioItsSandboxAndTheUiFlag(@TempDir Path dir) throws Exception {
+        int port;
+        try (ServerSocket free = new ServerSocket(0)) {
+            port = free.getLocalPort();
+        }
+        Path seen = dir.resolve("seen.txt");
+        start(port, Optional.of(new McpBridge.Launch(List.of("sh", "-c",
+                "printf '%s %s' \"$BOTMAKER_HOME\" \"$BOTMAKER_MCP_UI\" > '" + seen + "'; exit 3"), null, "%s",
+                dir.resolve("studio-run.log"))));
+        Path sandbox = dir.resolve("sandbox");
+        send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"start_studio\","
+                + "\"arguments\":{\"home\":\"" + sandbox + "\",\"ui\":true}}}");
+        assertTrue(answer(1).at("/result/content/0/text").asText().startsWith("Studio stopped as it started (exit 3)"));
+        assertEquals(sandbox + " 1", Files.readString(seen));
+    }
+
+    @Test
+    void neitherSandboxNorFlagAddsNothing() {
+        assertEquals(Map.of(), McpBridge.environment("", false));
+        assertEquals(Map.of("BOTMAKER_MCP_UI", "1"), McpBridge.environment(" ", true));
     }
 
     @Test
