@@ -64,12 +64,27 @@ public record Forcing(Module upstream, Module downstream, String reason) {
                             + "loading plugins with a different loader than Studio's admits plugins Studio "
                             + "then refuses"),
 
+            // The plugin parent (2026-10-27) pins both in the dependencyManagement every plugin inherits; a
+            // plugin moves one version, the parent's, and gets the pair released together.
+            new Forcing(Module.STUDIO_API, Module.PLUGIN_PARENT,
+                    "the plugin parent pins the contract for every plugin that names it, so a contract release "
+                            + "with no release here leaves new plugins on the old one"),
+            new Forcing(Module.PLUGIN_TOOLKIT, Module.PLUGIN_PARENT,
+                    "the plugin parent pins the toolkit for every plugin that names it, so a toolkit release "
+                            + "with no release here leaves new plugins on the old one"),
+
             // The example plugin `botmaker plugin new` copies is a plugin like any other since 2026-10-19: it
-            // compiles against both, and its tag's pom is what a new plugin pins. The cli bundles its zip.
+            // names the parent (2026-10-27), and its tag's pom is what a new plugin pins. The cli bundles its zip.
+            // The contract and the toolkit still force it directly: forcing never adds a module, so without
+            // these a contract release would be refused for the parent and then again for the example.
             new Forcing(Module.STUDIO_API, Module.PLUGIN_ARCHETYPE,
-                    "the example plugin compiles against the contract, and a new plugin pins what its tag pins"),
+                    "the example plugin compiles against the contract through its parent, and a new plugin pins "
+                            + "what its tag pins"),
             new Forcing(Module.PLUGIN_TOOLKIT, Module.PLUGIN_ARCHETYPE,
-                    "the example plugin compiles against the toolkit, and a new plugin pins what its tag pins"),
+                    "the example plugin compiles against the toolkit through its parent, and a new plugin pins "
+                            + "what its tag pins"),
+            new Forcing(Module.PLUGIN_PARENT, Module.PLUGIN_ARCHETYPE,
+                    "the example plugin names the plugin parent, and a new plugin pins what its tag pins"),
             new Forcing(Module.PLUGIN_ARCHETYPE, Module.CLI,
                     "`botmaker plugin new` copies the example plugin bundled into the cli at its build, so "
                             + "without a cli release new plugins keep starting from the previous one"),

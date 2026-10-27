@@ -95,6 +95,13 @@ public final class Poms {
         return new Dependency(group, text(root, "artifactId"), version, "");
     }
 
+    /** The {@code <parent>} the file names, as declared; empty when it names none. */
+    public static Optional<Dependency> parent(Path pom) throws IOException {
+        Element parent = firstChild(parse(pom).getDocumentElement(), "parent");
+        return parent == null ? Optional.empty() : Optional.of(new Dependency(text(parent, "groupId"),
+                text(parent, "artifactId"), text(parent, "version"), ""));
+    }
+
     /** The project's own {@code <name>}, as declared; {@code ""} when it has none. */
     public static String name(Path pom) throws IOException {
         return text(parse(pom).getDocumentElement(), "name");

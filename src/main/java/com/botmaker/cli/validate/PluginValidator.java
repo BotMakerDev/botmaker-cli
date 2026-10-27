@@ -75,6 +75,8 @@ public final class PluginValidator {
     public static final String CONTRACT_GROUP = "com.github.BotMakerDev";
     public static final String CONTRACT_ARTIFACT = "botmaker-studio-api";
     public static final String TOOLKIT_ARTIFACT = "botmaker-plugin-toolkit";
+    /** The parent a plugin's pom names, whose {@code dependencyManagement} pins the contract and the toolkit. */
+    public static final String PARENT_ARTIFACT = "botmaker-plugin-parent";
 
     /**
      * The groupId the contract and the toolkit were published under until 2026-10-05. Never required, never

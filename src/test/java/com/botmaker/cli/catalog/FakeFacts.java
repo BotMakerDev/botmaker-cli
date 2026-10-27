@@ -42,6 +42,12 @@ public final class FakeFacts implements EntryFacts, PomFacts.Source {
         return this;
     }
 
+    /** A pom at a ref read as written, a tag rather than a release's commit: the plugin parent a pom names. */
+    FakeFacts pomAtRef(String slug, String ref, String xml) {
+        poms.put(slug + "@" + ref, xml);
+        return this;
+    }
+
     @Override
     public Optional<String> pom(String repo, String ref) {
         return Optional.ofNullable(poms.get(repo + "@" + ref));

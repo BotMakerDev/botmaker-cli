@@ -31,6 +31,7 @@ public enum Module {
 
     STUDIO_API("botmaker-studio-api"),
     PLUGIN_TOOLKIT("botmaker-plugin-toolkit"),
+    PLUGIN_PARENT("botmaker-plugin-parent"),
     PLUGIN_HOST("botmaker-plugin-host"),
     PLUGIN_ARCHETYPE("botmaker-plugin-archetype"),
     PLUGIN_BASICS("botmaker-plugin-basics"),
@@ -149,6 +150,7 @@ public enum Module {
         return Optional.ofNullable(switch (this) {
             case STUDIO_API -> "studioapi";
             case PLUGIN_TOOLKIT -> "plugintoolkit";
+            case PLUGIN_PARENT -> "pluginparent";
             case PLUGIN_HOST -> "pluginhost";
             case PLUGIN_ARCHETYPE -> "pluginarchetype";
             case PLUGIN_BASICS -> "pluginbasics";
@@ -158,6 +160,15 @@ public enum Module {
             case SDK -> "sdk";
             default -> null;
         });
+    }
+
+    /**
+     * Whether a downstream pins this module as its {@code <parent>} rather than as a {@code botmaker.<key>.version}
+     * property: {@code botmaker-plugin-parent}, whose version Maven reads before any property exists. Its key
+     * names it in flags and tables all the same.
+     */
+    public boolean pinnedAsParent() {
+        return this == PLUGIN_PARENT;
     }
 
     /** The module a property key names, or empty. */
@@ -185,9 +196,12 @@ public enum Module {
         return switch (this) {
             case PLUGIN_TOOLKIT, PLUGIN_HOST -> List.of(STUDIO_API);
             // Plugin #2 pins two: the contract at `provided` and the toolkit at `compile`. Both reach the
-            // published pom, and that pom is what another plugin — the SDK — resolves. The example plugin
-            // pins the same two (2026-10-19), and its tag's pom is the one a new plugin starts from.
-            case PLUGIN_BASICS, PLUGIN_ARCHETYPE -> List.of(STUDIO_API, PLUGIN_TOOLKIT);
+            // published pom, and that pom is what another plugin — the SDK — resolves. The plugin parent pins
+            // the same two, in the dependencyManagement every plugin inherits (2026-10-27).
+            case PLUGIN_BASICS, PLUGIN_PARENT -> List.of(STUDIO_API, PLUGIN_TOOLKIT);
+            // The example plugin pins its <parent> (2026-10-27; the two pins above until then), and its tag's
+            // pom is the one a new plugin starts from.
+            case PLUGIN_ARCHETYPE -> List.of(PLUGIN_PARENT);
             // The archetype is the example plugin's `template` zip, bundled for `botmaker plugin new`.
             case CLI -> List.of(STUDIO_API, PLUGIN_HOST, PLUGIN_ARCHETYPE);
             case SESSION -> List.of(SHARED);

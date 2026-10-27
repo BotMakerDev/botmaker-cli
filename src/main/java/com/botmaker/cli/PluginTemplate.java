@@ -1,5 +1,7 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.validate.PluginValidator;
+
 import javax.lang.model.SourceVersion;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +30,9 @@ import java.util.zip.ZipInputStream;
  *       directories under {@code src/main/java} and {@code src/test/java};</li>
  *   <li>the name a user reads, the literal {@value #NAME} in the sources and the pom's {@code <name>};</li>
  *   <li>the pom's region marked {@code coordinates}, replaced, and its region marked {@code drop} (the build
- *       of this zip), removed; the contract and toolkit pins only when the author names other ones;</li>
+ *       of this zip), removed; its {@code <parent>}, {@code botmaker-plugin-parent}, found from the
+ *       repository rather than beside the example in the umbrella, at another version only when the author
+ *       names one;</li>
  *   <li>{@code gitignore}, stored without its dot because a jar's default excludes drop a {@code .gitignore}.</li>
  * </ul>
  * There is no plugin id to rename (2026-10-27): the pom's {@code groupId:artifactId} is the plugin's identity.
@@ -51,16 +55,24 @@ final class PluginTemplate {
     private static final Pattern REGION = Pattern.compile(
             "[ \\t]*<!-- botmaker plugin new: (\\w+) -->.*?<!-- /botmaker plugin new -->\\R", Pattern.DOTALL);
 
+    /** The parent every plugin names, which pins the contract and the toolkit together. */
+    static final String PARENT = PluginValidator.PARENT_ARTIFACT;
+
+    /** The pom's {@code <parent>} element. */
+    private static final Pattern PARENT_ELEMENT = Pattern.compile("<parent>.*?</parent>", Pattern.DOTALL);
+    private static final Pattern PARENT_VERSION = Pattern.compile("(<version>)\\s*([^<]*?)\\s*(</version>)");
+    private static final Pattern RELATIVE_PATH = Pattern.compile("<relativePath>[^<]*</relativePath>");
+
     /** The pom property naming the plugin class ({@code PluginPoms.PROPERTY}), with the class between. */
     private static final Pattern PLUGIN_CLASS = Pattern.compile(
             "(<botmaker\\.plugin>)\\s*([^<]*?)\\s*(</botmaker\\.plugin>)");
 
     /**
-     * What the new plugin is called. An empty pin keeps the one the template carries, which is the release
-     * this {@code botmaker} was built with.
+     * What the new plugin is called. An empty parent version keeps the one the template carries, which is the
+     * release this {@code botmaker} was built with.
      */
     record Answers(String groupId, String artifactId, String version, String javaPackage,
-                   String pluginName, Optional<String> studioApiVersion, Optional<String> toolkitVersion) {
+                   String pluginName, Optional<String> parentVersion) {
         Answers {
             if (!SourceVersion.isName(javaPackage)) {
                 throw new IllegalArgumentException("not a Java package name: " + javaPackage);
@@ -72,8 +84,8 @@ final class PluginTemplate {
         }
     }
 
-    /** The contract and toolkit versions the new plugin's pom pins. */
-    record Made(String studioApiVersion, String toolkitVersion) {
+    /** The parent version the new plugin's pom names. */
+    record Made(String parentVersion) {
     }
 
     private PluginTemplate() {
@@ -103,7 +115,7 @@ final class PluginTemplate {
                     name = "." + GITIGNORE;
                 } else if (name.equals("pom.xml")) {
                     text = pom(text, answers);
-                    made = new Made(pin(text, "studioapi"), pin(text, "plugintoolkit"));
+                    made = new Made(parentVersion(text));
                 } else if (name.endsWith(".java")) {
                     text = text.replace(PACKAGE, answers.javaPackage())
                             .replace(NAME, javaString(answers.pluginName()));
@@ -121,7 +133,7 @@ final class PluginTemplate {
         return made;
     }
 
-    /** The template's pom with the new coordinates, without the template's own build, and with any new pins. */
+    /** The template's pom with the new coordinates, without the template's own build, and on its parent. */
     static String pom(String pom, Answers answers) {
         StringBuilder out = new StringBuilder();
         Matcher region = REGION.matcher(pom);
@@ -150,26 +162,36 @@ final class PluginTemplate {
             throw new IllegalStateException("the template's pom has no region marked "
                     + (coordinates ? "drop" : "coordinates"));
         }
-        String copied = pluginClass(out.toString(), answers.javaPackage());
-        String api = answers.studioApiVersion().map(v -> withPin(copied, "studioapi", v)).orElse(copied);
-        return answers.toolkitVersion().map(v -> withPin(api, "plugintoolkit", v)).orElse(api);
+        return parent(pluginClass(out.toString(), answers.javaPackage()), answers.parentVersion());
     }
 
-    private static Pattern property(String key) {
-        return Pattern.compile("(<botmaker\\." + key + "\\.version>)([^<]*)(</botmaker\\." + key + "\\.version>)");
-    }
-
-    private static String pin(String pom, String key) {
-        Matcher match = property(key).matcher(pom);
-        if (!match.find()) {
-            throw new IllegalStateException("the template's pom has no botmaker." + key + ".version");
+    /**
+     * The pom with its {@code <parent>} found from the repository — the example's {@code relativePath} names the
+     * umbrella's sibling, which a new plugin has not got — and at {@code version} when one is given.
+     */
+    private static String parent(String pom, Optional<String> version) {
+        Matcher element = parentElement(pom);
+        String parent = RELATIVE_PATH.matcher(element.group()).replaceFirst("<relativePath/>");
+        if (version.isPresent()) {
+            parent = PARENT_VERSION.matcher(parent)
+                    .replaceFirst("$1" + Matcher.quoteReplacement(xml(version.get())) + "$3");
         }
-        return match.group(2);
+        return pom.substring(0, element.start()) + parent + pom.substring(element.end());
     }
 
-    private static String withPin(String pom, String key, String version) {
-        pin(pom, key);
-        return property(key).matcher(pom).replaceFirst("$1" + Matcher.quoteReplacement(xml(version)) + "$3");
+    private static String parentVersion(String pom) {
+        Matcher version = PARENT_VERSION.matcher(parentElement(pom).group());
+        if (!version.find()) throw new IllegalStateException("the template's <parent> names no version");
+        return version.group(2);
+    }
+
+    /** The {@code <parent>} naming {@value #PARENT}; a template on any other is refused. */
+    private static Matcher parentElement(String pom) {
+        Matcher element = PARENT_ELEMENT.matcher(pom);
+        if (!element.find() || !element.group().matches("(?s).*<artifactId>\\s*" + PARENT + "\\s*</artifactId>.*")) {
+            throw new IllegalStateException("the template's pom names no " + PARENT + " <parent>");
+        }
+        return element;
     }
 
     /**

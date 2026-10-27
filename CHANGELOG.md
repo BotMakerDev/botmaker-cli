@@ -9,6 +9,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed (breaking)
 
+- **`botmaker plugin new --parent <version>` replaces `--studio-api` and `--toolkit`** (2026-10-27). The example
+  plugin's pom names `botmaker-plugin-parent`, which pins the contract and the toolkit together; the copy finds the
+  parent from the repository (`<relativePath/>`) and says which parent it names.
+- **The release library knows `botmaker-plugin-parent`** (`--plugin-parent`): reactor and tag order after the
+  toolkit; the contract and the toolkit force it, it forces the archetype (which they still force directly, so one
+  refusal names all three). The archetype pins it as its `<parent>`, not a property: `Module.pinnedAsParent()`,
+  read by `PomVersions.property`, and its version literal moved by `Runner.replace` (any mojo would first resolve
+  the `-SNAPSHOT` parent it replaces; the release commit moves it before `versions:set`, back to snapshot after),
+  also in `BuildsAtPinsGate`'s throwaway tree. `PomVersions.projectVersion` reads a pom with a parent instead of
+  refusing it.
+- **The catalog reads a plugin's contract floor through `botmaker-plugin-parent`**: a contract dependency with no
+  version takes `botmaker.studioapi.version` from the parent's pom at the tag the plugin names, under the plugin's
+  own properties (`PomFacts`, `Poms.parent`).
+
 - **A plugin is its pom's coordinate; the plugin id is gone** (2026-10-27). The validator reads which plugin a jar
   is from the one pom in it that sets `botmaker.plugin` (plugin-host's `PluginPoms`), never from a services file or
   `StudioPlugin.id()`. The `id` check is `declared`: every pom naming a plugin names one a host loads (one per jar,

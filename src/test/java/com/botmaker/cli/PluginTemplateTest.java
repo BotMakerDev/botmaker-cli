@@ -54,17 +54,19 @@ class PluginTemplateTest {
     /** With a quote, so the name is written as a Java string rather than pasted into one. */
     private static final String PLUGIN_NAME = "Demo \"Plugin\"";
 
-    private static PluginTemplate.Answers answers(Optional<String> studioApi) {
+    private static PluginTemplate.Answers answers(Optional<String> parent) {
         return new PluginTemplate.Answers("com.acme", "demo-plugin", "0.1.0-SNAPSHOT", PACKAGE,
-                PLUGIN_NAME, studioApi, Optional.empty());
+                PLUGIN_NAME, parent);
     }
 
     @Test
     void the_copy_is_renamed_everywhere(@TempDir Path work) throws IOException {
         Path project = work.resolve("demo-plugin");
+        PluginTemplate.Made made;
         try (InputStream template = PluginTemplate.bundled()) {
-            PluginTemplate.write(template, project, answers(Optional.of("v0.10.0")));
+            made = PluginTemplate.write(template, project, answers(Optional.of("v0.1.0")));
         }
+        assertEquals("v0.1.0", made.parentVersion());
 
         assertTrue(Files.isRegularFile(project.resolve(".gitignore")), "the .gitignore lost its dot");
         assertTrue(Files.isRegularFile(project.resolve("README.md")));
@@ -82,7 +84,11 @@ class PluginTemplateTest {
         assertTrue(pom.contains("<name>Demo \"Plugin\"</name>"), pom);
         assertFalse(pom.contains("botmaker-plugin-archetype"), pom);
         assertFalse(pom.contains("maven-assembly-plugin"), "the template's own build reached the copy");
-        assertTrue(pom.contains("<botmaker.studioapi.version>v0.10.0</botmaker.studioapi.version>"), pom);
+        // On the parent at the version asked for, found from the repository: a new plugin has no umbrella beside it.
+        assertTrue(pom.matches("(?s).*<parent>\\s*<groupId>com.github.BotMakerDev</groupId>\\s*"
+                + "<artifactId>botmaker-plugin-parent</artifactId>\\s*<version>v0.1.0</version>\\s*"
+                + "<relativePath/>\\s*</parent>.*"), pom);
+        assertFalse(pom.contains("<botmaker.studioapi.version>"), "the parent pins the contract: " + pom);
         assertTrue(pom.contains("<botmaker.plugin>com.acme.demo.plugin.ExamplePlugin</botmaker.plugin>"),
                 "the pom names the renamed class: " + pom);
     }
@@ -145,11 +151,11 @@ class PluginTemplateTest {
     @Test
     void a_template_without_its_anchors_is_refused(@TempDir Path work) throws IOException {
         String plugin = "package com.example.greetings.plugin;\nclass ExamplePlugin { }\n";
-        String pom = "<project>\n    <!-- botmaker plugin new: coordinates -->\n    <groupId>x</groupId>\n"
+        String pom = "<project>\n    <parent>\n        <groupId>com.github.BotMakerDev</groupId>\n"
+                + "        <artifactId>botmaker-plugin-parent</artifactId>\n        <version>1</version>\n"
+                + "    </parent>\n    <!-- botmaker plugin new: coordinates -->\n    <groupId>x</groupId>\n"
                 + "    <!-- /botmaker plugin new -->\n    <properties>\n"
                 + "        <botmaker.plugin>com.example.greetings.plugin.ExamplePlugin</botmaker.plugin>\n"
-                + "        <botmaker.studioapi.version>1</botmaker.studioapi.version>\n"
-                + "        <botmaker.plugintoolkit.version>1</botmaker.plugintoolkit.version>\n"
                 + "    </properties>\n</project>\n";
 
         IllegalStateException noDrop = assertThrows(IllegalStateException.class, () -> PluginTemplate.write(
@@ -175,7 +181,7 @@ class PluginTemplateTest {
     @Test
     void a_package_that_is_not_java_is_refused() {
         assertThrows(IllegalArgumentException.class, () -> new PluginTemplate.Answers("com.acme", "2fa",
-                "0.1.0", "com.acme.2fa", "2FA", Optional.empty(), Optional.empty()));
+                "0.1.0", "com.acme.2fa", "2FA", Optional.empty()));
     }
 
     /** The name lands in string literals and a Javadoc comment. */
@@ -183,7 +189,7 @@ class PluginTemplateTest {
     void a_name_that_would_break_the_source_is_refused() {
         for (String name : new String[]{"Two\nLines", "Ends */ here"}) {
             assertThrows(IllegalArgumentException.class, () -> new PluginTemplate.Answers("com.acme", "demo",
-                    "0.1.0", PACKAGE, name, Optional.empty(), Optional.empty()), name);
+                    "0.1.0", PACKAGE, name, Optional.empty()), name);
         }
     }
 

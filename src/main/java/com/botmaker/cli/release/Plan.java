@@ -38,6 +38,7 @@ public final class Plan {
     static final Map<Module, String> LABEL = new EnumMap<>(Map.ofEntries(
             Map.entry(Module.STUDIO_API, "studio-api"),
             Map.entry(Module.PLUGIN_TOOLKIT, "toolkit   "),
+            Map.entry(Module.PLUGIN_PARENT, "parent    "),
             Map.entry(Module.PLUGIN_HOST, "host      "),
             Map.entry(Module.PLUGIN_ARCHETYPE, "archetype "),
             Map.entry(Module.PLUGIN_BASICS, "basics    "),
@@ -55,6 +56,7 @@ public final class Plan {
     private static final Map<Module, String> NOTE = new EnumMap<>(Map.ofEntries(
             Map.entry(Module.STUDIO_API, "  (the plugin contract)"),
             Map.entry(Module.PLUGIN_TOOLKIT, "  (the plugin widget toolkit)"),
+            Map.entry(Module.PLUGIN_PARENT, "  (the parent pom a plugin names)"),
             Map.entry(Module.PLUGIN_HOST, "  (the plugin loader)"),
             Map.entry(Module.PLUGIN_ARCHETYPE, "  (the example plugin `botmaker plugin new` copies)"),
             Map.entry(Module.PLUGIN_BASICS, "  (plugin #2: values, Settings, the store)"),

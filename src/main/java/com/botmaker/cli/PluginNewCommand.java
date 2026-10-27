@@ -52,18 +52,13 @@ final class PluginNewCommand implements Callable<Integer> {
     private String pluginVersion;
 
     /**
-     * No default of its own: the template pins the contract released with this {@code botmaker}, and a
-     * version written here would owe an edit on every contract release.
+     * No default of its own: the template names the parent released with this {@code botmaker}, and a version
+     * written here would owe an edit on every release. The parent pins the contract and the toolkit together.
      */
-    @Option(names = "--studio-api",
-            description = "botmaker-studio-api version in the generated pom. Default: the release this "
-                    + "botmaker was built with")
-    private String studioApiVersion;
-
-    @Option(names = "--toolkit",
-            description = "botmaker-plugin-toolkit version in the generated pom. Default: the release this "
-                    + "botmaker was built with")
-    private String toolkitVersion;
+    @Option(names = "--parent",
+            description = "botmaker-plugin-parent version the generated pom names; it pins the contract and the "
+                    + "toolkit. Default: the release this botmaker was built with")
+    private String parentVersion;
 
     @Option(names = "--dir", defaultValue = ".", description = "Where to generate. Default: ${DEFAULT-VALUE}")
     private String directory;
@@ -83,7 +78,7 @@ final class PluginNewCommand implements Callable<Integer> {
         try {
             answers = new PluginTemplate.Answers(group, name, pluginVersion, javaPackage,
                     pluginName != null ? pluginName : title(name),
-                    Optional.ofNullable(studioApiVersion), Optional.ofNullable(toolkitVersion));
+                    Optional.ofNullable(parentVersion));
         } catch (IllegalArgumentException e) {
             console.error(e.getMessage() + " (see --package and --plugin-name)");
             return 1;
@@ -92,11 +87,10 @@ final class PluginNewCommand implements Callable<Integer> {
         try (InputStream template = PluginTemplate.bundled()) {
             made = PluginTemplate.write(template, target, answers);
         }
-        console.out("Created " + target + " (contract " + made.studioApiVersion() + ", toolkit "
-                + made.toolkitVersion() + ")");
-        if (made.studioApiVersion().endsWith("-SNAPSHOT") || made.toolkitVersion().endsWith("-SNAPSHOT")) {
-            console.out("  A -SNAPSHOT pin resolves from this computer's ~/.m2 only: run `mvn install` in the "
-                    + "BotMaker umbrella first, or pass --studio-api and --toolkit a released tag.");
+        console.out("Created " + target + " (" + PluginTemplate.PARENT + " " + made.parentVersion() + ")");
+        if (made.parentVersion().endsWith("-SNAPSHOT")) {
+            console.out("  A -SNAPSHOT parent resolves from this computer's ~/.m2 only: run `mvn install` in the "
+                    + "BotMaker umbrella first, or pass --parent a released tag.");
         }
         console.out("");
         console.out("  cd " + name);

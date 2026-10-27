@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
 
 /**
  * A module being cut compiles against the releases its tag will pin — not against its upstreams' {@code main}.
@@ -38,9 +39,13 @@ public final class BuildsAtPinsGate {
     /** One build: the module, and each upstream outside the release with the tag its pin will name. */
     record Build(Module module, Map<Module, String> pins) {
 
-        /** The {@code -D} arguments that pin those upstreams, in upstream order. */
+        /**
+         * The {@code -D} arguments that pin those upstreams, in upstream order. A parent is not among them: Maven
+         * reads its version before any property, so {@code compile} moves it in the throwaway tree instead.
+         */
         List<String> properties() {
             return module.upstreams().stream().filter(pins::containsKey)
+                    .filter(upstream -> !upstream.pinnedAsParent())
                     .map(upstream -> "-Dbotmaker." + upstream.propertyKey().orElseThrow() + ".version="
                             + pins.get(upstream))
                     .toList();
@@ -111,6 +116,20 @@ public final class BuildsAtPinsGate {
             return new Proc.Result(1, "[ERROR] git worktree add failed: " + added.out());
         }
         try {
+            Optional<Module> parent = build.module().upstreams().stream().filter(Module::pinnedAsParent)
+                    .filter(build.pins()::containsKey).findFirst();
+            if (parent.isPresent()) {
+                // As the release commit moves it: the version literal, which no mojo could move without first
+                // resolving the snapshot it names now.
+                Path pom = tree.resolve("pom.xml");
+                String tag = Matcher.quoteReplacement(build.pins().get(parent.get()));
+                try {
+                    Files.writeString(pom, PomVersions.parentVersion(parent.get()).matcher(Files.readString(pom))
+                            .replaceFirst("$1" + tag + "$2"));
+                } catch (IOException e) {
+                    return new Proc.Result(1, "[ERROR] could not pin the parent: " + e.getMessage());
+                }
+            }
             List<String> argv = new ArrayList<>(List.of("mvn", "-B", "-q", "-U", "compile",
                     "-Dbotmaker.japicmp.skip=true"));
             argv.addAll(build.properties());

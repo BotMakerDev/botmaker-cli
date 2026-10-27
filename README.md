@@ -80,8 +80,8 @@ maintainer's cross-module release, run from the umbrella checkout.
 
 Copies the example plugin, `botmaker-plugin-archetype`, and renames it: package and directories, the plugin's
 name, the pom's coordinates (the plugin's identity) and the class its `botmaker.plugin` property names. The example is bundled in this jar as it was when this `botmaker` was released, so
-the command needs no network; its pom pins the contract and toolkit released with it (`--studio-api` and
-`--toolkit` pin others). It carries **no templates of its own**: the shape has exactly one source of truth, a
+the command needs no network; its pom names the plugin parent released with it, `botmaker-plugin-parent`, which
+pins the contract and toolkit together (`--parent` names another). It carries **no templates of its own**: the shape has exactly one source of truth, a
 plugin CI builds and tests, because three of the things it gets right (the dependency scopes) are wrong in ways
 that produce no compile error.
 

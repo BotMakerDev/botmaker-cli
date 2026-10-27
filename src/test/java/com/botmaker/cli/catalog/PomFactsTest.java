@@ -62,6 +62,40 @@ class PomFactsTest {
     }
 
     @Test
+    void a_plugin_on_the_plugin_parent_takes_its_contract_floor_from_the_parent_at_its_tag() {
+        String plugin = """
+                <project>
+                  <parent><groupId>com.github.BotMakerDev</groupId><artifactId>botmaker-plugin-parent</artifactId>
+                    <version>v0.1.0</version><relativePath/></parent>
+                  <dependencies>
+                    <dependency><groupId>com.github.BotMakerDev</groupId><artifactId>botmaker-studio-api</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """;
+        FakeFacts poms = new FakeFacts().pom("somedev/thing", "v1", plugin)
+                .pomAtRef("BotMakerDev/botmaker-plugin-parent", "v0.1.0",
+                        "<project><properties><botmaker.studioapi.version>v0.13.0</botmaker.studioapi.version>"
+                                + "</properties></project>");
+        assertEquals("v0.13.0", PomFacts.read(List.of(THING), poms, IDS).plugin(THING.repo(), "v1")
+                .minContractVersion());
+
+        // The plugin's own property wins, as it does in Maven.
+        FakeFacts overridden = new FakeFacts().pom("somedev/thing", "v1", plugin.replace("<dependencies>",
+                        "<properties><botmaker.studioapi.version>v0.12.0</botmaker.studioapi.version></properties>"
+                                + "<dependencies>"))
+                .pomAtRef("BotMakerDev/botmaker-plugin-parent", "v0.1.0",
+                        "<project><properties><botmaker.studioapi.version>v0.13.0</botmaker.studioapi.version>"
+                                + "</properties></project>");
+        assertEquals("v0.12.0", PomFacts.read(List.of(THING), overridden, IDS).plugin(THING.repo(), "v1")
+                .minContractVersion());
+
+        // A parent that cannot be read leaves the floor missing, never guessed.
+        assertNull(PomFacts.read(List.of(THING), new FakeFacts().pom("somedev/thing", "v1", plugin), IDS)
+                .plugin(THING.repo(), "v1").minContractVersion());
+    }
+
+    @Test
     void a_bot_pom_gives_its_catalog_plugin_pins_ignoring_case() {
         FakeFacts poms = new FakeFacts().pom("somedev/firestone", "v1.2.0", """
                 <project><dependencies>

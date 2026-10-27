@@ -29,7 +29,7 @@ class WaitsTest {
     void aFullReleaseWaitsOnEightOfItsNineArtifacts() {
         Set<Module> all = EnumSet.allOf(Module.class);
 
-        assertEquals(EnumSet.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_HOST,
+        assertEquals(EnumSet.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_PARENT, Module.PLUGIN_HOST,
                 Module.PLUGIN_ARCHETYPE, Module.CLI, Module.SHARED, Module.SESSION, Module.PLUGIN_BASICS), owed(all));
         // The one that goes: nothing tagged after the sdk resolves it from JitPack. The archetype went too until
         // the cli bundled its template (2026-10-19).

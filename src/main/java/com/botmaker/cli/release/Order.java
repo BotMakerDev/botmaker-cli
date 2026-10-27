@@ -19,7 +19,7 @@ import java.util.List;
  *
  * <pre>
  *   pilot, remote (APKs, ~3m each)
- *     → studio-api → plugin-toolkit → plugin-host → plugin-archetype → cli → remote-server → shared
+ *     → studio-api → plugin-toolkit → plugin-parent → plugin-host → plugin-archetype → cli → remote-server → shared
  *     → session → plugin-basics → sdk
  *     → studio (per-OS package matrix, ~6m)
  *     → dashboard (Linux package job)
@@ -53,6 +53,7 @@ public final class Order {
             Module.REMOTE,
             Module.STUDIO_API,
             Module.PLUGIN_TOOLKIT,
+            Module.PLUGIN_PARENT,
             Module.PLUGIN_HOST,
             Module.PLUGIN_ARCHETYPE,
             Module.PLUGIN_BASICS,
@@ -73,6 +74,8 @@ public final class Order {
             Module.REMOTE,
             Module.STUDIO_API,
             Module.PLUGIN_TOOLKIT,
+            // The parent pins the contract and the toolkit, and the example plugin's tag resolves it.
+            Module.PLUGIN_PARENT,
             Module.PLUGIN_HOST,
             Module.PLUGIN_ARCHETYPE,
             Module.CLI,

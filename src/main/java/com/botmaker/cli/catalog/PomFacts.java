@@ -29,6 +29,10 @@ public final class PomFacts {
         Optional<String> pom(String repo, String ref);
     }
 
+    /** Where {@code botmaker-plugin-parent} lives, and the property its dependencyManagement pins the contract by. */
+    private static final String PARENT_REPO = "BotMakerDev/" + PluginValidator.PARENT_ARTIFACT;
+    private static final String CONTRACT_PROPERTY = "botmaker.studioapi.version";
+
     private PomFacts() {}
 
     /**
@@ -51,7 +55,7 @@ public final class PomFacts {
                         // Read before the maps are touched: a pom that does not parse leaves no empty row.
                         switch (entry) {
                             case PluginEntry plugin -> {
-                                DerivedFacts.PluginFacts read = plugin(pom, plugin, pluginRepos);
+                                DerivedFacts.PluginFacts read = plugin(pom, plugin, pluginRepos, poms);
                                 plugins.computeIfAbsent(plugin.repo(), k -> new HashMap<>()).put(release.tag(), read);
                             }
                             case BotEntry bot -> {
@@ -74,14 +78,21 @@ public final class PomFacts {
     /**
      * A plugin's name (its pom's {@code <name>}, else the repository name), contract floor, editor dependencies and
      * the catalog plugins it declares.
+     *
+     * <p>A plugin on {@code botmaker-plugin-parent} declares the contract with no version: the parent's
+     * {@code dependencyManagement} pins it as {@code ${botmaker.studioapi.version}}. That parent's pom is read at
+     * the tag the plugin names, through {@code poms}, and the plugin's own properties override its own, as Maven does.
      */
-    static DerivedFacts.PluginFacts plugin(Path pom, PluginEntry entry, Map<String, String> pluginRepos)
+    static DerivedFacts.PluginFacts plugin(Path pom, PluginEntry entry, Map<String, String> pluginRepos, Source poms)
             throws IOException {
         Map<String, String> properties = Poms.properties(pom);
         String name = resolved(Poms.name(pom), properties).orElse(entry.name());
         List<Poms.Dependency> declared = Poms.dependencies(pom);
-        String contract = Poms.find(declared, PluginValidator.CONTRACT_GROUP, PluginValidator.CONTRACT_ARTIFACT)
-                .flatMap(d -> resolved(d.version(), properties)).orElse(null);
+        Optional<Poms.Dependency> declaredContract =
+                Poms.find(declared, PluginValidator.CONTRACT_GROUP, PluginValidator.CONTRACT_ARTIFACT);
+        String contract = (declaredContract.isPresent() && declaredContract.get().version().isBlank()
+                ? managedContract(pom, properties, poms)
+                : declaredContract.flatMap(d -> resolved(d.version(), properties))).orElse(null);
         return new DerivedFacts.PluginFacts(name, contract, editorDependencies(declared, properties),
                 pins(pom, pluginRepos));
     }
@@ -125,6 +136,24 @@ public final class PomFacts {
     /** How the catalog keys a coordinate: {@code groupId:artifactId}, lower case, since JitPack ignores case. */
     public static String key(String groupId, String artifactId) {
         return (groupId + ":" + artifactId).toLowerCase(Locale.ROOT);
+    }
+
+    /** The contract version {@code botmaker-plugin-parent} manages for this pom, or empty for any other parent. */
+    private static Optional<String> managedContract(Path pom, Map<String, String> own, Source poms) throws IOException {
+        Optional<Poms.Dependency> parent = Poms.parent(pom).filter(p -> PluginValidator.contractGroup(p.groupId())
+                && PluginValidator.PARENT_ARTIFACT.equals(p.artifactId()) && !p.version().isBlank());
+        if (parent.isEmpty()) return Optional.empty();
+        Optional<String> text = poms.pom(PARENT_REPO, parent.get().version());
+        if (text.isEmpty()) return Optional.empty();
+        Path parentPom = Files.createTempFile("catalog-parent-pom", ".xml");
+        try {
+            Files.writeString(parentPom, text.get());
+            Map<String, String> properties = new HashMap<>(Poms.properties(parentPom));
+            properties.putAll(own);
+            return resolved("${" + CONTRACT_PROPERTY + "}", properties);
+        } finally {
+            Files.deleteIfExists(parentPom);
+        }
     }
 
     private static Optional<String> resolved(String value, Map<String, String> properties) {

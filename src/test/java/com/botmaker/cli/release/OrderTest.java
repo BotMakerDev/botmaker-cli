@@ -140,7 +140,10 @@ class OrderTest {
         assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_HOST, Module.PLUGIN_ARCHETYPE), upstreamsOf(Module.CLI));
         assertEquals(Set.of(Module.SHARED), upstreamsOf(Module.SESSION));
         assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT), upstreamsOf(Module.PLUGIN_BASICS));
-        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT), upstreamsOf(Module.PLUGIN_ARCHETYPE));
+        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT), upstreamsOf(Module.PLUGIN_PARENT));
+        // The parent is its one pin; the contract and the toolkit still force it so one refusal names all.
+        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_PARENT),
+                upstreamsOf(Module.PLUGIN_ARCHETYPE));
         // Plugin #2 is in the SDK's set because the SDK compiles against it as an ordinary Maven
         // dependency — a plugin depending on another plugin, which PluginLoader's single classloader makes
         // possible and which costs plugin-basics its freedom to break.

@@ -63,6 +63,10 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "The plugin widget toolkit. " + SPEC_HELP)
     private String pluginToolkit;
 
+    @Option(names = "--plugin-parent", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
+            description = "The parent pom a plugin names. " + SPEC_HELP)
+    private String pluginParent;
+
     @Option(names = "--plugin-host", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
             description = "The plugin loader. " + SPEC_HELP)
     private String pluginHost;
@@ -246,6 +250,7 @@ public final class ReleaseCommand implements Callable<Integer> {
         Map<Module, String> explicit = new EnumMap<>(Module.class);
         put(explicit, Module.STUDIO_API, studioApi);
         put(explicit, Module.PLUGIN_TOOLKIT, pluginToolkit);
+        put(explicit, Module.PLUGIN_PARENT, pluginParent);
         put(explicit, Module.PLUGIN_HOST, pluginHost);
         put(explicit, Module.PLUGIN_ARCHETYPE, pluginArchetype);
         put(explicit, Module.PLUGIN_BASICS, pluginBasics);

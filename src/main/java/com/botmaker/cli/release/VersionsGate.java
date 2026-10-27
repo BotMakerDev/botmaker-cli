@@ -63,7 +63,8 @@ public final class VersionsGate {
     record Stale(Module upstream, String pinned, String theirs) {
 
         String line() {
-            return "botmaker." + upstream.propertyKey().orElseThrow() + ".version is " + pinned + ", "
+            return (upstream.pinnedAsParent() ? "its <parent> " + upstream.directory() + " is "
+                    : "botmaker." + upstream.propertyKey().orElseThrow() + ".version is ") + pinned + ", "
                     + upstream.directory() + "'s pom says " + theirs;
         }
     }

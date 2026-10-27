@@ -32,6 +32,8 @@ public final class PomVersions {
 
     private static final Pattern COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);
     private static final Pattern VERSION = Pattern.compile("<version>\\s*([^<\\s]+)\\s*</version>");
+    /** The {@code <parent>} element: a pom has at most one. */
+    private static final Pattern PARENT = Pattern.compile("<parent>.*?</parent>", Pattern.DOTALL);
 
     /**
      * The subjects of the commits a release lands after a tag — back to snapshot, and a dependent's pin — as
@@ -65,8 +67,10 @@ public final class PomVersions {
         }
         Path pom = pom(umbrella, module);
         List<String> pins = new ArrayList<>();
-        set(runner, pom, version.toString());
-        for (Module upstream : module.upstreams()) {
+        // A parent pin moves BEFORE versions:set, which resolves the parent the pom names: the released tag,
+        // built on JitPack before this module started, where the -SNAPSHOT it replaces may be nowhere.
+        // backToSnapshot runs the other way round for the same reason.
+        java.util.function.Consumer<Module> pin = upstream -> {
             // The TAG NAME (v0.5.0), not the bare number. JitPack does serve 0.5.0 off tag v0.5.0, but as a
             // separate build with its own cache: the release waits for the v0.5.0 build, and on 2026-10-06
             // every bare-number build of the contract (0.4.1, 0.4.2, 0.5.0) failed where the v build was ok,
@@ -74,7 +78,10 @@ public final class PomVersions {
             String pinned = DepTag.of(umbrella, upstream, Optional.ofNullable(releasing.get(upstream)));
             setProperty(runner, pom, upstream, pinned);
             pins.add(upstream.shortName() + " " + pinned);
-        }
+        };
+        module.upstreams().stream().filter(Module::pinnedAsParent).forEach(pin);
+        set(runner, pom, version.toString());
+        module.upstreams().stream().filter(upstream -> !upstream.pinnedAsParent()).forEach(pin);
         runner.say("  " + module.directory() + " " + version + (pins.isEmpty() ? ""
                 : " pinning " + String.join(", ", pins)));
     }
@@ -242,17 +249,33 @@ public final class PomVersions {
     }
 
     /**
-     * The project's own version: the first {@code <version>} once comments are gone. Every pom here has no
-     * {@code <parent>}, so the first one is the project's; a pom that grows a parent is refused rather than
-     * read as its parent's version.
+     * The project's own version: the first {@code <version>} once comments and the {@code <parent>} are gone.
+     * Only a plugin names a parent here ({@code botmaker-plugin-parent}, {@link Module#pinnedAsParent()}); a
+     * pom whose parent leaves no {@code <version>} of its own is empty, never read as its parent's.
      */
     public static Optional<String> projectVersion(String pom) {
-        String text = COMMENT.matcher(pom).replaceAll("");
-        if (text.contains("<parent>")) {
-            throw new ReleaseRefusal("a pom with a <parent> — its first <version> is not its own");
-        }
-        Matcher m = VERSION.matcher(text);
+        Matcher m = VERSION.matcher(PARENT.matcher(COMMENT.matcher(pom).replaceAll("")).replaceFirst(""));
         return m.find() ? Optional.of(m.group(1)) : Optional.empty();
+    }
+
+    /**
+     * The {@code <version>} after {@code upstream}'s artifactId, which in a plugin's pom is its {@code <parent>}'s
+     * (the parent is never a dependency); groups 1 and 2 keep everything but the version.
+     */
+    static Pattern parentVersion(Module upstream) {
+        return Pattern.compile("(<artifactId>\\s*" + upstream.directory()
+                + "\\s*</artifactId>\\s*<version>)\\s*[^<\\s]*\\s*(</version>)");
+    }
+
+    /** The version a pom's {@code <parent>} names, when that parent is {@code upstream}. */
+    private static Optional<String> parentVersion(String pom, Module upstream) {
+        Matcher parent = PARENT.matcher(COMMENT.matcher(pom).replaceAll(""));
+        if (!parent.find() || !parent.group().matches("(?s).*<artifactId>\\s*" + Pattern.quote(upstream.directory())
+                + "\\s*</artifactId>.*")) {
+            return Optional.empty();
+        }
+        Matcher version = VERSION.matcher(parent.group());
+        return version.find() ? Optional.of(version.group(1)) : Optional.empty();
     }
 
     /**
@@ -265,14 +288,27 @@ public final class PomVersions {
 
     private static String normalised(String pom) {
         String text = COMMENT.matcher(pom).replaceAll("");
-        text = VERSION.matcher(text).replaceFirst("<version/>");
+        Matcher parent = PARENT.matcher(text);
+        if (parent.find()) {
+            // The parent's version is a pin like the properties below; the project's own comes after it.
+            text = text.substring(0, parent.start()) + VERSION.matcher(parent.group()).replaceFirst("<version/>")
+                    + VERSION.matcher(text.substring(parent.end())).replaceFirst("<version/>");
+        } else {
+            text = VERSION.matcher(text).replaceFirst("<version/>");
+        }
         text = text.replaceAll("<botmaker\\.([a-z]+)\\.version>[^<]*</botmaker\\.\\1\\.version>",
                 "<botmaker.$1.version/>");
         return text.replaceAll("\\s+", " ").strip();
     }
 
-    /** The value of {@code <botmaker.<key>.version>}, comments ignored. */
+    /**
+     * The version {@code pom} pins {@code upstream} at, comments ignored: the value of
+     * {@code <botmaker.<key>.version>}, or the {@code <parent>}'s version for a module pinned as one.
+     */
     public static Optional<String> property(String pom, Module upstream) {
+        if (upstream.pinnedAsParent()) {
+            return parentVersion(pom, upstream);
+        }
         String key = upstream.propertyKey().orElseThrow();
         Matcher m = Pattern.compile("<botmaker\\." + key + "\\.version>\\s*([^<\\s]*)\\s*</botmaker\\."
                 + key + "\\.version>").matcher(COMMENT.matcher(pom).replaceAll(""));
@@ -297,6 +333,16 @@ public final class PomVersions {
     }
 
     private static void setProperty(Runner runner, Path pom, Module upstream, String version) {
+        if (upstream.pinnedAsParent()) {
+            if (!runner.dryRun() && property(read(pom), upstream).isEmpty()) {
+                throw new ReleaseRefusal(pom + ": names no " + upstream.directory() + " <parent> to pin");
+            }
+            // Not versions:update-parent: any mojo first resolves the parent the pom names NOW, a -SNAPSHOT whose
+            // sibling checkout has already moved on and which JitPack never serves, so it fails on any ~/.m2
+            // without that exact snapshot. One version literal, moved like Studio's SDK constant.
+            runner.replace(pom, parentVersion(upstream), "$1" + Matcher.quoteReplacement(version) + "$2");
+            return;
+        }
         if (!runner.dryRun() && property(read(pom), upstream).isEmpty()) {
             // set-property is silent about a property the pom does not declare; a pin that did not move is
             // the failure worth being loud about.

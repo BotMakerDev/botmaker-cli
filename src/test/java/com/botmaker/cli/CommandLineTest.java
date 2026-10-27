@@ -144,9 +144,8 @@ class CommandLineTest {
         // Not matchedOptionValue: an option nobody typed is not "matched", and the question here is what
         // the command will actually USE — which is the default, applied to the field during the parse.
         assertEquals("com.example", applied(verb, "--group"));
-        // No default: the template's pom keeps the pins it was released with.
-        assertNull(verb.commandSpec().findOption("--studio-api").getValue());
-        assertNull(verb.commandSpec().findOption("--toolkit").getValue());
+        // No default: the template's pom keeps the parent it was released with.
+        assertNull(verb.commandSpec().findOption("--parent").getValue());
         assertEquals("0.1.0-SNAPSHOT", applied(verb, "--plugin-version"));
     }
 
