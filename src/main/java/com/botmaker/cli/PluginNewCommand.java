@@ -1,5 +1,6 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.publish.JitpackFiles;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -22,7 +23,8 @@ import java.util.concurrent.Callable;
  * and no Maven.
  *
  * <p>What it adds over copying the repository by hand is the renaming nobody gets right twice: package and
- * directories, the plugin's name, the pom's coordinates (the plugin's identity) and the class it names.
+ * directories, the plugin's name, the pom's coordinates (the plugin's identity) and the class it names. And it
+ * writes the JitPack build the cli owns ({@link JitpackFiles}), which {@code plugin publish} refreshes.
  */
 @Command(name = "new",
         header = "Create a plugin project from the example plugin.",
@@ -38,10 +40,17 @@ final class PluginNewCommand implements Callable<Integer> {
             description = "The Maven artifact id, and the directory name. e.g. discord-notifier")
     private String name;
 
-    @Option(names = "--group", defaultValue = "com.example", description = "groupId. Default: ${DEFAULT-VALUE}")
-    private String group;
+    /**
+     * The GitHub account the plugin's repository will be under, which makes its groupId: {@code com.github.<owner>}
+     * is what JitPack serves the repository as, and the coordinate is the plugin's identity, so it is the one a
+     * plugin starts with rather than one its first publish would move it to (2026-10-27).
+     */
+    @Option(names = "--owner", paramLabel = "<account>",
+            description = "The GitHub account the repository goes under; the groupId is com.github.<owner>. "
+                    + "Default: the account `gh` is signed in to")
+    private String owner;
 
-    @Option(names = "--package", description = "Java package. Default: <group>.<name with no punctuation>")
+    @Option(names = "--package", description = "Java package. Default: com.github.<owner>.<name with no punctuation>")
     private String pkg;
 
     @Option(names = "--plugin-name", description = "The name a user reads. Default: the artifact id, titled")
@@ -73,7 +82,16 @@ final class PluginNewCommand implements Callable<Integer> {
             return 1;
         }
 
-        String javaPackage = pkg != null ? pkg : group + "." + name.replace("-", "").toLowerCase();
+        String account = owner != null ? owner.strip() : Shell.capture(Path.of("."), "gh", "api", "user", "--jq",
+                ".login").map(String::strip).filter(login -> !login.isEmpty()).orElse(null);
+        if (account == null || !account.matches("[A-Za-z0-9][A-Za-z0-9-]*")) {
+            console.error(account == null ? "no GitHub account: pass --owner, or sign `gh` in (`gh auth login`)"
+                    : "--owner wants a GitHub account name, got '" + account + "'");
+            return 1;
+        }
+        String group = "com.github." + account;
+        String javaPackage = pkg != null ? pkg : "com.github." + identifier(account) + "."
+                + identifier(name.replace("-", ""));
         PluginTemplate.Answers answers;
         try {
             answers = new PluginTemplate.Answers(group, name, pluginVersion, javaPackage,
@@ -87,16 +105,25 @@ final class PluginNewCommand implements Callable<Integer> {
         try (InputStream template = PluginTemplate.bundled()) {
             made = PluginTemplate.write(template, target, answers);
         }
-        console.out("Created " + target + " (" + PluginTemplate.PARENT + " " + made.parentVersion() + ")");
+        JitpackFiles.write(target, JitpackFiles.bundled());
+        console.out("Created " + target + " as " + group + ":" + name + " (" + PluginTemplate.PARENT + " "
+                + made.parentVersion() + "), for the repository " + account + "/" + name);
         if (made.parentVersion().endsWith("-SNAPSHOT")) {
             console.out("  A -SNAPSHOT parent resolves from this computer's ~/.m2 only: run `mvn install` in the "
-                    + "BotMaker umbrella first, or pass --parent a released tag.");
+                    + "BotMaker umbrella first, or pass --parent a released tag (`botmaker plugin upgrade` moves it to"
+                    + " one later; `plugin publish` refuses a -SNAPSHOT parent).");
         }
         console.out("");
         console.out("  cd " + name);
         console.out("  mvn verify               # the example's tests pass unedited");
         console.out("  botmaker plugin validate # the checks the plugin registry runs");
         return 0;
+    }
+
+    /** {@code My-Org} to {@code my_org}: a package segment, lower case, a character Java refuses made {@code _}. */
+    static String identifier(String word) {
+        String lower = word.toLowerCase().replaceAll("[^a-z0-9_]", "_");
+        return lower.isEmpty() || Character.isDigit(lower.charAt(0)) ? "_" + lower : lower;
     }
 
     /** {@code discord-notifier} to {@code Discord Notifier} — the name a user reads in Studio. */

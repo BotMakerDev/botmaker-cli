@@ -11,6 +11,7 @@ import com.botmaker.cli.catalog.PluginEntry;
 import com.botmaker.cli.catalog.Publishers;
 import com.botmaker.cli.release.Jitpack;
 import com.botmaker.cli.release.Level;
+import com.botmaker.cli.validate.CheckResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -116,10 +117,63 @@ class PublishTest {
         assertEquals("folder after []", checked.getFirst(), "the folder is checked before anything changes");
         assertEquals("jar com.github.somedev:thing:v0.1.0", checked.get(1));
         List<String> commands = runner.commands();
-        assertEquals(List.of("git push origin HEAD", "git tag v0.1.0", "git push origin refs/tags/v0.1.0",
+        String files = String.join(" ", JitpackFiles.PATHS);
+        assertEquals(List.of("git add -- " + files,
+                "git commit -qm Build on JitPack with BotMaker's build script -- " + files,
+                "git push origin HEAD", "git tag v0.1.0", "git push origin refs/tags/v0.1.0",
                 "gh release create v0.1.0 --repo somedev/thing --title v0.1.0 --notes somedev/thing v0.1.0."
-                        + " --verify-tag"), commands.subList(0, 4));
+                        + " --verify-tag"), commands.subList(0, 6));
         assertTrue(commands.getLast().startsWith("gh pr create --repo BotMakerDev/botmaker-catalog"), commands.getLast());
+        assertEquals(Map.of(), JitpackFiles.stale(dir), "the tag carries this botmaker's JitPack build");
+        assertEquals("", runner.read(dir, List.of("git", "status", "--porcelain")).orElseThrow());
+    }
+
+    /** A folder whose JitPack build is this jar's commits nothing before the tag. */
+    @Test
+    void current_jitpack_files_are_not_committed_again() throws Exception {
+        JitpackFiles.write(dir, JitpackFiles.bundled());
+        FakeRunner.repository(dir, ORIGIN);
+        assertInstanceOf(Publish.Outcome.Opened.class, publish());
+        assertEquals("git push origin HEAD", runner.commands().getFirst());
+    }
+
+    /** JitPack serves no -SNAPSHOT, so a tag on one would build Error for good. */
+    @Test
+    void a_snapshot_parent_is_refused_before_anything_is_tagged() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        Files.writeString(dir.resolve("pom.xml"), "<project><parent><groupId>com.github.BotMakerDev</groupId>"
+                + "<artifactId>botmaker-plugin-parent</artifactId><version>0.1.0-SNAPSHOT</version></parent>"
+                + "<artifactId>thing</artifactId></project>\n");
+        FakeRunner.git(dir, "commit", "-qam", "snapshot parent");
+        Publish.Outcome.Refused refused = assertInstanceOf(Publish.Outcome.Refused.class, publish());
+        assertTrue(refused.reason().contains("JitPack never serves") && refused.reason().contains("plugin upgrade"),
+                refused.reason());
+        assertEquals(List.of(), runner.changes);
+    }
+
+    @Test
+    void a_dry_run_names_the_jitpack_files_and_writes_none() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        List<String> steps = new ArrayList<>();
+        Listener listener = new Listener() {
+            @Override
+            public void step(String line) {
+                steps.add(line);
+            }
+
+            @Override
+            public void warn(String line) {
+            }
+
+            @Override
+            public void checks(List<CheckResult> results) {
+            }
+        };
+        new Publish(facts, catalog, checks, jitpack, duration -> true).run(new PublishRequest(dir,
+                EntryPath.Kind.PLUGIN, Level.PATCH, Optional.empty(), Optional.empty(), true, "botmaker plugin publish"),
+                listener, runner.host(dir));
+        assertTrue(steps.stream().anyMatch(s -> s.startsWith("Would write and commit jitpack.yml")), steps.toString());
+        assertFalse(Files.exists(dir.resolve("jitpack.yml")));
     }
 
     @Test
@@ -286,6 +340,7 @@ class PublishTest {
 
     @Test
     void a_failed_push_stops_before_the_tag() throws Exception {
+        JitpackFiles.write(dir, JitpackFiles.bundled());
         FakeRunner.repository(dir, ORIGIN);
         runner.failing.add(List.of("git", "push", "origin", "HEAD"));
         assertInstanceOf(Publish.Outcome.Refused.class, publish());

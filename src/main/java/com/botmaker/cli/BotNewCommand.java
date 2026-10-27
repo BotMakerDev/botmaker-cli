@@ -115,7 +115,7 @@ final class BotNewCommand implements Callable<Integer> {
     }
 
     /** The newest GitHub Release of {@code slug}, as Studio installs it: never a bare tag. */
-    private static String newestRelease(String slug) throws IOException {
+    static String newestRelease(String slug) throws IOException {
         return Shell.capture(Path.of("."), "gh", "release", "view", "--repo", slug, "--json", "tagName",
                         "--jq", ".tagName")
                 .filter(found -> !found.isBlank())

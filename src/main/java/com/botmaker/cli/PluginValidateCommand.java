@@ -60,6 +60,11 @@ final class PluginValidateCommand implements Callable<Integer> {
                     .fromDirectory(Path.of(directory).toAbsolutePath().normalize(), !noBuild);
         }
 
+        return report(console, subject);
+    }
+
+    /** {@code subject}'s checks printed, with the closing line; exit 1 when one failed. */
+    static int report(Console console, PluginSubject subject) {
         List<CheckResult> results = PluginValidator.validate(subject);
         console.report(results);
 

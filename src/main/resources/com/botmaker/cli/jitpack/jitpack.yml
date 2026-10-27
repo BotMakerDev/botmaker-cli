@@ -1,0 +1,8 @@
+jdk:
+  - openjdk25
+install:
+  # Written by `botmaker plugin new` and refreshed by `botmaker plugin publish`; edit neither file by hand.
+  # .jitpack/build.sh is BotMaker's own JitPack build: it brings Maven 3.9.9 (and Temurin 25 where JitPack's JDK
+  # download fails), fetched from Google's mirror of Maven Central first, and retries a 429 rather than losing
+  # the tag. Without it JitPack builds on its default JDK, which cannot compile Java 25.
+  - bash .jitpack/build.sh

@@ -30,7 +30,8 @@ import java.util.concurrent.Callable;
                 + "own checks, try it inside Studio, list it in the catalog.",
         mixinStandardHelpOptions = true,
         synopsisSubcommandLabel = "<command>",
-        subcommands = {PluginNewCommand.class, PluginValidateCommand.class, PluginRunCommand.class,
+        subcommands = {PluginNewCommand.class, PluginDeclareCommand.class, PluginUpgradeCommand.class,
+                PluginValidateCommand.class, PluginRunCommand.class,
                 PluginPublishCommand.class, PluginUnpublishCommand.class, PluginListCommand.class})
 final class PluginCommand implements Callable<Integer> {
 

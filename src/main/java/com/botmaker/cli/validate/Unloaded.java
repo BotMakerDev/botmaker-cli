@@ -1,28 +1,18 @@
 package com.botmaker.cli.validate;
 
-import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.host.PluginLoader.PluginFailure;
 import com.botmaker.plugin.host.PluginPoms;
 
-import java.io.IOException;
-import java.lang.reflect.Modifier;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.List;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.stream.Stream;
 
 /**
  * Why no plugin loaded, said as the line to fix (2026-10-19, `docs/refactor/46-plugin-target.md` F4): each plugin
  * that failed, with its own cause, or, when the plugin's own pom names no class, the class to name in it
  * (2026-10-27). A plugin that compiles and packages but is declared nowhere contributes nothing, and nothing else
- * says so.
+ * says so. A working copy is also offered {@code botmaker plugin declare}, which writes the property.
  */
 final class Unloaded {
 
@@ -32,71 +22,37 @@ final class Unloaded {
     static List<String> why(List<Path> classpath, List<PluginFailure> failures) {
         List<String> lines = new ArrayList<>();
         for (PluginFailure failure : failures) lines.add(failure.describe());
-        if (!lines.isEmpty() || classpath.isEmpty()) return lines.isEmpty() ? List.of("nothing to load") : lines;
+        if (classpath.isEmpty()) return lines.isEmpty() ? List.of("nothing to load") : lines;
 
         Path own = classpath.getFirst();
-        List<String> plugins = pluginClasses(own, classpath);
+        boolean workingCopy = Files.isDirectory(own);
+        List<String> plugins = PluginClasses.declarable(own, classpath);
+        if (!lines.isEmpty()) {
+            // The pom names a class that is not the plugin: the one class that could be is offered.
+            List<String> named = PluginPoms.read(own).stream().map(PluginPoms.PluginPom::pluginClass).toList();
+            if (workingCopy && plugins.size() == 1 && !named.contains(plugins.getFirst())) {
+                lines.add("`botmaker plugin declare` sets " + PluginPoms.PROPERTY + " to " + plugins.getFirst()
+                        + ", the one class here that can be the plugin");
+            }
+            return lines;
+        }
         if (plugins.isEmpty()) {
-            return List.of("no class in " + own.getFileName() + " implements StudioPlugin: a plugin is a public"
+            return List.of("no class in " + own.getFileName() + " extends DeclaredPlugin: a plugin is a public"
                     + " final class extending DeclaredPlugin, with a public no-argument constructor");
         }
-        lines.add("no pom in " + own.getFileName() + " sets " + PluginPoms.PROPERTY + ", so no host loads "
+        lines.add("no " + PluginPoms.PROPERTY + " in " + (workingCopy ? "pom.xml" : "the pom in " + own.getFileName())
+                + ", so no host loads "
                 + String.join(", ", plugins));
+        if (!workingCopy) {
+            lines.add("a flattened pom keeps it only with <pomElements><properties>keep</properties></pomElements>;"
+                    + " botmaker-plugin-parent's flatten does");
+        }
         lines.add("add to pom.xml's <properties>: <" + PluginPoms.PROPERTY + ">" + String.join(" / ", plugins)
                 + "</" + PluginPoms.PROPERTY + ">");
+        if (workingCopy) {
+            lines.add(plugins.size() == 1 ? "or run `botmaker plugin declare`, which sets it"
+                    : "or run `botmaker plugin declare <class>` naming one of them");
+        }
         return lines;
-    }
-
-    /** The concrete top-level {@link StudioPlugin} classes in {@code entry}, loaded over the whole classpath. */
-    private static List<String> pluginClasses(Path entry, List<Path> classpath) {
-        List<String> found = new ArrayList<>();
-        try (URLClassLoader loader = new URLClassLoader(urls(classpath), Unloaded.class.getClassLoader())) {
-            for (String name : classNames(entry)) {
-                try {
-                    Class<?> type = Class.forName(name, false, loader);
-                    if (StudioPlugin.class.isAssignableFrom(type) && !type.isInterface()
-                            && !Modifier.isAbstract(type.getModifiers())) {
-                        found.add(name);
-                    }
-                } catch (ReflectiveOperationException | LinkageError unloadable) {
-                    // Not a plugin this check can name; LOADS says what it can.
-                }
-            }
-        } catch (IOException unreadable) {
-            return found;
-        }
-        return found;
-    }
-
-    private static List<String> classNames(Path entry) throws IOException {
-        List<String> names = new ArrayList<>();
-        if (Files.isDirectory(entry)) {
-            try (Stream<Path> files = Files.walk(entry)) {
-                files.map(entry::relativize).map(Path::toString).filter(Unloaded::isTopLevelClass)
-                        .forEach(file -> names.add(className(file.replace('\\', '/'))));
-            }
-            return names;
-        }
-        try (JarFile jar = new JarFile(entry.toFile())) {
-            for (Enumeration<JarEntry> each = jar.entries(); each.hasMoreElements(); ) {
-                String file = each.nextElement().getName();
-                if (isTopLevelClass(file)) names.add(className(file));
-            }
-        }
-        return names;
-    }
-
-    private static boolean isTopLevelClass(String file) {
-        return file.endsWith(".class") && !file.contains("$") && !file.endsWith("module-info.class");
-    }
-
-    private static String className(String file) {
-        return file.substring(0, file.length() - ".class".length()).replace('/', '.');
-    }
-
-    private static URL[] urls(List<Path> classpath) throws MalformedURLException {
-        URL[] urls = new URL[classpath.size()];
-        for (int i = 0; i < urls.length; i++) urls[i] = classpath.get(i).toUri().toURL();
-        return urls;
     }
 }

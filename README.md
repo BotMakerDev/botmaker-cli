@@ -85,9 +85,25 @@ pins the contract and toolkit together (`--parent` names another). It carries **
 plugin CI builds and tests, because three of the things it gets right (the dependency scopes) are wrong in ways
 that produce no compile error.
 
+The coordinate is `com.github.<owner>:<artifact-id>` from the start, what JitPack serves the repository
+`<owner>/<artifact-id>` as, so the plugin's identity never moves at its first publish; `--owner` defaults to the
+account `gh` is signed in to. The copy also gets `jitpack.yml` and `.jitpack/build.sh` (with `statx.c`), the JitPack
+build every BotMaker module uses, bundled in this jar; `plugin publish` refreshes them.
+
 ```bash
-botmaker plugin new discord-notifier --group com.example --plugin-name "Discord Notifier"
+botmaker plugin new discord-notifier --owner somedev --plugin-name "Discord Notifier"
 ```
+
+### `botmaker plugin declare [class]`
+
+Sets the pom's `botmaker.plugin` to the plugin class: the one class in `target/classes` extending `DeclaredPlugin`
+directly, or the one named. An existing property moves by `versions:set-property`; a missing one is added at the
+top of `<properties>`. `validate` offers it when the property is missing or names another class.
+
+### `botmaker plugin upgrade [--to <tag>]`
+
+Moves the pom's `botmaker-plugin-parent` to its newest GitHub Release (or `--to`'s) by `versions:update-parent`,
+then compiles and runs `validate`'s checks. The parent pins the contract, the toolkit and JavaFX together.
 
 ### `botmaker plugin validate [dir]`
 

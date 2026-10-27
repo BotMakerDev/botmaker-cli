@@ -209,7 +209,9 @@ class PluginValidatorTest {
                 PluginSubject.local(List.of(classes), null));
         CheckResult loads = result(results, Check.LOADS);
         assertEquals(Status.FAIL, loads.status());
-        assertTrue(loads.detail().stream().anyMatch(d -> d.contains("sets botmaker.plugin")), loads::toString);
+        assertTrue(loads.detail().stream().anyMatch(d -> d.startsWith("no botmaker.plugin in pom.xml")), loads::toString);
+        assertTrue(loads.detail().stream().anyMatch(d -> d.contains("`botmaker plugin declare`")),
+                "offers declare for the one class: " + loads);
         assertTrue(loads.detail().stream().anyMatch(d -> d.endsWith("<botmaker.plugin>p.GoodPlugin</botmaker.plugin>")),
                 "names the property to write: " + loads);
         for (Check check : List.of(Check.DECLARED, Check.PALETTE, Check.TYPES, Check.EDITORS)) {

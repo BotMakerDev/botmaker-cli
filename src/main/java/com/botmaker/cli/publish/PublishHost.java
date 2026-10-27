@@ -4,6 +4,7 @@ import com.botmaker.cli.BotExport;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -55,6 +56,15 @@ public interface PublishHost {
 
     /** A folder that is no repository made one, with a first commit of everything but the build. */
     void firstCommit() throws Refusal;
+
+    /**
+     * {@code files} (each text by its path in the folder) written and committed as {@code message}, only those paths;
+     * in a folder that is no repository yet they are only written, and {@link #firstCommit} commits them. A plugin's
+     * JitPack build ({@link JitpackFiles}); a host that publishes no plugin refuses.
+     */
+    default void commitFiles(String message, Map<String, String> files) throws Refusal {
+        throw new Refusal("this host publishes no plugin, so it writes no JitPack build; run `botmaker plugin publish`.");
+    }
 
     /** {@code repo} created, public, from the folder, which becomes its remote and is pushed. */
     void createRepository(String repo) throws Refusal;

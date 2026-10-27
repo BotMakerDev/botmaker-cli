@@ -208,6 +208,39 @@
             </plugin>
 
             <!--
+              The JitPack build a plugin carries (JitpackFiles): this module's own .jitpack/build.sh and statx.c,
+              which the release's JitpackScriptGate keeps identical to the umbrella's tools/jitpack/build.sh, put
+              in this jar beside the jitpack.yml in src/main/resources. `plugin new` writes them and `plugin
+              publish` refreshes them, so a plugin builds on JitPack the way every BotMaker module does.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>plugin-jitpack</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/com/botmaker/cli/jitpack</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/.jitpack</directory>
+                                    <includes>
+                                        <include>build.sh</include>
+                                        <include>statx.c</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
               The executable jar, attached under the `all` classifier rather than replacing the main
               artifact — see the two-artifacts note at the top.
 

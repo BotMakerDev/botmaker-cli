@@ -10,6 +10,7 @@ import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.Finding;
 import com.botmaker.cli.catalog.PluginEntry;
 import com.botmaker.cli.bmk.BotFiles;
+import com.botmaker.cli.project.Poms;
 import com.botmaker.cli.release.Jitpack;
 import com.botmaker.cli.release.Level;
 
@@ -19,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -31,9 +33,10 @@ import java.util.function.Supplier;
  *   <li><b>Repository</b>: the folder's {@code origin} ({@link PublishTarget}).</li>
  *   <li><b>Version</b>: {@link NextVersion}. One the catalog lists already ends the run, listing nothing.</li>
  *   <li><b>Local check</b>, for a {@link NextVersion.Listing#NEW NEW} version only: a clean tree, the kind's own
- *       {@link Checks#folder checks}, and the entry's owner (a listed entry belongs to whoever controls it). A
- *       failure tags nothing. {@code --dry-run} stops here.</li>
- *   <li><b>Release</b>: {@code HEAD} pushed (the repository created first for a bot with no {@code origin}), the
+ *       {@link Checks#folder checks}, the entry's owner (a listed entry belongs to whoever controls it), and a
+ *       plugin's {@code <parent>} at a release. A failure tags nothing. {@code --dry-run} stops here.</li>
+ *   <li><b>Release</b>: a plugin's JitPack build ({@link JitpackFiles}) written and committed when the folder's
+ *       differs from this jar's, {@code HEAD} pushed (the repository created first for a bot with no {@code origin}), the
  *       tag made and pushed, the GitHub Release made as the signed-in user. Each part is skipped when already
  *       done, so a re-run after a failure finishes it.</li>
  *   <li><b>A plugin waits for JitPack</b> (the release library's poll; a build that failed is broken for good) and
@@ -172,8 +175,18 @@ public final class Publish {
                 throw new Refusal(folder.refusal().get() + " Nothing was tagged: the catalog runs these same checks.");
             }
             owner(path, listed, repo, account);
+            if (target.kind() == EntryPath.Kind.PLUGIN) releasedParent(target.dir());
         }
-        if (request.dryRun()) return new Outcome.WouldList(repo, tag, version.listing());
+        Map<String, String> build = fresh && target.kind() == EntryPath.Kind.PLUGIN
+                ? JitpackFiles.stale(target.dir()) : Map.of();
+        if (request.dryRun()) {
+            if (!build.isEmpty()) listener.step("Would write and commit " + String.join(", ", build.keySet()) + ".");
+            return new Outcome.WouldList(repo, tag, version.listing());
+        }
+        if (!build.isEmpty()) {
+            listener.step("Writing " + String.join(", ", build.keySet()) + ", the JitPack build this botmaker carries.");
+            host.commitFiles("Build on JitPack with BotMaker's build script", build);
+        }
         if (fresh) release(target, tag, host);
 
         Optional<ApprovedRelease> pinned;
@@ -223,6 +236,24 @@ public final class Publish {
         return EntryPath.parse(file).orElseThrow(() -> new Refusal(target.repo() + " cannot be listed: the catalog"
                 + " names an entry's file after owner/name, and this one does not fit (letters, digits, '.', '-' and"
                 + " '_')."));
+    }
+
+    /**
+     * A plugin is tagged on a released parent only: JitPack serves no {@code -SNAPSHOT}, so the tag would build
+     * {@code Error}, and a tag that did is broken for good. A pom that does not read is left to the folder's checks.
+     */
+    private static void releasedParent(Path dir) throws Refusal {
+        Optional<Poms.Dependency> parent;
+        try {
+            parent = Poms.parent(dir.resolve("pom.xml"));
+        } catch (IOException unreadable) {
+            return;
+        }
+        if (parent.isPresent() && parent.get().version().endsWith("-SNAPSHOT")) {
+            throw new Refusal("the pom's <parent> is " + parent.get().coordinate() + ":" + parent.get().version()
+                    + ", which JitPack never serves. Run `botmaker plugin upgrade` to name its newest release, commit,"
+                    + " then re-run. Nothing was tagged.");
+        }
     }
 
     private static boolean lists(Optional<Entry> listed, String tag) {

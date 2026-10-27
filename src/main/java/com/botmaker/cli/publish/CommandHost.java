@@ -6,7 +6,9 @@ import com.botmaker.cli.bmk.Central;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -105,6 +107,30 @@ final class CommandHost implements PublishHost {
         }
         must("could not make the first commit in " + dir + ".", List.of("git", "init", "-q", "-b", "main"),
                 List.of("git", "add", "-A"), List.of("git", "commit", "-qm", "Initial commit"));
+    }
+
+    @Override
+    public void commitFiles(String message, Map<String, String> files) throws Refusal {
+        for (Map.Entry<String, String> each : files.entrySet()) {
+            Path file = dir.resolve(each.getKey());
+            try {
+                Files.createDirectories(file.getParent());
+                runner.write(file, each.getValue());
+            } catch (IOException e) {
+                throw new Refusal("could not write " + file + ": " + e.getMessage());
+            }
+        }
+        if (!isRepository()) return;
+        List<String> add = new ArrayList<>(List.of("git", "add", "--"));
+        add.addAll(files.keySet());
+        must("could not stage " + String.join(", ", files.keySet()) + ".", add);
+        // A checkout that turned the files' line breaks into CRLF stages nothing new: then there is nothing to commit.
+        List<String> staged = new ArrayList<>(List.of("diff", "--cached", "--name-only", "--"));
+        staged.addAll(files.keySet());
+        if (lines(git(staged.toArray(String[]::new))).isEmpty()) return;
+        List<String> commit = new ArrayList<>(List.of("git", "commit", "-qm", message, "--"));
+        commit.addAll(files.keySet());
+        must("could not commit " + String.join(", ", files.keySet()) + ".", commit);
     }
 
     @Override

@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 public final class PomVersions {
 
     /** Pinned, so a release run does not pick up whatever the plugin's latest happens to do. */
-    static final String PLUGIN = "org.codehaus.mojo:versions-maven-plugin:2.18.0";
+    public static final String PLUGIN = "org.codehaus.mojo:versions-maven-plugin:2.18.0";
 
     private static final Pattern COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);
     private static final Pattern VERSION = Pattern.compile("<version>\\s*([^<\\s]+)\\s*</version>");

@@ -9,6 +9,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed (breaking)
 
+- **The cli owns a plugin's pom and its JitPack build** (2026-10-27).
+  - `botmaker plugin new` takes `--owner` (default: `gh`'s account) instead of `--group`: the coordinate is
+    `com.github.<owner>:<artifact-id>` from the start, and the default package `com.github.<owner>.<name>`. It writes
+    `jitpack.yml` and `.jitpack/build.sh` + `statx.c` (`JitpackFiles`: this module's `.jitpack` copy of the
+    umbrella's script, put in the jar at its build).
+  - `botmaker plugin publish` refuses a `-SNAPSHOT` `<parent>` before tagging, and writes and commits the JitPack
+    files when the folder's differ from the jar's (`PublishHost.commitFiles`; a host that publishes no plugin refuses
+    it by default). Without them JitPack built a new plugin on its default JDK, which fails `release 25`.
+  - New `botmaker plugin upgrade [--to <tag>]`: `botmaker-plugin-parent` moved to its newest GitHub Release by
+    `versions:update-parent -DskipResolution`, then compiled and validated.
+  - New `botmaker plugin declare [class]`: `botmaker.plugin` set to the one direct `DeclaredPlugin` subclass (or the
+    one named) by `versions:set-property`, added to `<properties>` when missing. `LOADS` offers it, and words a pom
+    without the property as "no `botmaker.plugin` in pom.xml" (a jar's: "in the pom in <jar>", with the flatten
+    `properties` hint). `PluginClasses` finds the candidates for both.
 - **`botmaker plugin new --parent <version>` replaces `--studio-api` and `--toolkit`** (2026-10-27). The example
   plugin's pom names `botmaker-plugin-parent`, which pins the contract and the toolkit together; the copy finds the
   parent from the repository (`<relativePath/>`) and says which parent it names.
