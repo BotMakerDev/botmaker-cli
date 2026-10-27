@@ -36,7 +36,7 @@ import java.util.stream.Stream;
  *       needs push access. A release made by {@value #ACTIONS_BOT} falls back to "the author is the repository's
  *       owner", which an organisation releasing from CI never is.</li>
  *   <li>An existing entry changes or goes only by whoever controls the <b>base</b> copy's repository (its newest
- *       release), so a plugin id never moves to somebody else's repository.</li>
+ *       release), so an entry never moves to somebody else's repository.</li>
  *   <li>The approved release is published (not a draft, not a prerelease) and its tag points at the pinned
  *       {@code commit} ({@link ApprovedRelease}).</li>
  * </ol>
@@ -308,7 +308,7 @@ public final class EntryGate {
                     + (named.kind() == EntryPath.Kind.BOT
                     ? "{\"repo\", \"releases\": [{\"tag\", \"commit\"[, \"bmkSha256\"]}, …]} and an optional"
                     + " \"detached\""
-                    : "{\"id\", \"repo\", \"releases\": [{\"tag\", \"commit\", \"jarSha256\", \"pomSha256\"}, …]}")
+                    : "{\"repo\", \"releases\": [{\"tag\", \"commit\", \"jarSha256\", \"pomSha256\"}, …]}")
                     + ", no tag twice, nothing else."));
         }
         if (!named.matches(entry)) {
@@ -432,7 +432,7 @@ public final class EntryGate {
 
     /**
      * A removal, only by whoever controls the entry. Not even when its repository answers 404: a repository made
-     * private for a while answers that too, and removing its entry would free its plugin id for anyone to claim.
+     * private for a while answers that too, and removing its entry would unlist it for no one's asking.
      * The catalog leaves a gone repository out anyway; the admin removes its file by hand.
      */
     private static List<Finding> removal(String path, Entry held, String author, EntryFacts facts) {
@@ -490,10 +490,10 @@ public final class EntryGate {
             Optional<Catalog> catalog = Catalog.read(request.head().resolve(Catalog.FILE));
             Mvn mvn = new Mvn(console);
             return switch (entry) {
-                case BotEntry bot -> BotChecks.checkRelease(bot.repo(), release, path, pluginIds(catalog), catalog,
+                case BotEntry bot -> BotChecks.checkRelease(bot.repo(), release, path, pluginRepos(catalog), catalog,
                         facts, mvn);
                 case PluginEntry plugin -> PluginChecks.check(plugin, release, path, facts,
-                        new Subjects(console, mvn), claimedIds(request.head(), plugin.id()));
+                        new Subjects(console, mvn));
             };
         } catch (Refused e) {
             return List.of(Finding.error(path, e.getMessage()));
@@ -505,21 +505,10 @@ public final class EntryGate {
         }
     }
 
-    /** The catalog's plugin ids by coordinate key ({@link PomFacts#key}). */
-    public static Map<String, String> pluginIds(Optional<Catalog> catalog) {
+    /** The catalog's plugins' {@code owner/repo} by coordinate key ({@link PomFacts#key}). */
+    public static Map<String, String> pluginRepos(Optional<Catalog> catalog) {
         return catalog.map(c -> c.plugins().stream().collect(Collectors.toMap(
-                p -> p.coordinate().toLowerCase(Locale.ROOT), Catalog.Plugin::id, (a, b) -> a))).orElse(Map.of());
-    }
-
-    /** The ids every other plugin entry claims: a jar answering to one of them is refused. */
-    private static Set<String> claimedIds(Path head, String except) throws IOException {
-        Path dir = head.resolve(EntryPath.PLUGINS);
-        if (!Files.isDirectory(dir)) return Set.of();
-        try (Stream<Path> files = Files.list(dir)) {
-            return files.map(f -> EntryPath.parse(EntryPath.PLUGINS + f.getFileName()))
-                    .flatMap(Optional::stream).map(EntryPath::key)
-                    .filter(id -> !id.equals(except)).collect(Collectors.toUnmodifiableSet());
-        }
+                p -> p.coordinate().toLowerCase(Locale.ROOT), Catalog.Plugin::repo, (a, b) -> a))).orElse(Map.of());
     }
 
     /** Another entry file in {@code root} whose name equals {@code named}'s ignoring case only. */

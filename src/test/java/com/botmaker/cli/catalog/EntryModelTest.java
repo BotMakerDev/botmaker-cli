@@ -58,7 +58,12 @@ class EntryModelTest {
                 "bots/a__x.git.json")) {
             assertEquals(Optional.empty(), EntryPath.parse(other), other);
         }
-        assertEquals("com.example.x", EntryPath.parse("plugins/com.example.x.json").orElseThrow().key());
+        assertEquals(Optional.empty(), EntryPath.parse("plugins/com.example.x.json"),
+                "a plugin's file is named by its repository since 2026-10-27, not by an id");
+        EntryPath plugin = EntryPath.parse("plugins/some-dev__x.json").orElseThrow();
+        assertEquals(EntryPath.Kind.PLUGIN, plugin.kind());
+        assertEquals("some-dev/x", plugin.key());
+        assertEquals("plugins/some-dev__x.json", EntryPath.plugin("some-dev/x"));
     }
 
     @Test
@@ -66,8 +71,9 @@ class EntryModelTest {
         EntryPath bot = EntryPath.parse("bots/a__b.json").orElseThrow();
         assertTrue(bot.matches(bot("a/b", false)));
         assertFalse(bot.matches(bot("a/c", false)));
-        assertFalse(bot.matches(plugin("a/b", "a/b")));
-        assertTrue(EntryPath.parse("plugins/x.y.json").orElseThrow().matches(plugin("x.y", "o/r")));
+        assertFalse(bot.matches(plugin("a/b")));
+        assertTrue(EntryPath.parse("plugins/o__r.json").orElseThrow().matches(plugin("o/r")));
+        assertFalse(EntryPath.parse("plugins/o__r.json").orElseThrow().matches(plugin("o/s")));
     }
 
     @Test
@@ -87,11 +93,11 @@ class EntryModelTest {
     @Test
     void a_plugin_release_carries_both_hashes_and_a_bot_release_none() {
         ApprovedRelease bare = ApprovedRelease.ofBot("v1", FakeFacts.commitOf("v1"));
-        assertThrows(IllegalArgumentException.class, () -> new PluginEntry("x.y", "o/r", List.of(bare)));
+        assertThrows(IllegalArgumentException.class, () -> new PluginEntry("o/r", List.of(bare)));
         assertThrows(IllegalArgumentException.class, () -> new BotEntry("o/r",
                 List.of(FakeFacts.pluginRelease("v1")), false));
         ApprovedRelease half = new ApprovedRelease("v1", FakeFacts.commitOf("v1"), FakeFacts.shaOf("jar"), null);
-        assertThrows(IllegalArgumentException.class, () -> new PluginEntry("x.y", "o/r", List.of(half)));
+        assertThrows(IllegalArgumentException.class, () -> new PluginEntry("o/r", List.of(half)));
     }
 
     @Test
@@ -115,7 +121,7 @@ class EntryModelTest {
         return new BotEntry(repo, List.of(FakeFacts.botRelease("v1")), detached);
     }
 
-    private static PluginEntry plugin(String id, String repo) {
-        return new PluginEntry(id, repo, List.of(FakeFacts.pluginRelease("v1")));
+    private static PluginEntry plugin(String repo) {
+        return new PluginEntry(repo,List.of(FakeFacts.pluginRelease("v1")));
     }
 }

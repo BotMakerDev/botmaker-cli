@@ -15,6 +15,7 @@ import static com.botmaker.cli.catalog.FakeFacts.commitOf;
 import static com.botmaker.cli.catalog.FakeFacts.pluginJson;
 import static com.botmaker.cli.catalog.FakeFacts.shaOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -22,8 +23,7 @@ class CatalogBuilderTest {
 
     private static final String NOW = "2026-10-23T18:00:00Z";
     private static final String LATER = "2026-10-24T18:00:00Z";
-    private static final String SDK = "plugins/com.botmaker.sdk.json";
-    private static final String SDK_ID = "com.botmaker.sdk";
+    private static final String SDK = "plugins/BotMakerDev__botmaker-sdk.json";
     private static final String SDK_REPO = "BotMakerDev/botmaker-sdk";
     private static final DerivedFacts.PluginFacts SDK_FACTS =
             new DerivedFacts.PluginFacts("BotMaker SDK", "v0.11.0", List.of());
@@ -38,7 +38,7 @@ class CatalogBuilderTest {
 
     @BeforeEach
     void entries() throws IOException {
-        entry(SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0"));
+        entry(SDK, pluginJson(SDK_REPO, "v2.1.0"));
         entry("bots/somedev__firestone.json", botJson("somedev/firestone", "v1.2.0"));
         entry("bots/stranger__fork.json", FakeFacts.json(new BotEntry("stranger/fork",
                 List.of(FakeFacts.botRelease("v1")), true)));
@@ -46,8 +46,8 @@ class CatalogBuilderTest {
                 .repo("somedev/firestone", 2, "Idle runs.", "LiQiyeDev/firestone")
                 .release("somedev/firestone", "v1.2.0", "somedev")
                 .repo("stranger/fork", 3, "", "somedev/firestone").release("stranger/fork", "v1", "stranger");
-        List<DerivedFacts.Pin> pins = List.of(new DerivedFacts.Pin(SDK_ID, "2.1.0"));
-        derived = new DerivedFacts(Map.of(SDK_ID, Map.of("v2.1.0", SDK_FACTS)),
+        List<DerivedFacts.Pin> pins = List.of(new DerivedFacts.Pin(SDK_REPO, "2.1.0"));
+        derived = new DerivedFacts(Map.of(SDK_REPO, Map.of("v2.1.0", SDK_FACTS)),
                 Map.of("somedev/firestone", Map.of("v1.2.0", pins), "stranger/fork", Map.of("v1", pins)));
     }
 
@@ -73,8 +73,8 @@ class CatalogBuilderTest {
     @Test
     void every_approved_release_is_listed_newest_first_with_its_own_facts() throws IOException {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
-        entry(SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
-        DerivedFacts two = new DerivedFacts(Map.of(SDK_ID, Map.of("v2.1.0", SDK_FACTS,
+        entry(SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
+        DerivedFacts two = new DerivedFacts(Map.of(SDK_REPO, Map.of("v2.1.0", SDK_FACTS,
                 "v2.2.0", new DerivedFacts.PluginFacts("The SDK", "v0.12.0", List.of()))), derived.botPlugins());
         Catalog.Plugin sdk = CatalogBuilder.build(root, publishers, facts, two, NOW).plugins().getFirst();
         assertEquals(List.of("v2.2.0", "v2.1.0"), sdk.releases().stream().map(Catalog.Plugin.Release::tag).toList());
@@ -85,28 +85,27 @@ class CatalogBuilderTest {
 
     @Test
     void a_plugin_release_keeps_only_the_other_catalog_plugins_it_brings() throws IOException {
-        String basicsId = "com.botmaker.basics";
         String basicsRepo = "BotMakerDev/botmaker-plugin-basics";
-        entry("plugins/" + basicsId + ".json", pluginJson(basicsId, basicsRepo, "v0.5.0"));
+        entry(EntryPath.plugin(basicsRepo), pluginJson(basicsRepo, "v0.5.0"));
         facts.repo(basicsRepo, 1, "Basics.", null).release(basicsRepo, "v0.5.0", "LiQiyeDev");
-        DerivedFacts.Pin basics = new DerivedFacts.Pin(basicsId, "v0.5.0");
+        DerivedFacts.Pin basics = new DerivedFacts.Pin(basicsRepo, "v0.5.0");
         DerivedFacts.PluginFacts sdk = new DerivedFacts.PluginFacts("BotMaker SDK", "v0.11.0", List.of(),
-                List.of(new DerivedFacts.Pin(SDK_ID, "v2.1.0"), new DerivedFacts.Pin("no.such", "v1"),
-                        new DerivedFacts.Pin(basicsId, "${unresolved}"), basics));
-        DerivedFacts withPins = new DerivedFacts(Map.of(SDK_ID, Map.of("v2.1.0", sdk),
-                basicsId, Map.of("v0.5.0", new DerivedFacts.PluginFacts("BotMaker Basics", "v0.11.0", List.of()))),
+                List.of(new DerivedFacts.Pin(SDK_REPO, "v2.1.0"), new DerivedFacts.Pin("no/such", "v1"),
+                        new DerivedFacts.Pin(basicsRepo, "${unresolved}"), basics));
+        DerivedFacts withPins = new DerivedFacts(Map.of(SDK_REPO, Map.of("v2.1.0", sdk),
+                basicsRepo, Map.of("v0.5.0", new DerivedFacts.PluginFacts("BotMaker Basics", "v0.11.0", List.of()))),
                 derived.botPlugins());
         Catalog catalog = CatalogBuilder.build(root, publishers, facts, withPins, NOW);
-        Catalog.Plugin built = catalog.plugins().stream().filter(p -> p.id().equals(SDK_ID)).findFirst().orElseThrow();
+        Catalog.Plugin built = catalog.plugins().stream().filter(p -> p.repo().equals(SDK_REPO)).findFirst().orElseThrow();
         assertEquals(List.of(basics), built.newest().plugins(),
-                "itself, an unknown id and a version of another shape are left out");
+                "itself, an unlisted plugin and a version of another shape are left out");
     }
 
     @Test
     void a_release_gone_from_github_is_left_out_and_an_entry_with_none_left_too() throws IOException {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
-        entry(SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
-        DerivedFacts two = new DerivedFacts(Map.of(SDK_ID, Map.of("v2.1.0", SDK_FACTS, "v2.2.0", SDK_FACTS)),
+        entry(SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
+        DerivedFacts two = new DerivedFacts(Map.of(SDK_REPO, Map.of("v2.1.0", SDK_FACTS, "v2.2.0", SDK_FACTS)),
                 derived.botPlugins());
         facts.releases.remove(SDK_REPO + "@v2.1.0");
         assertEquals(List.of("v2.2.0"), CatalogBuilder.build(root, publishers, facts, two, NOW).plugins()
@@ -141,7 +140,7 @@ class CatalogBuilderTest {
         assertEquals(2, again.bots().size());
 
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
-        entry(SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
+        entry(SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
         assertEquals(List.of("v2.1.0"), CatalogBuilder.build(root, publishers, facts, nothing, LATER).plugins()
                 .getFirst().releases().stream().map(Catalog.Plugin.Release::tag).toList(),
                 "a new release nobody derived is not listed under another release's facts");
@@ -160,7 +159,10 @@ class CatalogBuilderTest {
 
     @Test
     void a_file_with_a_missing_field_or_the_old_single_tag_is_skipped_not_a_crash() throws IOException {
-        entry("plugins/com.example.x.json", "{\"id\":\"com.example.x\",\"repo\":\"a/b\",\"tag\":\"v1\"}");
+        entry("plugins/a__b.json", "{\"repo\":\"a/b\",\"tag\":\"v1\"}");
+        // A plugin's id went on 2026-10-27; an entry still holding one does not read.
+        entry("plugins/c__d.json", "{\"id\":\"c.d\"," + pluginJson("c/d", "v1").substring(1));
+        facts.repo("c/d", 1, "", null).release("c/d", "v1", "c");
         entry("bots/a__b.json", "{}");
         Catalog catalog = CatalogBuilder.build(root, publishers, facts, derived, NOW);
         assertEquals(1, catalog.plugins().size());
@@ -169,7 +171,7 @@ class CatalogBuilderTest {
 
     @Test
     void a_file_whose_name_lies_or_repeats_is_skipped() throws IOException {
-        entry("plugins/a.json", pluginJson(SDK_ID, "evil/x", "v1"));
+        entry("plugins/a.json", pluginJson("evil/x", "v1"));
         entry("bots/SomeDev__Firestone.json", botJson("SomeDev/Firestone", "v9"));
         facts.repo("evil/x", 9, "", null).repo("SomeDev/Firestone", 2, "", null);
         Catalog catalog = CatalogBuilder.build(root, publishers, facts, derived, NOW);
@@ -188,7 +190,7 @@ class CatalogBuilderTest {
 
     @Test
     void derived_facts_are_checked_again() throws IOException {
-        DerivedFacts bad = new DerivedFacts(Map.of(SDK_ID, Map.of("v2.1.0", new DerivedFacts.PluginFacts(
+        DerivedFacts bad = new DerivedFacts(Map.of(SDK_REPO, Map.of("v2.1.0", new DerivedFacts.PluginFacts(
                 "BotMaker SDK", "v0.11.0", List.of("com.github.BotMakerDev:botmaker-studio-api:0.11.0")))),
                 derived.botPlugins());
         Catalog catalog = CatalogBuilder.build(root, publishers, facts, bad, NOW);
@@ -196,7 +198,7 @@ class CatalogBuilderTest {
         assertTrue(catalog.bots().isEmpty());
 
         DerivedFacts snapshot = new DerivedFacts(derived.plugins(), Map.of("somedev/firestone",
-                Map.of("v1.2.0", List.of(new DerivedFacts.Pin(SDK_ID, "2.2.0-SNAPSHOT")))));
+                Map.of("v1.2.0", List.of(new DerivedFacts.Pin(SDK_REPO, "2.2.0-SNAPSHOT")))));
         assertEquals(List.of(), CatalogBuilder.build(root, publishers, facts, snapshot, NOW).bots());
     }
 
@@ -212,7 +214,7 @@ class CatalogBuilderTest {
     @Test
     void a_previous_row_is_reused_only_for_the_same_repository() throws IOException {
         write(CatalogBuilder.build(root, publishers, facts, derived, NOW));
-        entry(SDK, pluginJson(SDK_ID, "BotMakerDev/other", "v2.1.0"));
+        entry(SDK, pluginJson("BotMakerDev/other", "v2.1.0"));
         facts.repo("BotMakerDev/other", 1, "", null).release("BotMakerDev/other", "v2.1.0", "LiQiyeDev");
         assertTrue(CatalogBuilder.build(root, publishers, facts, new DerivedFacts(Map.of(), Map.of()), LATER)
                 .plugins().isEmpty());
@@ -224,7 +226,8 @@ class CatalogBuilderTest {
         write(catalog);
         assertEquals(catalog, Catalog.read(root.resolve(Catalog.FILE)).orElseThrow());
         assertTrue(catalog.toJson().contains("\"rank\" : \"admin\""));
-        assertTrue(catalog.toJson().contains("\"schemaVersion\" : 4"));
+        assertTrue(catalog.toJson().contains("\"schemaVersion\" : 5"));
+        assertFalse(catalog.toJson().contains("\"id\""), "a plugin is named by its repo since 2026-10-27");
     }
 
     private void write(Catalog catalog) throws IOException {

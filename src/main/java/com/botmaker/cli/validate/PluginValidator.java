@@ -18,8 +18,10 @@ import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Wither;
 import com.botmaker.plugin.host.ContractLinks;
 import com.botmaker.plugin.host.FilledTypes;
+import com.botmaker.plugin.host.LoadedPlugin;
 import com.botmaker.plugin.host.Palettes;
 import com.botmaker.plugin.host.PluginLoader;
+import com.botmaker.plugin.host.PluginPoms;
 
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
@@ -33,16 +35,16 @@ import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * The eight checks, run once, over a {@link PluginSubject}.
@@ -61,14 +63,6 @@ import java.util.regex.Pattern;
  * those words.
  */
 public final class PluginValidator {
-
-    /**
-     * A plugin id is lower case, starts and ends with a letter or digit, and is separated by dots, dashes
-     * or underscores. Not a style rule: the id keys the host's merge and is written into a project file, so
-     * two ids differing only in case are two plugins on a case-insensitive filesystem and one everywhere
-     * else.
-     */
-    private static final Pattern ID = Pattern.compile("[a-z0-9]([a-z0-9._-]*[a-z0-9])?");
 
     /**
      * The two coordinates the platform's own rules are about.
@@ -110,7 +104,7 @@ public final class PluginValidator {
         CheckResult classpath = checkClasspath(subject);
         results.add(classpath);
         if (classpath.failed()) {
-            for (Check check : List.of(Check.CONTRACT_LINKS, Check.LOADS, Check.ID, Check.PALETTE,
+            for (Check check : List.of(Check.CONTRACT_LINKS, Check.LOADS, Check.DECLARED, Check.PALETTE,
                     Check.TYPES, Check.MANAGED, Check.EDITORS, Check.PICKERS)) {
                 results.add(CheckResult.skip(check, "the classpath did not resolve"));
             }
@@ -126,21 +120,26 @@ public final class PluginValidator {
         PluginLoader.Loaded opened = PluginLoader.openReporting(
                 subject.classpath().stream().map(Object::toString).toList());
         try (PluginLoader loaded = opened.loader()) {
-            List<StudioPlugin> plugins = loaded == null ? List.of() : List.copyOf(loaded.plugins());
+            List<LoadedPlugin> found = loaded == null ? List.of() : loaded.plugins();
+            List<StudioPlugin> plugins = found.stream().map(LoadedPlugin::plugin).toList();
             if (plugins.isEmpty()) {
                 results.add(CheckResult.fail(Check.LOADS, Unloaded.why(subject.classpath(), opened.failures())));
-                for (Check check : List.of(Check.ID, Check.PALETTE, Check.TYPES, Check.MANAGED,
+                for (Check check : List.of(Check.DECLARED, Check.PALETTE, Check.TYPES, Check.MANAGED,
                         Check.EDITORS, Check.PICKERS)) {
                     results.add(CheckResult.skip(check, "nothing loaded"));
                 }
             } else {
-                results.add(CheckResult.pass(Check.LOADS, plugins.size() + " plugin(s): " + ids(plugins)));
-                results.add(checkIds(plugins, subject));
+                // By identity: two plugins are two instances, and no plugin's equals decides which are judged.
+                Set<StudioPlugin> judged = Collections.newSetFromMap(new IdentityHashMap<>());
+                found.stream().filter(p -> subject.judges(p.coordinate())).forEach(p -> judged.add(p.plugin()));
+                results.add(CheckResult.pass(Check.LOADS, plugins.size() + " plugin(s): " + String.join(", ",
+                        found.stream().map(p -> p.coordinate().toString()).toList())));
+                results.add(checkDeclared(found, opened.failures(), subject));
                 results.add(checkPalette(plugins));
-                results.add(checkTypes(plugins, subject));
-                results.add(checkManaged(plugins, subject));
+                results.add(checkTypes(plugins, judged));
+                results.add(checkManaged(plugins, judged));
                 results.add(checkEditors(plugins));
-                results.add(checkPickers(plugins, subject));
+                results.add(checkPickers(plugins, judged));
             }
         }
 
@@ -185,7 +184,7 @@ public final class PluginValidator {
         List<String> problems = new ArrayList<>();
         int plugins = 0;
         for (var entry : subject.classpath()) {
-            if (!ContractLinks.declaresPlugin(entry)) continue;
+            if (!PluginPoms.declaresPlugin(entry)) continue;
             plugins++;
             List<ContractLinks.Link> missing = ContractLinks.missing(entry, contract);
             if (!missing.isEmpty()) {
@@ -199,34 +198,30 @@ public final class PluginValidator {
     }
 
     // -------------------------------------------------------------------------------------------------
-    // 3 — ids
+    // 3 — declared
     // -------------------------------------------------------------------------------------------------
 
-    private static CheckResult checkIds(List<StudioPlugin> plugins, PluginSubject subject) {
+    /**
+     * Every pom that names a plugin names one the loader took (2026-10-27): a jar with two declaring poms, a class
+     * that is not a {@code public final} direct {@code DeclaredPlugin}, a coordinate twice — each is a plugin a host
+     * would leave out, reported here even when another plugin on the classpath loaded. And when an entry says which
+     * plugin it is about, the loaded plugin with that coordinate exists: the pom's {@code groupId:artifactId} is the
+     * plugin's identity, so a jar declaring another one is not the entry's plugin.
+     */
+    private static CheckResult checkDeclared(List<LoadedPlugin> plugins, List<PluginLoader.PluginFailure> failures,
+                                             PluginSubject subject) {
         List<String> problems = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
-        for (StudioPlugin plugin : plugins) {
-            String id;
-            try {
-                id = plugin.id();
-            } catch (RuntimeException e) {
-                problems.add(plugin.getClass().getName() + "#id() threw " + e);
-                continue;
-            }
-            if (id == null || id.isBlank()) {
-                problems.add(plugin.getClass().getName() + " has a blank id");
-            } else if (!ID.matcher(id).matches()) {
-                problems.add("'" + id + "' is not a well-formed id; expected lower case, starting and ending"
-                        + " with a letter or digit, separated by . - or _");
-            } else if (!seen.add(id)) {
-                problems.add("'" + id + "' is claimed twice inside this build");
-            } else if (subject.judges(id) && subject.claimedPluginIds().contains(id)) {
-                problems.add("'" + id + "' is already registered by another plugin; pick an id nobody else"
-                        + " could reasonably want, and prefix it with something that is yours");
-            }
+        for (PluginLoader.PluginFailure failure : failures) problems.add(failure.describe());
+        if (subject.entry() != null && plugins.stream().noneMatch(p -> subject.judges(p.coordinate()))) {
+            problems.add("no plugin on the classpath is " + subject.entry() + ": the poms declare "
+                    + String.join(", ", plugins.stream().map(p -> p.coordinate().toString()).toList())
+                    + ". A plugin is its pom's groupId:artifactId, so the pom must say the entry's");
         }
-        return problems.isEmpty() ? CheckResult.pass(Check.ID, String.join(", ", seen))
-                : CheckResult.fail(Check.ID, problems);
+        return problems.isEmpty()
+                ? CheckResult.pass(Check.DECLARED, String.join(", ", plugins.stream()
+                        .map(p -> p.coordinate() + " (" + p.name() + ", " + p.plugin().getClass().getName() + ")")
+                        .toList()))
+                : CheckResult.fail(Check.DECLARED, problems);
     }
 
     // -------------------------------------------------------------------------------------------------
@@ -315,7 +310,7 @@ public final class PluginValidator {
      * submitted one depends on it answers for its own types under its own entry. The clash is asked of
      * everyone, because it is a fact about the two together.
      */
-    private static CheckResult checkTypes(List<StudioPlugin> plugins, PluginSubject subject) {
+    private static CheckResult checkTypes(List<StudioPlugin> plugins, Set<StudioPlugin> judges) {
         List<String> problems = new ArrayList<>();
         List<String> declared = new ArrayList<>();
         List<String> unlinked = new ArrayList<>();
@@ -325,7 +320,7 @@ public final class PluginValidator {
         int roundTrips = 0;
         for (StudioPlugin plugin : plugins) {
             String id = safeId(plugin);
-            boolean judged = subject.judges(id);
+            boolean judged = judges.contains(plugin);
             List<PluginType<?>> types;
             List<ComponentType<?>> components;
             try {
@@ -882,7 +877,7 @@ public final class PluginValidator {
      * value, so it owes an {@code initial}. An open set (the plugin's marker on a class) is written as an empty
      * class, and asks for its holder and a host-writable element type.
      */
-    private static CheckResult checkManaged(List<StudioPlugin> plugins, PluginSubject subject) {
+    private static CheckResult checkManaged(List<StudioPlugin> plugins, Set<StudioPlugin> judges) {
         Map<String, ComponentType<?>> shapes = new HashMap<>();
         Map<String, PluginType<?>> types = new HashMap<>();
         for (StudioPlugin plugin : plugins) {
@@ -904,7 +899,7 @@ public final class PluginValidator {
         int sound = 0;
         for (StudioPlugin plugin : plugins) {
             String id = safeId(plugin);
-            if (!subject.judges(id)) continue;
+            if (!judges.contains(plugin)) continue;
             List<ManagedValue<?>> values;
             try {
                 values = plugin.managedValues();
@@ -1131,7 +1126,7 @@ public final class PluginValidator {
      * with</i>. Asked with {@code matches} alone, so no JavaFX toolkit is started; a predicate that throws is not
      * a picker, and {@link Check#EDITORS} reports the throw.
      */
-    private static CheckResult checkPickers(List<StudioPlugin> plugins, PluginSubject subject) {
+    private static CheckResult checkPickers(List<StudioPlugin> plugins, Set<StudioPlugin> judges) {
         if (!javafx()) {
             return CheckResult.skip(Check.PICKERS, "no JavaFX on this classpath, so neither a declared type nor a"
                     + " slot editor can be linked. Put javafx-controls on the classpath to check that every type"
@@ -1152,7 +1147,7 @@ public final class PluginValidator {
         int own = 0;
         for (StudioPlugin plugin : plugins) {
             String id = safeId(plugin);
-            if (!subject.judges(id)) continue;
+            if (!judges.contains(plugin)) continue;
             List<PluginType<?>> types;
             try {
                 types = plugin.types();
@@ -1319,17 +1314,8 @@ public final class PluginValidator {
 
     // -------------------------------------------------------------------------------------------------
 
-    private static String ids(List<StudioPlugin> plugins) {
-        return String.join(", ", plugins.stream().map(PluginValidator::safeId).toList());
-    }
-
-    /** A plugin whose {@code id()} throws still has to be nameable in the report about it. */
+    /** A plugin named in a report by its class, which every {@code #method} line after it belongs to. */
     private static String safeId(StudioPlugin plugin) {
-        try {
-            String id = plugin.id();
-            return id == null || id.isBlank() ? plugin.getClass().getName() : id;
-        } catch (RuntimeException | LinkageError e) {
-            return plugin.getClass().getName();
-        }
+        return plugin.getClass().getName();
     }
 }

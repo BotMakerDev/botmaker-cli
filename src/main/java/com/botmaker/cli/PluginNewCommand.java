@@ -16,13 +16,13 @@ import java.util.concurrent.Callable;
  * {@code botmaker plugin new <name>} — the example plugin, copied and renamed.
  *
  * <p><b>It copies {@code botmaker-plugin-archetype} and carries no templates of its own.</b> The generated
- * shape is three dependency scopes, a services file, a palette and an editor, and every one of them is wrong
- * in a way that produces no compile error — so it has exactly one source of truth, a plugin its own CI builds
+ * shape is three dependency scopes, the pom's {@code botmaker.plugin} class, a palette and an editor, and every one
+ * of them is wrong in a way that produces no compile error — so it has exactly one source of truth, a plugin its own CI builds
  * and tests. This jar bundles that plugin's sources ({@link PluginTemplate}), so the command needs no network
  * and no Maven.
  *
  * <p>What it adds over copying the repository by hand is the renaming nobody gets right twice: package and
- * directories, plugin id and name, the pom's coordinates, and the services file.
+ * directories, the plugin's name, the pom's coordinates (the plugin's identity) and the class it names.
  */
 @Command(name = "new",
         header = "Create a plugin project from the example plugin.",
@@ -43,14 +43,6 @@ final class PluginNewCommand implements Callable<Integer> {
 
     @Option(names = "--package", description = "Java package. Default: <group>.<name with no punctuation>")
     private String pkg;
-
-    /**
-     * Deliberately not defaulted to the groupId. A plugin id must be unique across the registry, and a groupId
-     * is not: two plugins from one author share it.
-     */
-    @Option(names = "--plugin-id",
-            description = "The StudioPlugin id; must be unique in the catalog. Default: <group>.<name>")
-    private String pluginId;
 
     @Option(names = "--plugin-name", description = "The name a user reads. Default: the artifact id, titled")
     private String pluginName;
@@ -90,7 +82,6 @@ final class PluginNewCommand implements Callable<Integer> {
         PluginTemplate.Answers answers;
         try {
             answers = new PluginTemplate.Answers(group, name, pluginVersion, javaPackage,
-                    pluginId != null ? pluginId : group + "." + name,
                     pluginName != null ? pluginName : title(name),
                     Optional.ofNullable(studioApiVersion), Optional.ofNullable(toolkitVersion));
         } catch (IllegalArgumentException e) {

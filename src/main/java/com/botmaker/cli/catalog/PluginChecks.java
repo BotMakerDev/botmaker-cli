@@ -4,8 +4,7 @@ import com.botmaker.cli.Subjects;
 import com.botmaker.cli.validate.CheckResult;
 import com.botmaker.cli.validate.PluginSubject;
 import com.botmaker.cli.validate.PluginValidator;
-import com.botmaker.plugin.api.StudioPlugin;
-import com.botmaker.plugin.host.PluginLoader;
+import com.botmaker.plugin.host.PluginCoordinate;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,14 +16,13 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * A plugin's own rules, on what JitPack serves at the approved release's tag — what Studio will resolve:
  *
  * <ol start="6">
  *   <li>{@link PluginValidator}'s checks pass (pom scopes, the contract, construction headless, declarations), and
- *       the jar holds a plugin whose id is the entry's {@code id};</li>
+ *       the jar's pom declares the plugin with the entry's coordinate, {@code com.github.<owner>:<repo>};</li>
  *   <li>JitPack serves the coordinate at {@code tag}, and its jar and pom hash to the release's pins.</li>
  * </ol>
  *
@@ -34,12 +32,9 @@ public final class PluginChecks {
 
     private PluginChecks() {}
 
-    /**
-     * @param release    the release the pull request approves
-     * @param claimedIds the ids every other plugin entry claims
-     */
+    /** @param release the release the pull request approves */
     public static List<Finding> check(PluginEntry entry, ApprovedRelease release, String path, EntryFacts facts,
-                                      Subjects subjects, Set<String> claimedIds) throws IOException {
+                                      Subjects subjects) throws IOException {
         Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
         if (repo.isEmpty()) {
             return List.of(Finding.error(path, entry.repo() + " is not a public repository on GitHub."));
@@ -53,19 +48,18 @@ public final class PluginChecks {
         }
         List<Finding> pins = pinFindings(path, coordinate, release, facts);
         if (!pins.isEmpty()) return pins;
-        PluginSubject subject = subjects.fromCoordinate(coordinate + ":" + tag, claimedIds).about(entry.id());
+        PluginSubject subject = subjects.fromCoordinate(coordinate + ":" + tag)
+                .about(PluginCoordinate.parse(coordinate));
         // Maven downloads on its own, so the bytes about to run are hashed too: the pins hold for what is checked.
         List<Finding> resolved = resolvedFindings(path, coordinate, release, subject.classpath());
         if (!resolved.isEmpty()) return resolved;
+        // DECLARED, told the entry's coordinate, refuses a jar whose pom declares another plugin.
         List<CheckResult> results = PluginValidator.validate(subject);
         if (!PluginValidator.passed(results)) {
             return List.of(Finding.error(path, "the plugin checks fail: " + String.join(", ", results.stream()
                     .filter(CheckResult::failed).map(r -> r.check().id() + " (" + String.join("; ", r.detail()) + ")").toList())));
         }
-        try (PluginLoader loaded = PluginLoader.open(subject.classpath().stream().map(Object::toString).toList())) {
-            List<String> ids = loaded == null ? List.of() : loaded.plugins().stream().map(StudioPlugin::id).toList();
-            return idFindings(path, entry.id(), ids);
-        }
+        return List.of();
     }
 
     /** Rule 7's second half: the jar and pom JitPack serves now are the bytes the release pins. */
@@ -122,13 +116,5 @@ public final class PluginChecks {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("no SHA-256 in this JDK", e);
         }
-    }
-
-    /** The jar must hold the plugin the entry names: the file name is the id, and the id is what Studio loads. */
-    static List<Finding> idFindings(String path, String entryId, List<String> jarIds) {
-        if (jarIds.contains(entryId)) return List.of();
-        return List.of(Finding.error(path, "the entry's id is " + entryId + " but the jar's plugin"
-                + (jarIds.size() == 1 ? " is " : "s are ") + String.join(", ", jarIds)
-                + ". Name the file and the id after the plugin's own id()."));
     }
 }

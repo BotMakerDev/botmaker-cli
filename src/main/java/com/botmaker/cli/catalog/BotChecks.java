@@ -57,17 +57,17 @@ public final class BotChecks {
      * @param catalog the catalog as the pull request's tree holds it, for the plugin jars' pins
      */
     public static List<Finding> checkRelease(String repo, ApprovedRelease release, String path,
-                                             Map<String, String> pluginIds, Optional<Catalog> catalog,
+                                             Map<String, String> pluginRepos, Optional<Catalog> catalog,
                                              EntryFacts facts, Mvn mvn) throws IOException {
         Path clone = Files.createDirectories(Files.createTempDirectory("catalog-bot").resolve("bot"));
         String failure = fetch(clone, repo, release);
         if (failure != null) return List.of(Finding.error(path, failure));
-        if (release.bmkSha256() == null) return check(clone, path, pluginIds, mvn);
+        if (release.bmkSha256() == null) return check(clone, path, pluginRepos, mvn);
         Path list = Files.createTempFile("catalog-deps", ".txt");
         try {
             // One build: the dependency list's jars are in the build's own empty repository (Mvn#runUntrusted's
             // HOME), which a second run would not see.
-            List<Finding> found = check(clone, path, pluginIds, mvn, "dependency:list",
+            List<Finding> found = check(clone, path, pluginRepos, mvn, "dependency:list",
                     "-DoutputAbsoluteArtifactFilename=true", "-DoutputFile=" + list, "-DappendOutput=false");
             if (Finding.refused(found)) return found;
             // The build ran the bot's own plugins, which may have rewritten the clone, its .git and the list: the
@@ -212,15 +212,15 @@ public final class BotChecks {
     }
 
     /** Rules 6–8 and 10 on a working copy. */
-    public static List<Finding> check(Path clone, String path, Map<String, String> pluginIds, Mvn mvn)
+    public static List<Finding> check(Path clone, String path, Map<String, String> pluginRepos, Mvn mvn)
             throws IOException {
-        return check(clone, path, pluginIds, mvn, new String[0]);
+        return check(clone, path, pluginRepos, mvn, new String[0]);
     }
 
     /** {@link #check(Path, String, Map, Mvn)}, with {@code goals} run in the same build after the compile. */
-    private static List<Finding> check(Path clone, String path, Map<String, String> pluginIds, Mvn mvn,
+    private static List<Finding> check(Path clone, String path, Map<String, String> pluginRepos, Mvn mvn,
                                        String... goals) throws IOException {
-        List<Finding> pom = checkPom(clone.resolve("pom.xml"), path, pluginIds);
+        List<Finding> pom = checkPom(clone.resolve("pom.xml"), path, pluginRepos);
         if (Finding.refused(pom)) return pom;
         List<Finding> icon = checkIcon(clone, path);
         if (Finding.refused(icon)) return icon;
@@ -237,9 +237,9 @@ public final class BotChecks {
      * Rules 6–8 on the author's own folder, before a publish tags it. Compiled as the author's own build (their
      * Maven settings and repository): it is their code on their machine, which {@link #check} cannot assume.
      */
-    public static List<Finding> checkFolder(Path dir, String path, Map<String, String> pluginIds, Mvn mvn)
+    public static List<Finding> checkFolder(Path dir, String path, Map<String, String> pluginRepos, Mvn mvn)
             throws IOException {
-        List<Finding> pom = checkPom(dir.resolve("pom.xml"), path, pluginIds);
+        List<Finding> pom = checkPom(dir.resolve("pom.xml"), path, pluginRepos);
         if (Finding.refused(pom)) return pom;
         List<Finding> icon = checkIcon(dir, path);
         if (Finding.refused(icon)) return icon;
@@ -251,17 +251,17 @@ public final class BotChecks {
     }
 
     /** Rule 6. Public for a host that compiles the bot its own way (Studio). */
-    public static List<Finding> checkPom(Path pom, String path, Map<String, String> pluginIds) throws IOException {
+    public static List<Finding> checkPom(Path pom, String path, Map<String, String> pluginRepos) throws IOException {
         if (!Files.isRegularFile(pom, LinkOption.NOFOLLOW_LINKS)) {
             return List.of(Finding.error(path, "no pom.xml at this tag: a bot is a Maven project."));
         }
-        List<DerivedFacts.Pin> pins = PomFacts.pins(pom, pluginIds);
+        List<DerivedFacts.Pin> pins = PomFacts.pins(pom, pluginRepos);
         if (pins.isEmpty()) {
             return List.of(Finding.error(path, "the pom declares no plugin the catalog lists; a bot declares at"
                     + " least one (the BotMaker SDK, for most)."));
         }
         return pins.stream().filter(p -> !CatalogBuilder.VERSION.matcher(p.version()).matches())
-                .map(p -> Finding.error(path, p.id() + " is pinned at \"" + p.version() + "\", not a released"
+                .map(p -> Finding.error(path, p.repo() + " is pinned at \"" + p.version() + "\", not a released"
                         + " version (no -SNAPSHOT, no property the pom does not define)."))
                 .toList();
     }

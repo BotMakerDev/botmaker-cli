@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Turning "this directory" or "this coordinate" into the resolved facts {@code PluginValidator} needs.
@@ -75,8 +74,8 @@ public final class Subjects {
      * asks what the <em>published</em> pom declares — and a plugin whose working copy is right and whose
      * published pom says {@code 0.0.0-SNAPSHOT} is a real failure mode this project has shipped before.
      */
-    public PluginSubject fromCoordinate(String coordinate, Set<String> claimedIds) throws IOException {
-        return fromCoordinates(List.of(coordinate), claimedIds);
+    public PluginSubject fromCoordinate(String coordinate) throws IOException {
+        return fromCoordinates(List.of(coordinate));
     }
 
     /**
@@ -90,7 +89,7 @@ public final class Subjects {
      *
      * <p>The first coordinate is the subject: its published pom is the one the scope check reads.
      */
-    public PluginSubject fromCoordinates(List<String> coordinates, Set<String> claimedIds) throws IOException {
+    public PluginSubject fromCoordinates(List<String> coordinates) throws IOException {
         if (coordinates.isEmpty()) {
             throw new IOException("no coordinate to resolve");
         }
@@ -123,7 +122,7 @@ public final class Subjects {
                     + "; the dependency-scope check will be skipped");
             published = null;
         }
-        return new PluginSubject(classpath, published, claimedIds);
+        return new PluginSubject(classpath, published, null);
     }
 
 

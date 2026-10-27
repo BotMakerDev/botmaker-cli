@@ -50,53 +50,53 @@ class CatalogPrTest {
     @Test
     void a_plugin_publish_by_someone_who_can_push_pushes_to_the_catalog_itself() {
         CatalogPr.Change change = CatalogPr.Change.put(
-                new PluginEntry("com.example.thing", "somedev/thing", List.of(new ApprovedRelease("v0.3.0",
+                new PluginEntry("somedev/thing", List.of(new ApprovedRelease("v0.3.0",
                         "0123456789abcdef0123456789abcdef01234567", "a".repeat(64), "b".repeat(64)))),
                 "botmaker plugin publish");
         assertEquals("plugin: somedev/thing v0.3.0", change.title());
-        assertTrue(change.body().contains("\"id\" : \"com.example.thing\""), change.body());
+        assertTrue(change.body().contains("\"repo\" : \"somedev/thing\""), change.body());
 
         List<CatalogPr.Step> steps = CatalogPr.steps(change, true, "LiQiyeDev");
         assertTrue(steps.stream().noneMatch(s -> s instanceof CatalogPr.Step.Run run && run.argv().contains("fork")),
                 steps.toString());
         assertEquals(new CatalogPr.Step.Run(true, List.of("git", "push", "--force", "-u", "origin",
-                "entry/plugins/com.example.thing.json")), steps.get(5));
-        assertEquals("entry/plugins/com.example.thing.json", ((CatalogPr.Step.PullRequest) steps.getLast()).head());
+                "entry/plugins/somedev__thing.json")), steps.get(5));
+        assertEquals("entry/plugins/somedev__thing.json", ((CatalogPr.Step.PullRequest) steps.getLast()).head());
     }
 
     @Test
     void an_unpublish_deletes_the_file_and_writes_nothing() {
-        EntryPath path = EntryPath.parse("plugins/com.example.thing.json").orElseThrow();
+        EntryPath path = EntryPath.parse("plugins/somedev__thing.json").orElseThrow();
         CatalogPr.Change change = CatalogPr.Change.remove(path, "botmaker plugin unpublish");
-        assertEquals("plugin: remove com.example.thing", change.title());
+        assertEquals("plugin: remove somedev/thing", change.title());
 
         List<CatalogPr.Step> steps = CatalogPr.steps(change, false, "somedev");
         assertTrue(steps.stream().noneMatch(CatalogPr.Step.Write.class::isInstance), steps.toString());
         assertEquals(new CatalogPr.Step.Run(true, List.of("git", "rm", "--quiet", "--",
-                "plugins/com.example.thing.json")), steps.get(3));
+                "plugins/somedev__thing.json")), steps.get(3));
     }
 
     @Test
     void unpublishing_one_release_keeps_the_others_and_the_last_one_removes_the_entry() throws Refusal {
         FakeFacts facts = new FakeFacts().repo("somedev/thing", 2, "", null)
                 .release("somedev/thing", "v1", "somedev").release("somedev/thing", "v2", "somedev");
-        EntryPath path = EntryPath.parse("plugins/com.example.thing.json").orElseThrow();
-        Map<String, Entry> held = new HashMap<>(Map.of(path.path(), new PluginEntry("com.example.thing",
-                "somedev/thing", List.of(FakeFacts.pluginRelease("v1"), FakeFacts.pluginRelease("v2")))));
+        EntryPath path = EntryPath.parse("plugins/somedev__thing.json").orElseThrow();
+        Map<String, Entry> held = new HashMap<>(Map.of(path.path(), new PluginEntry("somedev/thing",
+                List.of(FakeFacts.pluginRelease("v1"), FakeFacts.pluginRelease("v2")))));
         CatalogPr.Reader catalog = reader(held);
 
         FakeRunner runner = new FakeRunner(facts);
         CatalogPr.unpublish(path, Optional.of("v1"), SOMEDEV, "test", facts, catalog, runner.host(HERE)::pullRequest,
                 FakeRunner.QUIET);
-        assertTrue(runner.commands().contains("git add -- plugins/com.example.thing.json"), runner.commands().toString());
+        assertTrue(runner.commands().contains("git add -- plugins/somedev__thing.json"), runner.commands().toString());
         assertTrue(runner.commands().getLast().contains("plugin: somedev/thing remove v1"), runner.commands().getLast());
 
-        held.put(path.path(), new PluginEntry("com.example.thing", "somedev/thing",
+        held.put(path.path(), new PluginEntry("somedev/thing",
                 List.of(FakeFacts.pluginRelease("v2"))));
         FakeRunner last = new FakeRunner(facts);
         CatalogPr.unpublish(path, Optional.of("v2"), SOMEDEV, "test", facts, catalog, last.host(HERE)::pullRequest,
                 FakeRunner.QUIET);
-        assertTrue(last.commands().contains("git rm --quiet -- plugins/com.example.thing.json"), last.commands().toString());
+        assertTrue(last.commands().contains("git rm --quiet -- plugins/somedev__thing.json"), last.commands().toString());
 
         Refusal unknown = assertThrows(Refusal.class, () -> CatalogPr.unpublish(path, Optional.of("v9"), SOMEDEV,
                 "test", facts, catalog, new FakeRunner(facts).host(HERE)::pullRequest, FakeRunner.QUIET));

@@ -20,8 +20,11 @@ import java.util.Optional;
 @JsonPropertyOrder({"schemaVersion", "builtAt", "plugins", "bots"})
 public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, List<Bot> bots) {
 
-    /** 4 (2026-10-24): every approved release per entry, newest first, each pinned. */
-    public static final int SCHEMA_VERSION = 4;
+    /**
+     * 5 (2026-10-27): a plugin has no {@code id}, its {@code repo} names it, and a pin names the plugin by
+     * {@code repo}. 4 (2026-10-24): every approved release per entry, newest first, each pinned.
+     */
+    public static final int SCHEMA_VERSION = 5;
 
     /** The file's name at the catalog's root. */
     public static final String FILE = "catalog.json";
@@ -29,14 +32,15 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
     /**
      * A listed plugin.
      *
+     * @param repo       {@code owner/name}, which names it: no two entries share one
      * @param coordinate {@code com.github.<owner>:<repo>}, no version: a release's {@code tag} is the version
      * @param name       its newest release's pom {@code <name>}
      * @param tags       the repository's GitHub topics
      * @param releases   every approved release still published, newest first; never empty
      */
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
-    @JsonPropertyOrder({"id", "repo", "rank", "coordinate", "name", "description", "tags", "stars", "releases"})
-    public record Plugin(String id, String repo, Rank rank, String coordinate, String name, String description,
+    @JsonPropertyOrder({"repo", "rank", "coordinate", "name", "description", "tags", "stars", "releases"})
+    public record Plugin(String repo, Rank rank, String coordinate, String name, String description,
                          List<String> tags, int stars, List<Release> releases) {
 
         /**

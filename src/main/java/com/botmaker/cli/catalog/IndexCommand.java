@@ -42,14 +42,14 @@ public final class IndexCommand {
     /** Builds and writes the catalog; whether the file changed. */
     static <F extends EntryFacts & PomFacts.Source> boolean write(Path root, F facts, String now) throws IOException {
         List<Entry> entries = CatalogBuilder.entries(root);
-        Map<String, String> pluginIds = new HashMap<>();
+        Map<String, String> pluginRepos = new HashMap<>();
         for (Entry entry : entries) {
             if (entry instanceof PluginEntry plugin) {
-                facts.repo(plugin.repo()).ifPresent(repo -> pluginIds.putIfAbsent(
-                        PomFacts.key("com.github." + repo.ownerLogin(), repo.name()), plugin.id()));
+                facts.repo(plugin.repo()).ifPresent(repo -> pluginRepos.putIfAbsent(
+                        PomFacts.key("com.github." + repo.ownerLogin(), repo.name()), plugin.repo()));
             }
         }
-        DerivedFacts derived = PomFacts.read(entries, facts, pluginIds);
+        DerivedFacts derived = PomFacts.read(entries, facts, pluginRepos);
         Catalog catalog = CatalogBuilder.build(root, Publishers.read(root.resolve(Publishers.FILE)), facts,
                 derived, now);
         Path file = root.resolve(Catalog.FILE);

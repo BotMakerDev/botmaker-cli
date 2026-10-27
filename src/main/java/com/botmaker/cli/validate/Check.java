@@ -25,11 +25,15 @@ public enum Check {
      */
     CONTRACT_LINKS("contract-links", "Every contract member the plugin links exists"),
 
-    /** {@code PluginLoader} finds at least one {@code StudioPlugin} on it. */
-    LOADS("loads", "ServiceLoader finds a StudioPlugin"),
+    /** {@code PluginLoader} constructs at least one plugin a pom on it declares. */
+    LOADS("loads", "A pom declares a plugin, and it loads"),
 
-    /** Every plugin's {@code id()} is well formed, and claimed by nobody else. */
-    ID("id", "Every plugin id is well formed and unclaimed"),
+    /**
+     * Every pom naming a plugin names one a host loads — one declaring pom per jar, a {@code public final} direct
+     * {@code DeclaredPlugin}, each coordinate once — and the plugin an entry is about is the one with its
+     * coordinate. Was {@code id} until 2026-10-27, when the coordinate became a plugin's only identity.
+     */
+    DECLARED("declared", "Each plugin is declared once, by its own pom"),
 
     /** {@code catalog().problems()} is empty and every entry names a real public member. */
     PALETTE("palette", "The palette catalog is clean and every entry resolves"),

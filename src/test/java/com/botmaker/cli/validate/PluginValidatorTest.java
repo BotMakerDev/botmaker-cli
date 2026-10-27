@@ -1,5 +1,6 @@
 package com.botmaker.cli.validate;
 
+import com.botmaker.plugin.host.PluginCoordinate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,7 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Locale;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,8 +24,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * The checks, against plugins compiled here.
  *
  * <p><b>The fixtures are compiled rather than mocked, and that is the point of the file.</b> Every failure
- * these checks exist to catch is a failure of a real classloader over real bytecode — a services file naming
- * a class that is not there, a catalogued member that was renamed, two plugins declaring one class.
+ * these checks exist to catch is a failure of a real classloader over real bytecode — a pom naming a class
+ * that is not there, a catalogued member that was renamed, two plugins declaring one class.
  * A mock {@code StudioPlugin} would pass through the same code and prove none of it, because it would never
  * have been loaded by {@code PluginLoader} in the first place.
  */
@@ -34,26 +36,31 @@ class PluginValidatorTest {
     // ------------------------------------------------------------------------------------------------
 
     /**
-     * The good case: a well-formed id, one catalogued facade with one hidden member, one declared type that
-     * is also a component type.
+     * The good case: one catalogued facade with one hidden member, one declared type that is also a component
+     * type. Its pom (written by {@link #declare}) is {@code com.example:good}.
      *
      * <p>{@code Greeting} has no {@code equals}, on purpose: most classes a plugin writes have none, and the
      * round trip compares parts so that such a type still passes.
      */
     private static final String GOOD_PLUGIN = """
             package p;
+            import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
             import com.botmaker.plugin.api.catalog.PaletteCatalog;
             import com.botmaker.plugin.api.slot.ValueContext;
+            import com.botmaker.plugin.api.source.ManagedValue;
             import com.botmaker.plugin.api.value.ComponentType;
             import com.botmaker.plugin.api.value.EditableType;
             import com.botmaker.plugin.api.value.PluginType;
             import java.util.List;
-            public final class GoodPlugin implements StudioPlugin {
-                @Override public String id() { return "com.example.good"; }
-                @Override public String displayName() { return "Good"; }
-                @Override public PaletteCatalog catalog() { return PaletteCatalog.of(Api.class); }
-                @Override public List<PluginType<?>> types() { return List.of(new GreetingType()); }
+            public final class GoodPlugin extends DeclaredPlugin {
+                public GoodPlugin() {
+                    super(StudioPlugin.declare()
+                            .catalog(() -> PaletteCatalog.of(Api.class))
+                            .types(GoodPlugin::declaredTypes).values(GoodPlugin::declaredValues));
+                }
+                public static List<ManagedValue<?>> declaredValues() { return List.of(); }
+                public static List<PluginType<?>> declaredTypes() { return List.of(new GreetingType()); }
 
                 public static final class Greeting {
                     final String who;
@@ -77,12 +84,13 @@ class PluginValidatorTest {
     /** A second plugin declaring the good plugin's own class, which a host cannot load beside it. */
     private static final String OTHER_PLUGIN = """
             package p;
+            import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
-            import com.botmaker.plugin.api.value.PluginType;
             import java.util.List;
-            public final class OtherPlugin implements StudioPlugin {
-                @Override public String id() { return "com.example.other"; }
-                @Override public List<PluginType<?>> types() { return List.of(new GoodPlugin.GreetingType()); }
+            public final class OtherPlugin extends DeclaredPlugin {
+                public OtherPlugin() {
+                    super(StudioPlugin.declare().types(() -> List.of(new GoodPlugin.GreetingType())));
+                }
             }
             """;
 
@@ -170,7 +178,7 @@ class PluginValidatorTest {
         Path classes = Files.createDirectories(dir.resolve("classes"));
         assertEquals(0, javac.run(null, null, null, "-cp", stub.toString(), "-d", classes.toString(),
                 pluginSource.toString()));
-        services(classes, "p.Newer");
+        declare(classes, "p.Newer");
 
         List<CheckResult> results = PluginValidator.validate(PluginSubject.local(List.of(classes), null));
 
@@ -191,20 +199,20 @@ class PluginValidatorTest {
 
     /**
      * The single most likely first-run failure, and the one whose message has to name the file: a plugin
-     * that compiles, packages and contributes nothing, because {@code META-INF/services} is missing.
+     * that compiles, packages and contributes nothing, because its pom names no class (2026-10-27).
      */
     @Test
-    void a_build_with_no_services_file_fails_the_loads_check(@TempDir Path dir) throws IOException {
+    void a_build_whose_pom_names_no_class_fails_the_loads_check(@TempDir Path dir) throws IOException {
         Path classes = compile(dir, GOOD_PLUGIN, GOOD_API);
-        // deliberately no services file
+        // deliberately no declaring pom
         List<CheckResult> results = PluginValidator.validate(
                 PluginSubject.local(List.of(classes), null));
         CheckResult loads = result(results, Check.LOADS);
         assertEquals(Status.FAIL, loads.status());
-        assertTrue(loads.detail().stream().anyMatch(d -> d.contains("META-INF/services")), loads::toString);
-        assertTrue(loads.detail().stream().anyMatch(d -> d.endsWith("with the line: p.GoodPlugin")),
-                "names the line to write: " + loads);
-        for (Check check : List.of(Check.ID, Check.PALETTE, Check.TYPES, Check.EDITORS)) {
+        assertTrue(loads.detail().stream().anyMatch(d -> d.contains("sets botmaker.plugin")), loads::toString);
+        assertTrue(loads.detail().stream().anyMatch(d -> d.endsWith("<botmaker.plugin>p.GoodPlugin</botmaker.plugin>")),
+                "names the property to write: " + loads);
+        for (Check check : List.of(Check.DECLARED, Check.PALETTE, Check.TYPES, Check.EDITORS)) {
             assertEquals(Status.SKIP, result(results, check).status(), check::name);
         }
     }
@@ -212,39 +220,56 @@ class PluginValidatorTest {
     /** A constructor that throws is said with its own message, not as "nothing found". */
     @Test
     void a_plugin_whose_constructor_throws_fails_the_loads_check_with_its_cause(@TempDir Path dir) throws IOException {
-        Path classes = compile(dir, GOOD_PLUGIN.replace("public final class GoodPlugin implements StudioPlugin {",
-                "public final class GoodPlugin implements StudioPlugin {"
-                        + " public GoodPlugin() { throw new IllegalStateException(\"no editor for Greeting\"); }"),
+        Path classes = compile(dir, GOOD_PLUGIN.replace("super(StudioPlugin.declare()", "super(boom()").replace(
+                "public static List<PluginType<?>> declaredTypes() {",
+                "static com.botmaker.plugin.api.PluginDeclaration boom() {"
+                        + " throw new IllegalStateException(\"no editor for Greeting\"); }"
+                        + " public static List<PluginType<?>> declaredTypes() {"),
                 GOOD_API);
-        services(classes, "p.GoodPlugin");
-        CheckResult loads = result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)), Check.LOADS);
+        List<Path> classpath = declare(classes, "p.GoodPlugin");
+        CheckResult loads = result(PluginValidator.validate(PluginSubject.local(classpath, null)), Check.LOADS);
         assertEquals(Status.FAIL, loads.status());
         assertTrue(loads.detail().stream().anyMatch(d -> d.contains("no editor for Greeting")), loads::toString);
     }
 
     // ------------------------------------------------------------------------------------------------
-    // ids
+    // declared
     // ------------------------------------------------------------------------------------------------
 
     @Test
-    void an_id_that_is_not_well_formed_fails(@TempDir Path dir) throws IOException {
-        // Both sources, always: overriding one means supplying the other, because the facade the plugin
-        // catalogues has to be on the same javac invocation.
-        PluginSubject subject = subject(dir, GOOD_POM,
-                GOOD_PLUGIN.replace("\"com.example.good\"", "\"Com Example\""), GOOD_API);
-        CheckResult id = result(PluginValidator.validate(subject), Check.ID);
-        assertEquals(Status.FAIL, id.status());
-        assertTrue(id.detail().getFirst().contains("well-formed"), id.detail()::toString);
+    void a_plugin_is_named_by_its_poms_coordinate(@TempDir Path dir) throws IOException {
+        CheckResult declared = result(PluginValidator.validate(subject(dir, GOOD_POM)), Check.DECLARED);
+        assertEquals(Status.PASS, declared.status(), declared::toString);
+        assertTrue(declared.detail().getFirst().contains("com.example:good (GoodPlugin, p.GoodPlugin)"),
+                declared.detail()::toString);
     }
 
+    /** A second jar whose pom names a class that is no plugin is left out by a host; the check says so. */
     @Test
-    void an_id_the_registry_already_holds_fails(@TempDir Path dir) throws IOException {
+    void a_pom_naming_a_class_that_is_no_plugin_fails_even_beside_one_that_loads(@TempDir Path dir)
+            throws IOException {
         Path classes = compile(dir, GOOD_PLUGIN, GOOD_API);
-        services(classes, "p.GoodPlugin");
-        PluginSubject subject = new PluginSubject(List.of(classes), null, Set.of("com.example.good"));
-        CheckResult id = result(PluginValidator.validate(subject), Check.ID);
-        assertEquals(Status.FAIL, id.status());
-        assertTrue(id.detail().getFirst().contains("already registered"), id.detail()::toString);
+        List<Path> classpath = declare(classes, "p.GoodPlugin", "p.Api");
+        CheckResult declared = result(PluginValidator.validate(PluginSubject.local(classpath, null)), Check.DECLARED);
+        assertEquals(Status.FAIL, declared.status());
+        assertTrue(declared.detail().getFirst().contains("p.Api does not extend DeclaredPlugin"),
+                declared.detail()::toString);
+    }
+
+    /** An entry is about its repository's coordinate: a jar whose pom says another is not its plugin. */
+    @Test
+    void a_jar_declaring_another_coordinate_than_its_entry_fails(@TempDir Path dir) throws IOException {
+        Path classes = compile(dir, GOOD_PLUGIN, GOOD_API);
+        PluginSubject subject = PluginSubject.local(declare(classes, "p.GoodPlugin"), null)
+                .about(new PluginCoordinate("com.github.somedev", "good"));
+        CheckResult declared = result(PluginValidator.validate(subject), Check.DECLARED);
+        assertEquals(Status.FAIL, declared.status());
+        assertTrue(declared.detail().getFirst().contains("no plugin on the classpath is com.github.somedev:good"),
+                declared.detail()::toString);
+
+        PluginSubject cased = subject.about(new PluginCoordinate("COM.EXAMPLE", "good"));
+        assertEquals(Status.PASS, result(PluginValidator.validate(cased), Check.DECLARED).status(),
+                "a GitHub owner is one account however it is cased");
     }
 
     // ------------------------------------------------------------------------------------------------
@@ -270,7 +295,7 @@ class PluginValidatorTest {
     @Test
     void a_plugin_with_no_catalog_is_judged_on_the_discovered_palette(@TempDir Path dir) throws IOException {
         PluginSubject subject = subject(dir, GOOD_POM, GOOD_PLUGIN.replace(
-                "@Override public PaletteCatalog catalog() { return PaletteCatalog.of(Api.class); }", ""),
+                ".catalog(() -> PaletteCatalog.of(Api.class))", ""),
                 GOOD_API);
         CheckResult palette = result(PluginValidator.validate(subject), Check.PALETTE);
         assertEquals(Status.PASS, palette.status(), palette.detail()::toString);
@@ -292,8 +317,8 @@ class PluginValidatorTest {
     @Test
     void two_plugins_may_not_own_one_type(@TempDir Path dir) throws IOException {
         Path classes = compile(dir, GOOD_PLUGIN, GOOD_API, OTHER_PLUGIN);
-        services(classes, "p.GoodPlugin", "p.OtherPlugin");
-        CheckResult types = result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)),
+        List<Path> classpath = declare(classes, "p.GoodPlugin", "p.OtherPlugin");
+        CheckResult types = result(PluginValidator.validate(PluginSubject.local(classpath, null)),
                 Check.TYPES);
         assertEquals(Status.FAIL, types.status());
         assertTrue(types.detail().getFirst().contains("already declares"), types.detail()::toString);
@@ -313,12 +338,13 @@ class PluginValidatorTest {
     /** A call written with withers: its factory takes the parts before theirs, which the check must not count. */
     private static final String TASK_PLUGIN = """
             package p;
+            import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
             import com.botmaker.plugin.api.value.ComponentType;
             import com.botmaker.plugin.api.value.DeclaredCall;
             import java.util.List;
-            public final class TaskPlugin implements StudioPlugin {
-                @Override public String id() { return "com.example.task"; }
+            public final class TaskPlugin extends DeclaredPlugin {
+                public TaskPlugin() { super(StudioPlugin.declare().parts(() -> List.of(TASK))); }
                 public record Task(String name, String note, boolean home) {
                     public static Task of(String name) { return new Task(name, "", false); }
                     public Task described(String note) { return new Task(name, note, home); }
@@ -328,15 +354,14 @@ class PluginValidatorTest {
                         .writtenAs(Task::of, Task::name)
                         .with(Task::described, Task::note)
                         .flag(Task::goesHome, Task::home);
-                @Override public List<ComponentType<?>> componentTypes() { return List.of(TASK); }
             }
             """;
 
     @Test
     void a_call_with_withers_is_judged_on_its_factorys_parts(@TempDir Path dir) throws IOException {
         Path classes = compile(dir, GOOD_PLUGIN, GOOD_API, TASK_PLUGIN);
-        services(classes, "p.GoodPlugin", "p.TaskPlugin");
-        CheckResult types = result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)),
+        List<Path> classpath = declare(classes, "p.GoodPlugin", "p.TaskPlugin");
+        CheckResult types = result(PluginValidator.validate(PluginSubject.local(classpath, null)),
                 Check.TYPES);
         assertEquals(Status.PASS, types.status(), types::toString);
     }
@@ -358,15 +383,20 @@ class PluginValidatorTest {
      */
     private static final String BAG_PLUGIN = """
             package p;
+            import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
             import com.botmaker.plugin.api.slot.ValueContext;
+            import com.botmaker.plugin.api.source.ManagedValue;
             import com.botmaker.plugin.api.value.ComponentType;
             import com.botmaker.plugin.api.value.EditableType;
             import com.botmaker.plugin.api.value.PluginType;
             import java.util.List;
-            public final class BagPlugin implements StudioPlugin {
-                @Override public String id() { return "com.example.bag"; }
-                @Override public List<PluginType<?>> types() { return List.of(new BagType()); }
+            public final class BagPlugin extends DeclaredPlugin {
+                public BagPlugin() {
+                    super(StudioPlugin.declare().types(BagPlugin::declaredTypes).values(BagPlugin::declaredValues));
+                }
+                public static List<ManagedValue<?>> declaredValues() { return List.of(); }
+                public static List<PluginType<?>> declaredTypes() { return List.of(new BagType()); }
 
                 public static final class Loose { }
                 public enum Kind { SMALL, LARGE }
@@ -389,8 +419,8 @@ class PluginValidatorTest {
 
     private static CheckResult bagTypes(Path dir, String part, String raw) throws IOException {
         Path classes = compile(dir, BAG_PLUGIN.replace("PART_RAW", raw).replace("PART", part));
-        services(classes, "p.BagPlugin");
-        return result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)), Check.TYPES);
+        return result(PluginValidator.validate(PluginSubject.local(declare(classes, "p.BagPlugin"), null)),
+                Check.TYPES);
     }
 
     /** A part nobody declares: the empty bag round-trips, and the first one holding a part could not be written. */
@@ -433,18 +463,17 @@ class PluginValidatorTest {
     @Test
     void a_class_part_a_grouped_set_writes_passes(@TempDir Path dir) throws IOException {
         String plugin = BAG_PLUGIN.replace("PART_RAW", "Class").replace("PART", "Class<? extends Tag>").replace(
-                "@Override public List<PluginType<?>> types() {",
+                NO_VALUES,
                 MARKER + "public interface Tag { } "
                         + "public static Tag tag(String group, String name) { return new Tag() { }; } "
                         + "public static Loose group(String name) { return new Loose(); } "
-                        + "@Override public List<com.botmaker.plugin.api.source.ManagedValue<?>> managedValues() {"
-                        + " return List.of(com.botmaker.plugin.api.source.ManagedValue.openSet(GreetingValue.Id.GREETINGS)"
+                        + "public static List<ManagedValue<?>> declaredValues() {"
+                        + " return List.of(ManagedValue.openSet(GreetingValue.Id.GREETINGS)"
                         + ".ofEnumGroups(Tag.class, BagPlugin::tag).groupedAs(Loose.class, BagPlugin::group)"
-                        + ".in(\"Tags\").because(\"why\")); }"
-                        + " @Override public List<PluginType<?>> types() {");
+                        + ".in(\"Tags\").because(\"why\")); }");
         Path classes = compile(dir, plugin);
-        services(classes, "p.BagPlugin");
-        CheckResult types = result(PluginValidator.validate(PluginSubject.local(List.of(classes), null)), Check.TYPES);
+        CheckResult types = result(PluginValidator.validate(PluginSubject.local(declare(classes, "p.BagPlugin"),
+                null)), Check.TYPES);
         assertEquals(Status.PASS, types.status(), types::toString);
     }
 
@@ -469,12 +498,15 @@ class PluginValidatorTest {
      * with {@link #MARKER} beside them.
      */
     private static String managing(String... values) {
-        return GOOD_PLUGIN.replace(
-                "@Override public List<PluginType<?>> types() {",
-                MARKER + "@Override public List<com.botmaker.plugin.api.source.ManagedValue<?>> managedValues() {"
-                        + " return List.of(" + String.join(", ", values) + "); }"
-                        + " @Override public List<PluginType<?>> types() {");
+        return GOOD_PLUGIN.replace(NO_VALUES, MARKER + "public static List<ManagedValue<?>> declaredValues() {"
+                + " return List.of(" + String.join(", ", values) + "); }");
     }
+
+    /** What a fixture plugin declares as its managed values when a test gives it none. */
+    private static final String NO_VALUES = "public static List<ManagedValue<?>> declaredValues() { return List.of(); }";
+
+    /** Where a fixture plugin's helpers go: before its types. */
+    private static final String TYPES = "public static List<PluginType<?>> declaredTypes() {";
 
     /** {@code ManagedValue.method(GreetingValue.Id.<constant>)}, to be continued with its steps. */
     private static String method(String constant) {
@@ -533,10 +565,9 @@ class PluginValidatorTest {
     private static CheckResult classes(Path dir, String returns) throws IOException {
         String plugin = managing(openSet("GREETINGS") + ".ofClasses(Sheet.class).fields(Object.class, GoodPlugin::cell)"
                 + ".setup(Sheet::setup).in(\"Sheets\").because(\"why\")").replace(
-                "@Override public List<PluginType<?>> types() {",
+                TYPES,
                 "public abstract static class Sheet { public abstract " + returns + " setup(); } "
-                        + "public static Object cell(String sheet, String name) { return name; } "
-                        + "@Override public List<PluginType<?>> types() {");
+                        + "public static Object cell(String sheet, String name) { return name; } " + TYPES);
         return result(PluginValidator.validate(subject(dir, GOOD_POM, plugin, GOOD_API)), Check.MANAGED);
     }
 
@@ -711,8 +742,8 @@ class PluginValidatorTest {
     void a_plugin_that_is_not_judged_is_not_asked_for_a_fresh_value(@TempDir Path dir) throws IOException {
         Path classes = compile(dir,
                 GOOD_PLUGIN.replace("return new Greeting(\"world\", 1);", "return null;"), GOOD_API);
-        services(classes, "p.GoodPlugin");
-        PluginSubject subject = PluginSubject.local(List.of(classes), null).about("com.example.someone.else");
+        PluginSubject subject = PluginSubject.local(declare(classes, "p.GoodPlugin"), null)
+                .about(new PluginCoordinate("com.example", "someone-else"));
         assertEquals(Status.PASS, result(PluginValidator.validate(subject), Check.TYPES).status());
     }
 
@@ -764,9 +795,8 @@ class PluginValidatorTest {
     @Test
     void no_pom_at_all_is_a_skip_rather_than_a_failure(@TempDir Path dir) throws IOException {
         Path classes = compile(dir, GOOD_PLUGIN, GOOD_API);
-        services(classes, "p.GoodPlugin");
         List<CheckResult> results = PluginValidator.validate(
-                PluginSubject.local(List.of(classes), null));
+                PluginSubject.local(declare(classes, "p.GoodPlugin"), null));
         assertEquals(Status.SKIP, result(results, Check.POM_SCOPES).status());
         assertFalse(results.stream().anyMatch(CheckResult::failed), () -> render(results));
     }
@@ -812,12 +842,12 @@ class PluginValidatorTest {
     /** A type its plugin declares but does not draw. */
     private static final String PLAIN_PLUGIN = """
             package p;
+            import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
             import com.botmaker.plugin.api.value.PluginType;
             import java.util.List;
-            public final class PlainPlugin implements StudioPlugin {
-                @Override public String id() { return "com.example.plain"; }
-                @Override public List<PluginType<?>> types() { return List.of(new PlainType()); }
+            public final class PlainPlugin extends DeclaredPlugin {
+                public PlainPlugin() { super(StudioPlugin.declare().types(() -> List.of(new PlainType()))); }
                 public static final class Plain {}
                 public static final class PlainType implements PluginType<Plain> {
                     @Override public Class<Plain> type() { return Plain.class; }
@@ -829,13 +859,14 @@ class PluginValidatorTest {
     /** Another plugin that draws the plain type through a slot editor of its own. */
     private static final String DRAWER_PLUGIN = """
             package p;
+            import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
             import com.botmaker.plugin.api.slot.SlotEditor;
             import java.util.List;
-            public final class DrawerPlugin implements StudioPlugin {
-                @Override public String id() { return "com.example.drawer"; }
-                @Override public List<SlotEditor> slotEditors() {
-                    return List.of(SlotEditor.forType(PlainPlugin.Plain.class).draw(() -> ctx -> null));
+            public final class DrawerPlugin extends DeclaredPlugin {
+                public DrawerPlugin() {
+                    super(StudioPlugin.declare().editors(() -> List.of(
+                            SlotEditor.forType(PlainPlugin.Plain.class).draw(() -> ctx -> null))));
                 }
             }
             """;
@@ -843,14 +874,15 @@ class PluginValidatorTest {
     /** A plugin whose only editor throws when asked. */
     private static final String THROWING_DRAWER = """
             package p;
+            import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
             import com.botmaker.plugin.api.slot.SlotEditor;
             import java.util.List;
-            public final class ThrowingDrawer implements StudioPlugin {
-                @Override public String id() { return "com.example.throwing"; }
-                @Override public List<SlotEditor> slotEditors() {
-                    return List.of(SlotEditor.when(ctx -> { throw new IllegalStateException("boom"); })
-                            .draw(() -> ctx -> null));
+            public final class ThrowingDrawer extends DeclaredPlugin {
+                public ThrowingDrawer() {
+                    super(StudioPlugin.declare().editors(() -> List.of(
+                            SlotEditor.when(ctx -> { throw new IllegalStateException("boom"); })
+                                    .draw(() -> ctx -> null))));
                 }
             }
             """;
@@ -877,7 +909,7 @@ class PluginValidatorTest {
                 PLAIN_PLUGIN, DRAWER_PLUGIN)), Check.PICKERS);
         String detail = String.join("\n", pickers.detail());
         assertEquals(Status.PASS, pickers.status(), detail);
-        assertTrue(detail.contains("com.example.drawer"), detail);
+        assertTrue(detail.contains("p.DrawerPlugin"), detail);
     }
 
     @Test
@@ -891,21 +923,21 @@ class PluginValidatorTest {
     // helpers
     // ------------------------------------------------------------------------------------------------
 
-    /** Compiles {@code sources}, registers {@code services} (newline-separated) and judges every plugin. */
-    private static PluginSubject loose(Path dir, String services, String... sources) throws IOException {
+    /** Compiles {@code sources}, declares {@code plugins} (newline-separated) one per entry, and judges every one. */
+    private static PluginSubject loose(Path dir, String plugins, String... sources) throws IOException {
         Path classes = compile(dir, sources);
-        services(classes, services);
+        List<Path> classpath = declare(classes, plugins.split("\n"));
         Path pomFile = dir.resolve("pom.xml");
         Files.writeString(pomFile, GOOD_POM);
-        return PluginSubject.local(List.of(classes), pomFile);
+        return PluginSubject.local(classpath, pomFile);
     }
 
     private static PluginSubject subject(Path dir, String pom, String... sources) throws IOException {
         Path classes = compile(dir, sources.length == 0 ? new String[]{GOOD_PLUGIN, GOOD_API} : sources);
-        services(classes, "p.GoodPlugin");
+        List<Path> classpath = declare(classes, "p.GoodPlugin");
         Path pomFile = dir.resolve("pom.xml");
         Files.writeString(pomFile, pom);
-        return PluginSubject.local(List.of(classes), pomFile);
+        return PluginSubject.local(classpath, pomFile);
     }
 
     /**
@@ -937,10 +969,36 @@ class PluginValidatorTest {
         return classes;
     }
 
-    private static void services(Path classes, String... pluginClasses) throws IOException {
-        Path dir = Files.createDirectories(classes.resolve("META-INF/services"));
-        Files.writeString(dir.resolve("com.botmaker.plugin.api.StudioPlugin"),
-                String.join("\n", pluginClasses) + "\n");
+    /**
+     * Each of {@code pluginClasses} (in package {@code p}) declared by a pom of its own, as its jar would carry it
+     * ({@code com.example:<simple name less "Plugin", lower case>}): the first in {@code classes}, each other moved
+     * with its nested classes into an entry of its own, since one jar is one plugin. The classpath, in that order.
+     */
+    private static List<Path> declare(Path classes, String... pluginClasses) throws IOException {
+        List<Path> entries = new ArrayList<>();
+        for (String pluginClass : pluginClasses) {
+            String simple = pluginClass.substring(pluginClass.lastIndexOf('.') + 1);
+            Path entry = classes;
+            if (!entries.isEmpty()) {
+                entry = Files.createDirectories(classes.resolveSibling(simple + "-classes"));
+                Path to = Files.createDirectories(entry.resolve("p"));
+                try (Stream<Path> files = Files.list(classes.resolve("p"))) {
+                    for (Path file : files.filter(f -> f.getFileName().toString().equals(simple + ".class")
+                            || f.getFileName().toString().startsWith(simple + "$")).toList()) {
+                        Files.move(file, to.resolve(file.getFileName()));
+                    }
+                }
+            }
+            String artifact = simple.replace("Plugin", "").toLowerCase(Locale.ROOT);
+            Path pom = entry.resolve("META-INF/maven/com.example/" + artifact + "/pom.xml");
+            Files.createDirectories(pom.getParent());
+            Files.writeString(pom, "<project xmlns=\"http://maven.apache.org/POM/4.0.0\"><modelVersion>4.0.0"
+                    + "</modelVersion><groupId>com.example</groupId><artifactId>" + artifact + "</artifactId>"
+                    + "<version>0.1.0</version><name>" + simple + "</name><properties><botmaker.plugin>"
+                    + pluginClass + "</botmaker.plugin></properties></project>");
+            entries.add(entry);
+        }
+        return entries;
     }
 
     private static CheckResult result(List<CheckResult> results, Check check) {

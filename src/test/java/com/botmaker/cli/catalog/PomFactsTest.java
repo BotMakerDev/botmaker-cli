@@ -15,11 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PomFactsTest {
 
-    private static final PluginEntry THING = new PluginEntry("com.example.thing", "somedev/thing",
+    private static final PluginEntry THING = new PluginEntry("somedev/thing",
             List.of(FakeFacts.pluginRelease("v1")));
     private static final BotEntry BOT = new BotEntry("somedev/firestone", List.of(FakeFacts.botRelease("v1.2.0")),
             false);
-    private static final Map<String, String> IDS = Map.of(PomFacts.key("com.github.somedev", "thing"), THING.id());
+    private static final Map<String, String> IDS = Map.of(PomFacts.key("com.github.somedev", "thing"), THING.repo());
 
     @TempDir
     Path dir;
@@ -42,7 +42,7 @@ class PomFactsTest {
                   </dependencies>
                 </project>
                 """);
-        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, IDS).plugin(THING.id(), "v1");
+        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, IDS).plugin(THING.repo(), "v1");
         assertEquals("The Thing", facts.name());
         assertEquals("0.11.0", facts.minContractVersion());
         assertEquals(List.of("io.javalin:javalin:6.7.0"), facts.editorDependencies());
@@ -56,7 +56,7 @@ class PomFactsTest {
                     <version>${botmaker.studioapi.version}</version></dependency>
                 </dependencies></project>
                 """);
-        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, IDS).plugin(THING.id(), "v1");
+        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, IDS).plugin(THING.repo(), "v1");
         assertEquals("thing", facts.name());
         assertNull(facts.minContractVersion());
     }
@@ -69,7 +69,7 @@ class PomFactsTest {
                   <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId><version>2.0</version></dependency>
                 </dependencies></project>
                 """);
-        assertEquals(List.of(new DerivedFacts.Pin(THING.id(), "1.0")),
+        assertEquals(List.of(new DerivedFacts.Pin(THING.repo(), "1.0")),
                 PomFacts.read(List.of(BOT), poms, IDS).bot(BOT.repo(), "v1.2.0"));
     }
 
@@ -85,10 +85,10 @@ class PomFactsTest {
                   </dependencies>
                 </project>
                 """);
-        Map<String, String> ids = Map.of(PomFacts.key("com.github.somedev", "thing"), THING.id(),
-                PomFacts.key("com.github.BotMakerDev", "botmaker-plugin-basics"), "com.botmaker.basics");
-        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, ids).plugin(THING.id(), "v1");
-        assertEquals(List.of(new DerivedFacts.Pin("com.botmaker.basics", "v0.5.0")), facts.plugins());
+        Map<String, String> ids = Map.of(PomFacts.key("com.github.somedev", "thing"), THING.repo(),
+                PomFacts.key("com.github.BotMakerDev", "botmaker-plugin-basics"), "BotMakerDev/botmaker-plugin-basics");
+        DerivedFacts.PluginFacts facts = PomFacts.read(List.of(THING), poms, ids).plugin(THING.repo(), "v1");
+        assertEquals(List.of(new DerivedFacts.Pin("BotMakerDev/botmaker-plugin-basics", "v0.5.0")), facts.plugins());
     }
 
     @Test
@@ -106,7 +106,7 @@ class PomFactsTest {
     @Test
     void the_index_writes_the_catalog_once_and_leaves_it_when_nothing_changed() throws IOException {
         Files.createDirectories(dir.resolve("plugins"));
-        Files.writeString(dir.resolve("plugins/com.example.thing.json"), FakeFacts.json(THING));
+        Files.writeString(dir.resolve(EntryPath.plugin(THING.repo())), FakeFacts.json(THING));
         FakeFacts facts = new FakeFacts().repo("somedev/thing", 2, "A thing.", null)
                 .release("somedev/thing", "v1", "somedev")
                 .pom("somedev/thing", "v1", "<project><name>Thing</name></project>");

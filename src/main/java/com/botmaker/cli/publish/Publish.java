@@ -60,8 +60,7 @@ public final class Publish {
         record AlreadyListed(String repo, String tag) implements Outcome {}
 
         /** {@code --dry-run}: what a real run would list, after the local check passed. */
-        record WouldList(String repo, String tag, NextVersion.Listing listing, Optional<String> pluginId)
-                implements Outcome {}
+        record WouldList(String repo, String tag, NextVersion.Listing listing) implements Outcome {}
 
         /** Stopped, saying why and what to do. */
         record Refused(String reason) implements Outcome {}
@@ -154,8 +153,8 @@ public final class Publish {
             throw new Refusal(repo + " already exists, and this folder has no origin pointing at it. Set origin to it"
                     + " if it is yours (`git remote add origin …`), or pass another --repo.");
         }
-        Optional<EntryPath> path = knownPath(target);
-        Optional<Entry> listed = path.flatMap(catalog::listed);
+        EntryPath path = knownPath(target);
+        Optional<Entry> listed = catalog.listed(path);
         NextVersion version = NextVersion.decide(request.bump(), request.tag(), listed, repo, facts, host);
         String tag = version.tag();
         if (lists(listed, tag)) return new Outcome.AlreadyListed(repo, tag);
@@ -172,20 +171,9 @@ public final class Publish {
             if (folder.refusal().isPresent()) {
                 throw new Refusal(folder.refusal().get() + " Nothing was tagged: the catalog runs these same checks.");
             }
-            if (target.kind() == EntryPath.Kind.PLUGIN) {
-                EntryPath own = pluginPath(folder.pluginId());
-                if (!path.equals(Optional.of(own))) {
-                    path = Optional.of(own);
-                    listed = catalog.listed(own);
-                    if (lists(listed, tag)) return new Outcome.AlreadyListed(repo, tag);
-                }
-            }
-            owner(path.orElseThrow(), listed, repo, account);
+            owner(path, listed, repo, account);
         }
-        if (request.dryRun()) {
-            return new Outcome.WouldList(repo, tag, version.listing(),
-                    path.filter(p -> p.kind() == EntryPath.Kind.PLUGIN).map(EntryPath::key));
-        }
+        if (request.dryRun()) return new Outcome.WouldList(repo, tag, version.listing());
         if (fresh) release(target, tag, host);
 
         Optional<ApprovedRelease> pinned;
@@ -198,13 +186,6 @@ public final class Publish {
                 throw new Refusal("the jar JitPack built for " + tag + " does not pass the checks the catalog runs: "
                         + jar.refusal().get() + " Fix it and publish the next version.");
             }
-            // No id when the checks are the catalog's alone (Checks.LEFT_TO_THE_CATALOG): the known path stands.
-            EntryPath own = jar.pluginId().isEmpty() && path.isPresent() ? path.get() : pluginPath(jar.pluginId());
-            if (!path.equals(Optional.of(own))) {
-                path = Optional.of(own);
-                listed = catalog.listed(own);
-                if (lists(listed, tag)) return new Outcome.AlreadyListed(repo, tag);
-            }
             pinned = pin(() -> ApprovedRelease.pinPlugin(facts, repo, tag));
         } else {
             Optional<String> bmk = attachBmk(repo, tag, listener, host);
@@ -212,9 +193,8 @@ public final class Publish {
         }
         ApprovedRelease release = pinned.orElseThrow(() -> new Refusal("released " + tag + ", but GitHub or JitPack"
                 + " does not show it yet, so it cannot be pinned. Re-run in a minute: the run lists " + tag + "."));
-        String key = path.orElseThrow().key();
         Entry entry = listed.map(e -> e.appended(release)).orElseGet(() -> target.kind() == EntryPath.Kind.PLUGIN
-                ? new PluginEntry(key, repo, List.of(release))
+                ? new PluginEntry(repo, List.of(release))
                 : new BotEntry(repo, List.of(release), false));
 
         List<Finding> findings = EntryGate.checkEntry(entry, EntryPath.of(entry), login,
@@ -231,24 +211,18 @@ public final class Publish {
     }
 
     /**
-     * The entry's path when it can be known before the folder is checked: a bot's from its repository, a plugin's
-     * from {@code catalog.json}'s row for its repository (its id is read off the jar otherwise).
+     * The entry's path, from its repository: a plugin's file is named like a bot's (2026-10-27). A plugin the catalog
+     * lists already is spelled as its row is, since GitHub ignores a repository's case and a file name does not.
      */
-    private Optional<EntryPath> knownPath(PublishTarget target) throws Refusal {
-        if (target.kind() == EntryPath.Kind.BOT) {
-            return Optional.of(EntryPath.parse(EntryPath.bot(target.repo())).orElseThrow(() -> new Refusal(
-                    target.repo() + " cannot be listed: the catalog names a bot's file after owner/name, and this"
-                            + " one does not fit (letters, digits, '.', '-' and '_').")));
-        }
-        return catalog.catalog().flatMap(c -> c.plugins().stream()
-                        .filter(p -> p.repo().equalsIgnoreCase(target.repo())).findFirst())
-                .flatMap(p -> EntryPath.parse(EntryPath.PLUGINS + p.id() + ".json"));
-    }
-
-    private static EntryPath pluginPath(Optional<String> id) throws Refusal {
-        String named = id.orElseThrow(() -> new Refusal("the check loaded no plugin, so there is no id to list."));
-        return EntryPath.parse(EntryPath.PLUGINS + named + ".json").orElseThrow(() -> new Refusal("the plugin's id "
-                + named + " cannot name a catalog file: letters, digits, '.', '-' and '_', at most 128."));
+    private EntryPath knownPath(PublishTarget target) throws Refusal {
+        String repo = target.kind() == EntryPath.Kind.BOT ? target.repo() : catalog.catalog()
+                .flatMap(c -> c.plugins().stream().map(Catalog.Plugin::repo)
+                        .filter(listed -> listed.equalsIgnoreCase(target.repo())).findFirst())
+                .orElse(target.repo());
+        String file = target.kind() == EntryPath.Kind.BOT ? EntryPath.bot(repo) : EntryPath.plugin(repo);
+        return EntryPath.parse(file).orElseThrow(() -> new Refusal(target.repo() + " cannot be listed: the catalog"
+                + " names an entry's file after owner/name, and this one does not fit (letters, digits, '.', '-' and"
+                + " '_')."));
     }
 
     private static boolean lists(Optional<Entry> listed, String tag) {

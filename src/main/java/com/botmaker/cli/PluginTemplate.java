@@ -24,21 +24,21 @@ import java.util.zip.ZipInputStream;
  * <p>What a copy changes is the whole of what makes the example the author's, each found by an anchor the
  * example keeps, and a template without one is refused rather than copied half-renamed:
  * <ul>
- *   <li>the package {@value #PACKAGE}, in every source and in the services file, and the directories under
- *       {@code src/main/java} and {@code src/test/java};</li>
- *   <li>the plugin id, the string literal {@code "com.example.greetings"} ({@code ExamplePlugin.ID}), and the
- *       name a user reads, the literal {@value #NAME};</li>
+ *   <li>the package {@value #PACKAGE}, in every source and in the pom's {@code botmaker.plugin} class, and the
+ *       directories under {@code src/main/java} and {@code src/test/java};</li>
+ *   <li>the name a user reads, the literal {@value #NAME} in the sources and the pom's {@code <name>};</li>
  *   <li>the pom's region marked {@code coordinates}, replaced, and its region marked {@code drop} (the build
  *       of this zip), removed; the contract and toolkit pins only when the author names other ones;</li>
  *   <li>{@code gitignore}, stored without its dot because a jar's default excludes drop a {@code .gitignore}.</li>
  * </ul>
+ * There is no plugin id to rename (2026-10-27): the pom's {@code groupId:artifactId} is the plugin's identity.
  */
 final class PluginTemplate {
 
     /** Where the build puts the archetype's {@code template} zip in this jar. */
     static final String RESOURCE = "/com/botmaker/cli/plugin-template.zip";
 
-    /** The example's package, which is also its plugin id. */
+    /** The example's package. */
     static final String PACKAGE = "com.example.greetings";
 
     /** The example's display name, as the literal it is spelled with. */
@@ -46,17 +46,20 @@ final class PluginTemplate {
 
     private static final String PACKAGE_PATH = PACKAGE.replace('.', '/') + "/";
     private static final String GITIGNORE = "gitignore";
-    private static final String ID_PLACEHOLDER = "\u0000plugin-id\u0000";
 
     /** A marked region of the pom, with the indentation before it and the line break after it. */
     private static final Pattern REGION = Pattern.compile(
             "[ \\t]*<!-- botmaker plugin new: (\\w+) -->.*?<!-- /botmaker plugin new -->\\R", Pattern.DOTALL);
 
+    /** The pom property naming the plugin class ({@code PluginPoms.PROPERTY}), with the class between. */
+    private static final Pattern PLUGIN_CLASS = Pattern.compile(
+            "(<botmaker\\.plugin>)\\s*([^<]*?)\\s*(</botmaker\\.plugin>)");
+
     /**
      * What the new plugin is called. An empty pin keeps the one the template carries, which is the release
      * this {@code botmaker} was built with.
      */
-    record Answers(String groupId, String artifactId, String version, String javaPackage, String pluginId,
+    record Answers(String groupId, String artifactId, String version, String javaPackage,
                    String pluginName, Optional<String> studioApiVersion, Optional<String> toolkitVersion) {
         Answers {
             if (!SourceVersion.isName(javaPackage)) {
@@ -89,7 +92,6 @@ final class PluginTemplate {
     static Made write(InputStream template, Path target, Answers answers) throws IOException {
         String packagePath = answers.javaPackage().replace('.', '/') + "/";
         Made made = null;
-        int ids = 0;
         try (ZipInputStream zip = new ZipInputStream(template)) {
             for (ZipEntry entry; (entry = zip.getNextEntry()) != null; ) {
                 if (entry.isDirectory()) {
@@ -102,14 +104,8 @@ final class PluginTemplate {
                 } else if (name.equals("pom.xml")) {
                     text = pom(text, answers);
                     made = new Made(pin(text, "studioapi"), pin(text, "plugintoolkit"));
-                } else if (name.endsWith(".java") || name.startsWith("src/main/resources/META-INF/services/")) {
-                    String id = javaString(PACKAGE);
-                    ids += count(text, id);
-                    // The id through a placeholder, so an id that contains the example's package is not renamed
-                    // again by the package's own replacement.
-                    text = text.replace(id, ID_PLACEHOLDER)
-                            .replace(PACKAGE, answers.javaPackage())
-                            .replace(ID_PLACEHOLDER, javaString(answers.pluginId()))
+                } else if (name.endsWith(".java")) {
+                    text = text.replace(PACKAGE, answers.javaPackage())
                             .replace(NAME, javaString(answers.pluginName()));
                     name = name.replace(PACKAGE_PATH, packagePath);
                 }
@@ -121,10 +117,7 @@ final class PluginTemplate {
                 Files.writeString(file, text);
             }
         }
-        if (made == null || ids != 1) {
-            throw new IllegalStateException("not the example plugin's template: "
-                    + (made == null ? "no pom.xml" : ids + " plugin ids spelled " + javaString(PACKAGE)));
-        }
+        if (made == null) throw new IllegalStateException("not the example plugin's template: no pom.xml");
         return made;
     }
 
@@ -157,7 +150,7 @@ final class PluginTemplate {
             throw new IllegalStateException("the template's pom has no region marked "
                     + (coordinates ? "drop" : "coordinates"));
         }
-        String copied = out.toString();
+        String copied = pluginClass(out.toString(), answers.javaPackage());
         String api = answers.studioApiVersion().map(v -> withPin(copied, "studioapi", v)).orElse(copied);
         return answers.toolkitVersion().map(v -> withPin(api, "plugintoolkit", v)).orElse(api);
     }
@@ -179,12 +172,22 @@ final class PluginTemplate {
         return property(key).matcher(pom).replaceFirst("$1" + Matcher.quoteReplacement(xml(version)) + "$3");
     }
 
-    private static int count(String text, String needle) {
-        int count = 0;
-        for (int at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + needle.length())) {
-            count++;
+    /**
+     * The pom with its one {@code botmaker.plugin} class moved into {@code javaPackage}, as the sources are: the
+     * class a host constructs is the one the copy holds. The example's must be in {@value #PACKAGE}, or the copy
+     * would name a class it does not have.
+     */
+    private static String pluginClass(String pom, String javaPackage) {
+        Matcher match = PLUGIN_CLASS.matcher(pom);
+        if (!match.find()) throw new IllegalStateException("the template's pom sets no botmaker.plugin");
+        String example = match.group(2);
+        if (!example.startsWith(PACKAGE + ".")) {
+            throw new IllegalStateException("the template's botmaker.plugin, " + example + ", is not in " + PACKAGE);
         }
-        return count;
+        String replaced = pom.substring(0, match.start()) + match.group(1)
+                + javaPackage + example.substring(PACKAGE.length()) + match.group(3) + pom.substring(match.end());
+        if (match.find()) throw new IllegalStateException("the template's pom sets botmaker.plugin twice");
+        return replaced;
     }
 
     private static String javaString(String value) {

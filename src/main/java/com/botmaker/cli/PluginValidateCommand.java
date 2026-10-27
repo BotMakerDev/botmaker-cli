@@ -12,7 +12,6 @@ import picocli.CommandLine.Parameters;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
@@ -25,8 +24,9 @@ import java.util.concurrent.Callable;
  */
 @Command(name = "validate",
         header = "Run the eight checks the plugin registry runs.",
-        description = "A local pass is not a promise the pull request passes: two checks ask whether an id "
-                + "is already claimed, and only the registry's index holds those answers.",
+        description = "A local pass is not a promise the pull request passes: the catalog also asks that the "
+                + "published pom declare the coordinate JitPack serves for the repository, which a local run "
+                + "cannot know.",
         mixinStandardHelpOptions = true)
 final class PluginValidateCommand implements Callable<Integer> {
 
@@ -53,7 +53,7 @@ final class PluginValidateCommand implements Callable<Integer> {
         Console console = parent.main().console();
         PluginSubject subject;
         if (coordinate != null) {
-            subject = parent.main().subjects().fromCoordinate(coordinate, Set.of());
+            subject = parent.main().subjects().fromCoordinate(coordinate);
         } else {
             String directory = dirArgument != null ? dirArgument : dirOption != null ? dirOption : ".";
             subject = parent.main().subjects()
@@ -69,8 +69,8 @@ final class PluginValidateCommand implements Callable<Integer> {
             console.out(results.stream().filter(CheckResult::failed).count() + " check(s) failed.");
             return 1;
         }
-        // Said on every pass, and not as a formality. Two of the eight checks ask whether an id is already
-        // claimed, and locally nothing is claimed — the registry's index is what holds those answers. An
+        // Said on every pass, and not as a formality. The catalog's DECLARED also asks whether the published pom
+        // is the entry's coordinate, and locally there is no entry — the catalog is what holds that answer. An
         // author who reads "all checks passed" as "the PR will be accepted" has been misled by this tool.
         console.out("All checks passed"
                 + (results.stream().anyMatch(r -> r.status() == Status.SKIP) ? " (some were skipped)." : ".")

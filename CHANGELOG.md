@@ -5,6 +5,23 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed (breaking)
+
+- **A plugin is its pom's coordinate; the plugin id is gone** (2026-10-27). The validator reads which plugin a jar
+  is from the one pom in it that sets `botmaker.plugin` (plugin-host's `PluginPoms`), never from a services file or
+  `StudioPlugin.id()`. The `id` check is `declared`: every pom naming a plugin names one a host loads (one per jar,
+  a `public final` direct `DeclaredPlugin`, each coordinate once), and a catalog entry's plugin is the one with the
+  entry's coordinate (`PluginSubject.entry`, groupId compared without case). A plugin's own report lines name it by
+  class; `LOADS` says which `botmaker.plugin` to write when a pom names none.
+- **Catalog schema 5**: a plugin entry is `{repo, releases}`, filed as `plugins/<owner>__<repo>.json` like a bot's;
+  `catalog.json`'s plugin rows have no `id`, and a pin names its plugin by `repo` (`DerivedFacts.Pin`).
+  `PluginChecks.idFindings` and the claimed-id set are gone; `Publish` names the entry from the repository, and
+  `Checks.Result` carries no plugin id.
+- `botmaker plugin new` has no `--plugin-id`: it moves the pom's `botmaker.plugin` class into the new package.
+  `botmaker plugin unpublish` takes `--repo <owner/name>`, as `bot unpublish` does.
+
 ## [0.8.1] — 2026-10-25
 
 ### Fixed

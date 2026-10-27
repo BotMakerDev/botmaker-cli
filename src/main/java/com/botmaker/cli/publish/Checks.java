@@ -10,19 +10,19 @@ import java.util.Optional;
 public interface Checks {
 
     /**
-     * What a check found.
+     * What a check found. A plugin's entry is named by its repository, so nothing read off the jar names it
+     * (2026-10-27, with the plugin id).
      *
-     * @param refusal  why it failed, or empty when it passed
-     * @param pluginId the plugin's own id read off the loaded jar, which names its entry; empty for a bot
+     * @param refusal why it failed, or empty when it passed
      */
-    record Result(Optional<String> refusal, Optional<String> pluginId) {
+    record Result(Optional<String> refusal) {
 
-        public static Result passed(Optional<String> pluginId) {
-            return new Result(Optional.empty(), pluginId);
+        public static Result passed() {
+            return new Result(Optional.empty());
         }
 
         public static Result refused(String why) {
-            return new Result(Optional.of(why), Optional.empty());
+            return new Result(Optional.of(why));
         }
     }
 
@@ -50,7 +50,7 @@ public interface Checks {
         @Override
         public Result published(String coordinate, Listener listener) {
             listener.step("The catalog's own check runs the plugin's checks on " + coordinate + ".");
-            return Result.passed(Optional.empty());
+            return Result.passed();
         }
     };
 }

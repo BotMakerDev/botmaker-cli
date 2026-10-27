@@ -17,15 +17,16 @@ import java.util.concurrent.Callable;
  */
 @Command(name = "unpublish",
         header = "Stop listing this plugin in the catalog.",
-        description = "Opens the pull request that removes plugins/<id>.json. Nothing else changes.",
+        description = "Opens the pull request that removes plugins/<owner>__<repo>.json. Nothing else changes.",
         mixinStandardHelpOptions = true)
 final class PluginUnpublishCommand implements Callable<Integer> {
 
     @ParentCommand
     private PluginCommand parent;
 
-    @Option(names = "--id", paramLabel = "<plugin-id>", required = true, description = "The plugin's id.")
-    private String id;
+    @Option(names = "--repo", paramLabel = "<owner/name>", required = true,
+            description = "The plugin's repository.")
+    private String repo;
 
     @Option(names = "--release", paramLabel = "<tag>",
             description = "Remove only this release; the others stay listed. Default: the whole entry.")
@@ -33,8 +34,9 @@ final class PluginUnpublishCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws IOException {
-        EntryPath path = EntryPath.parse(EntryPath.PLUGINS + id.strip() + ".json").orElseThrow(
-                () -> new IOException(id + " is not a plugin id"));
+        String slug = BotNewCommand.slug(repo);
+        EntryPath path = EntryPath.parse(EntryPath.plugin(slug)).orElseThrow(
+                () -> new IOException(slug + " cannot be a catalog entry"));
         return PublishCommands.unpublish(parent.main(), path, Optional.ofNullable(release),
                 "botmaker plugin unpublish");
     }

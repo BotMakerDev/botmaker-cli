@@ -72,7 +72,7 @@ class NextVersionTest {
     void a_head_the_catalog_lists_already_has_nothing_new() throws Exception {
         FakeRunner.repository(dir, null);
         FakeRunner.git(dir, "tag", "v0.3.0");
-        Optional<Entry> listed = Optional.of(new PluginEntry("com.example.thing", REPO,
+        Optional<Entry> listed = Optional.of(new PluginEntry(REPO,
                 List.of(FakeFacts.pluginRelease("v0.3.0"))));
         Refusal refusal = assertThrows(Refusal.class, () -> decide(Level.PATCH, Optional.empty(), listed));
         assertTrue(refusal.getMessage().contains("lists already"), refusal.getMessage());
@@ -145,7 +145,7 @@ class NextVersionTest {
         FakeRunner.git(dir, "tag", "v1.1.5");
         FakeRunner.commit(dir, "three");
         assertEquals("v1.2.1", decide(Level.PATCH).tag());
-        Optional<Entry> listed = Optional.of(new PluginEntry("com.example.thing", REPO,
+        Optional<Entry> listed = Optional.of(new PluginEntry(REPO,
                 List.of(FakeFacts.pluginRelease("v1.5.0"))));
         assertEquals("v1.6.0", decide(Level.MINOR, Optional.empty(), listed).tag(), "an approved tag counts too");
     }

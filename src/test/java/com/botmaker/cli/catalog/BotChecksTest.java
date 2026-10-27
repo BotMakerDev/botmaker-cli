@@ -180,7 +180,7 @@ class BotChecksTest {
     }
 
     private static Optional<Catalog> catalog(String jarSha) {
-        Catalog.Plugin sdk = new Catalog.Plugin("com.botmaker.sdk", "BotMakerDev/botmaker-sdk", Rank.ADMIN,
+        Catalog.Plugin sdk = new Catalog.Plugin("BotMakerDev/botmaker-sdk", Rank.ADMIN,
                 "com.github.BotMakerDev:botmaker-sdk", "SDK", "", List.of(), 0, List.of(new Catalog.Plugin.Release(
                 "v2.1.0", FakeFacts.commitOf("v2.1.0"), jarSha, "a".repeat(64), "0.11.0", List.of())));
         return Optional.of(new Catalog(Catalog.SCHEMA_VERSION, "2026-10-25T00:00:00Z", List.of(sdk), List.of()));

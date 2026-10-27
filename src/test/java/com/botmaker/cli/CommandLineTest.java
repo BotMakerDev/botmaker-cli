@@ -217,13 +217,15 @@ class CommandLineTest {
         assertEquals(".", applied(export, "--dir"));
     }
 
-    /** The catalog's verbs for a plugin: unpublish names the entry by id, list takes nothing. */
+    /** The catalog's verbs for a plugin: unpublish names the entry by repository, as a bot's, list takes nothing. */
     @Test
     void plugin_has_unpublish_and_list() {
-        assertEquals("com.example.thing", parse("plugin", "unpublish", "--id", "com.example.thing")
-                .subcommand().subcommand().matchedOptionValue("--id", ""));
+        assertEquals("me/thing", parse("plugin", "unpublish", "--repo", "me/thing")
+                .subcommand().subcommand().matchedOptionValue("--repo", ""));
         assertEquals("list", parse("plugin", "list").subcommand().subcommand().commandSpec().name());
-        assertEquals(CommandLine.ExitCode.USAGE, exit("plugin", "unpublish"), "--id is required");
+        assertEquals(CommandLine.ExitCode.USAGE, exit("plugin", "unpublish"), "--repo is required");
+        assertEquals(CommandLine.ExitCode.USAGE, exit("plugin", "unpublish", "--id", "com.example.thing"),
+                "a plugin has no id since 2026-10-27");
         assertEquals(CommandLine.ExitCode.USAGE, exit("plugin", "publish", "--min-contract-version", "0.9.0"),
                 "the catalog derives the contract version; the option is gone");
         assertEquals(CommandLine.ExitCode.USAGE, exit("bot", "publish", "--repo", "me/farmbot", "--tags", "a"),

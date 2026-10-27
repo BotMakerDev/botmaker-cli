@@ -5,7 +5,8 @@ import com.botmaker.cli.validate.CheckResult;
 import com.botmaker.cli.validate.PluginSubject;
 import com.botmaker.cli.validate.PluginValidator;
 import com.botmaker.cli.validate.Status;
-import com.botmaker.plugin.api.StudioPlugin;
+import com.botmaker.plugin.host.LoadedPlugin;
+import com.botmaker.plugin.host.PluginCoordinate;
 import com.botmaker.plugin.host.PluginLoader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -50,12 +51,11 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class PluginTemplateTest {
 
     private static final String PACKAGE = "com.acme.demo";
-    private static final String PLUGIN_ID = "com.acme.demo-plugin";
     /** With a quote, so the name is written as a Java string rather than pasted into one. */
     private static final String PLUGIN_NAME = "Demo \"Plugin\"";
 
     private static PluginTemplate.Answers answers(Optional<String> studioApi) {
-        return new PluginTemplate.Answers("com.acme", "demo-plugin", "0.1.0-SNAPSHOT", PACKAGE, PLUGIN_ID,
+        return new PluginTemplate.Answers("com.acme", "demo-plugin", "0.1.0-SNAPSHOT", PACKAGE,
                 PLUGIN_NAME, studioApi, Optional.empty());
     }
 
@@ -83,9 +83,8 @@ class PluginTemplateTest {
         assertFalse(pom.contains("botmaker-plugin-archetype"), pom);
         assertFalse(pom.contains("maven-assembly-plugin"), "the template's own build reached the copy");
         assertTrue(pom.contains("<botmaker.studioapi.version>v0.10.0</botmaker.studioapi.version>"), pom);
-        String plugin = Files.readString(project.resolve("src/main/java/com/acme/demo/plugin/ExamplePlugin.java"));
-        assertTrue(plugin.contains("ID = \"com.acme.demo-plugin\";"), plugin);
-        assertTrue(plugin.contains("NAME = \"Demo \\\"Plugin\\\"\";"), plugin);
+        assertTrue(pom.contains("<botmaker.plugin>com.acme.demo.plugin.ExamplePlugin</botmaker.plugin>"),
+                "the pom names the renamed class: " + pom);
     }
 
     @Test
@@ -100,10 +99,8 @@ class PluginTemplateTest {
         try (InputStream template = PluginTemplate.bundled()) {
             PluginTemplate.write(template, project, answers(Optional.empty()));
         }
+        // target/classes: the loader reads the module's pom two levels up, as `plugin validate` does.
         Path classes = Files.createDirectories(project.resolve("target/classes"));
-        Path services = Files.createDirectories(classes.resolve("META-INF/services"));
-        Files.copy(project.resolve("src/main/resources/META-INF/services/com.botmaker.plugin.api.StudioPlugin"),
-                services.resolve("com.botmaker.plugin.api.StudioPlugin"));
 
         // ---- it compiles ------------------------------------------------------------------------------
         String classpath = System.getProperty("java.class.path") + File.pathSeparator + toolkitClasses;
@@ -121,9 +118,9 @@ class PluginTemplateTest {
         try (PluginLoader loaded = PluginLoader.open(pluginClasspath.stream().map(Path::toString).toList())) {
             assertNotNull(loaded, "PluginLoader found no plugin on the copy's own classpath");
             assertEquals(1, loaded.plugins().size());
-            StudioPlugin plugin = loaded.plugins().getFirst();
-            assertEquals(PLUGIN_ID, plugin.id());
-            assertEquals(PLUGIN_NAME, plugin.displayName());
+            LoadedPlugin plugin = loaded.plugins().getFirst();
+            assertEquals(new PluginCoordinate("com.acme", "demo-plugin"), plugin.coordinate());
+            assertEquals(PLUGIN_NAME, plugin.name());
         }
 
         // ---- and the gate that decides a pull request passes it ---------------------------------------
@@ -147,9 +144,10 @@ class PluginTemplateTest {
     /** A template that lost an anchor is refused, not copied half-renamed. */
     @Test
     void a_template_without_its_anchors_is_refused(@TempDir Path work) throws IOException {
-        String plugin = "package com.example.greetings.plugin;\nclass ExamplePlugin { String ID = \"com.example.greetings\"; }\n";
+        String plugin = "package com.example.greetings.plugin;\nclass ExamplePlugin { }\n";
         String pom = "<project>\n    <!-- botmaker plugin new: coordinates -->\n    <groupId>x</groupId>\n"
                 + "    <!-- /botmaker plugin new -->\n    <properties>\n"
+                + "        <botmaker.plugin>com.example.greetings.plugin.ExamplePlugin</botmaker.plugin>\n"
                 + "        <botmaker.studioapi.version>1</botmaker.studioapi.version>\n"
                 + "        <botmaker.plugintoolkit.version>1</botmaker.plugintoolkit.version>\n"
                 + "    </properties>\n</project>\n";
@@ -161,17 +159,23 @@ class PluginTemplateTest {
 
         String complete = pom.replace("</project>",
                 "    <!-- botmaker plugin new: drop -->\n    <!-- /botmaker plugin new -->\n</project>");
-        IllegalStateException noId = assertThrows(IllegalStateException.class, () -> PluginTemplate.write(
-                zip("pom.xml", complete, "src/main/java/com/example/greetings/plugin/ExamplePlugin.java",
-                        plugin.replace("\"com.example.greetings\"", "\"elsewhere\"")),
+        IllegalStateException noClass = assertThrows(IllegalStateException.class, () -> PluginTemplate.write(
+                zip("pom.xml", complete.replaceAll("\\s*<botmaker\\.plugin>.*</botmaker\\.plugin>", ""),
+                        "src/main/java/com/example/greetings/plugin/ExamplePlugin.java", plugin),
                 work.resolve("b"), answers(Optional.empty())));
-        assertTrue(noId.getMessage().contains("0 plugin ids"), noId.getMessage());
+        assertTrue(noClass.getMessage().contains("sets no botmaker.plugin"), noClass.getMessage());
+
+        IllegalStateException elsewhere = assertThrows(IllegalStateException.class, () -> PluginTemplate.write(
+                zip("pom.xml", complete.replace("com.example.greetings.plugin.ExamplePlugin", "org.other.Plugin"),
+                        "src/main/java/com/example/greetings/plugin/ExamplePlugin.java", plugin),
+                work.resolve("c"), answers(Optional.empty())));
+        assertTrue(elsewhere.getMessage().contains("is not in com.example.greetings"), elsewhere.getMessage());
     }
 
     @Test
     void a_package_that_is_not_java_is_refused() {
         assertThrows(IllegalArgumentException.class, () -> new PluginTemplate.Answers("com.acme", "2fa",
-                "0.1.0", "com.acme.2fa", "com.acme.2fa", "2FA", Optional.empty(), Optional.empty()));
+                "0.1.0", "com.acme.2fa", "2FA", Optional.empty(), Optional.empty()));
     }
 
     /** The name lands in string literals and a Javadoc comment. */
@@ -179,21 +183,8 @@ class PluginTemplateTest {
     void a_name_that_would_break_the_source_is_refused() {
         for (String name : new String[]{"Two\nLines", "Ends */ here"}) {
             assertThrows(IllegalArgumentException.class, () -> new PluginTemplate.Answers("com.acme", "demo",
-                    "0.1.0", PACKAGE, PLUGIN_ID, name, Optional.empty(), Optional.empty()), name);
+                    "0.1.0", PACKAGE, name, Optional.empty(), Optional.empty()), name);
         }
-    }
-
-    /** An id containing the example's package is written once, not renamed again by the package. */
-    @Test
-    void an_id_containing_the_examples_package_survives(@TempDir Path work) throws IOException {
-        Path project = work.resolve("demo-plugin");
-        try (InputStream template = PluginTemplate.bundled()) {
-            PluginTemplate.write(template, project, new PluginTemplate.Answers("com.acme", "demo-plugin",
-                    "0.1.0-SNAPSHOT", PACKAGE, "com.example.greetings2", PLUGIN_NAME, Optional.empty(),
-                    Optional.empty()));
-        }
-        String plugin = Files.readString(project.resolve("src/main/java/com/acme/demo/plugin/ExamplePlugin.java"));
-        assertTrue(plugin.contains("ID = \"com.example.greetings2\";"), plugin);
     }
 
     private static int javac(JavaCompiler javac, String classpath, Path out, Path sources) throws IOException {

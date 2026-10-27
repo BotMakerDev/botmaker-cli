@@ -21,8 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntryGateTest {
 
-    private static final String SDK = "plugins/com.botmaker.sdk.json";
-    private static final String SDK_ID = "com.botmaker.sdk";
+    private static final String SDK = "plugins/BotMakerDev__botmaker-sdk.json";
     private static final String SDK_REPO = "BotMakerDev/botmaker-sdk";
     private static final String BOT = "bots/somedev__firestone.json";
     private static final long ADMIN_ID = 330995542;
@@ -36,8 +35,8 @@ class EntryGateTest {
 
     @BeforeEach
     void catalog() throws IOException {
-        write(base, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0"));
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0"));
+        write(base, SDK, pluginJson(SDK_REPO, "v2.1.0"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.1.0"));
         facts.repo(SDK_REPO, 1, "The SDK.", null)
                 .release(SDK_REPO, "v2.1.0", "LiQiyeDev")
                 .repo("somedev/firestone", 2, "Idle runs.", null)
@@ -100,21 +99,22 @@ class EntryGateTest {
 
     @Test
     void a_listed_entry_keeps_its_repository() throws IOException {
-        write(head, SDK, pluginJson(SDK_ID, "mallory/sdk", "v1"));
-        assertRefused(check("mallory", SDK), "keeps its repository " + SDK_REPO);
+        // The file is named by the repository, a plugin's as a bot's (2026-10-27): another one is another file.
+        write(head, SDK, pluginJson("mallory/sdk", "v1"));
+        assertRefused(check("mallory", SDK), "rename it to plugins/mallory__sdk.json");
     }
 
     @Test
     void the_controller_appends_a_release() throws IOException {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
         assertEquals(List.of(), check("LiQiyeDev", SDK));
     }
 
     @Test
     void someone_else_cannot_append_to_an_entry() throws IOException {
         facts.release(SDK_REPO, "v2.2.0", "mallory");
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
         assertRefused(check("mallory", SDK), "only they may change it");
     }
 
@@ -123,17 +123,17 @@ class EntryGateTest {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
         ApprovedRelease moved = new ApprovedRelease("v2.1.0", commitOf("elsewhere"),
                 pluginRelease("v2.1.0").jarSha256(), pluginRelease("v2.1.0").pomSha256());
-        write(head, SDK, json(new PluginEntry(SDK_ID, SDK_REPO, List.of(moved, pluginRelease("v2.2.0")))));
+        write(head, SDK, json(new PluginEntry(SDK_REPO, List.of(moved, pluginRelease("v2.2.0")))));
         assertRefused(check("LiQiyeDev", SDK), "release v2.1.0 was edited");
     }
 
     @Test
     void a_reorder_two_appends_or_a_new_entry_with_two_releases_are_refused() throws IOException {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev").release(SDK_REPO, "v2.3.0", "LiQiyeDev");
-        write(base, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.2.0", "v2.1.0"));
+        write(base, SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.2.0", "v2.1.0"));
         assertRefused(check("LiQiyeDev", SDK), "never edited or reordered");
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0", "v2.3.0", "v2.4.0"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0", "v2.3.0", "v2.4.0"));
         assertRefused(check("LiQiyeDev", SDK), "appends one release");
         write(head, BOT, botJson("somedev/firestone", "v1.1.0", "v1.2.0"));
         assertRefused(check("somedev", BOT), "lists one release");
@@ -142,8 +142,8 @@ class EntryGateTest {
     @Test
     void the_controller_removes_a_release_and_nobody_else_does() throws Exception {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
-        write(base, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.2.0"));
+        write(base, SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.2.0"));
         assertEquals(List.of(), check("LiQiyeDev", SDK));
         assertRefused(check("mallory", SDK), "only they may change it");
         assertEquals(new EntryGate.Change.Remove(List.of("v2.1.0")), EntryGate.Change.between(
@@ -167,7 +167,7 @@ class EntryGateTest {
     void a_tag_that_points_elsewhere_than_the_pinned_commit_is_refused() throws IOException {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
         facts.commits.put(SDK_REPO + "@v2.2.0", commitOf("moved"));
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
         assertRefused(check("LiQiyeDev", SDK), "not the pinned commit");
     }
 
@@ -199,7 +199,7 @@ class EntryGateTest {
     void an_admin_may_change_somebody_elses_entry() throws IOException {
         admins();
         facts.release(SDK_REPO, "v2.2.0", "somebody-else");
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
         assertEquals(List.of(), check("BotMakerDev", ADMIN_ID, SDK));
         assertRefused(check("mallory", 9, SDK), "only they may change it");
     }
@@ -222,7 +222,7 @@ class EntryGateTest {
     @Test
     void an_admin_still_needs_a_published_release() throws IOException {
         admins();
-        write(head, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v9"));
+        write(head, SDK, pluginJson(SDK_REPO, "v2.1.0", "v9"));
         assertRefused(check("BotMakerDev", ADMIN_ID, SDK), "no GitHub Release v9");
         facts.releases.put(SDK_REPO + "@v9", new EntryFacts.Release("LiQiyeDev", true, false));
         assertRefused(check("BotMakerDev", ADMIN_ID, SDK), "draft");
@@ -298,7 +298,7 @@ class EntryGateTest {
     @Test
     void a_removal_runs_no_kind_check() throws IOException {
         facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
-        write(base, SDK, pluginJson(SDK_ID, SDK_REPO, "v2.1.0", "v2.2.0"));
+        write(base, SDK, pluginJson(SDK_REPO, "v2.1.0", "v2.2.0"));
         assertEquals(0, EntryGate.run(new String[]{head.toString(), "--author", "LiQiyeDev", "--base",
                 base.toString(), "--part", "kind", "--", SDK}, facts), "nothing downloads for a removal");
     }

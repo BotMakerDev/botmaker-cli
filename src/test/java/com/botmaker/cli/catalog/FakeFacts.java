@@ -129,8 +129,8 @@ public final class FakeFacts implements EntryFacts, PomFacts.Source {
     }
 
     /** A plugin entry's file text, its releases pinned as {@link #pluginRelease}. */
-    static String pluginJson(String id, String repo, String... tags) {
-        return json(new PluginEntry(id, repo, Arrays.stream(tags).map(FakeFacts::pluginRelease).toList()));
+    static String pluginJson(String repo, String... tags) {
+        return json(new PluginEntry(repo,Arrays.stream(tags).map(FakeFacts::pluginRelease).toList()));
     }
 
     /** An entry or a release as the entry file writes it. */

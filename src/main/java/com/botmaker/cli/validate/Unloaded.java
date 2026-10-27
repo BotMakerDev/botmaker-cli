@@ -2,6 +2,7 @@ package com.botmaker.cli.validate;
 
 import com.botmaker.plugin.api.StudioPlugin;
 import com.botmaker.plugin.host.PluginLoader.PluginFailure;
+import com.botmaker.plugin.host.PluginPoms;
 
 import java.io.IOException;
 import java.lang.reflect.Modifier;
@@ -18,13 +19,12 @@ import java.util.jar.JarFile;
 import java.util.stream.Stream;
 
 /**
- * Why no plugin loaded, said as the line to fix (2026-10-19, `docs/refactor/46-plugin-target.md` F4): each provider
- * that failed, with its own cause, or, when the plugin's own entry has no services file, the class to name in it.
- * A plugin that compiles and packages but is listed nowhere contributes nothing, and nothing else says so.
+ * Why no plugin loaded, said as the line to fix (2026-10-19, `docs/refactor/46-plugin-target.md` F4): each plugin
+ * that failed, with its own cause, or, when the plugin's own pom names no class, the class to name in it
+ * (2026-10-27). A plugin that compiles and packages but is declared nowhere contributes nothing, and nothing else
+ * says so.
  */
 final class Unloaded {
-
-    static final String SERVICES = "META-INF/services/" + StudioPlugin.class.getName();
 
     private Unloaded() {}
 
@@ -35,28 +35,16 @@ final class Unloaded {
         if (!lines.isEmpty() || classpath.isEmpty()) return lines.isEmpty() ? List.of("nothing to load") : lines;
 
         Path own = classpath.getFirst();
-        if (hasServices(own)) {
-            return List.of(own.getFileName() + "'s " + SERVICES + " names no class: write your plugin's fully"
-                    + " qualified class on a line of its own");
-        }
         List<String> plugins = pluginClasses(own, classpath);
         if (plugins.isEmpty()) {
-            return List.of("no class in " + own.getFileName() + " implements StudioPlugin: a plugin is a class"
-                    + " extending DeclaredPlugin, with a public no-argument constructor");
+            return List.of("no class in " + own.getFileName() + " implements StudioPlugin: a plugin is a public"
+                    + " final class extending DeclaredPlugin, with a public no-argument constructor");
         }
-        lines.add(own.getFileName() + " has no " + SERVICES + ", so no host loads "
+        lines.add("no pom in " + own.getFileName() + " sets " + PluginPoms.PROPERTY + ", so no host loads "
                 + String.join(", ", plugins));
-        lines.add("write src/main/resources/" + SERVICES + " with the line: " + String.join(" / ", plugins));
+        lines.add("add to pom.xml's <properties>: <" + PluginPoms.PROPERTY + ">" + String.join(" / ", plugins)
+                + "</" + PluginPoms.PROPERTY + ">");
         return lines;
-    }
-
-    private static boolean hasServices(Path entry) {
-        if (Files.isDirectory(entry)) return Files.isRegularFile(entry.resolve(SERVICES));
-        try (JarFile jar = new JarFile(entry.toFile())) {
-            return jar.getEntry(SERVICES) != null;
-        } catch (IOException unreadable) {
-            return false;
-        }
     }
 
     /** The concrete top-level {@link StudioPlugin} classes in {@code entry}, loaded over the whole classpath. */

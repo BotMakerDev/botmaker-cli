@@ -29,8 +29,8 @@ import java.util.stream.Stream;
  *       {@code editorDependencies} ({@link EditorDependencies}), a bot's pinned versions — because the author
  *       controls the pom. A release that fails is left out.</li>
  *   <li>Only regular files are read: a symbolic link could point the read anywhere on the runner.</li>
- *   <li>An entry file whose name is not what its content claims, or a second entry for a plugin id or (ignoring
- *       case, as GitHub does) a repository, is skipped and said: the check refuses both, and this is the
+ *   <li>An entry file whose name is not what its content claims, or a second entry for (ignoring case, as GitHub
+ *       does) a repository, is skipped and said: the check refuses both, and this is the
  *       backstop for anything that reached {@code main} without it.</li>
  *   <li>A repository that is gone or private is left out; its entry file stays until its owner removes it.</li>
  *   <li>A release whose pom could not be read this time keeps its previous facts while its repository, tag and
@@ -50,20 +50,21 @@ public final class CatalogBuilder {
                                 String now) throws IOException {
         Optional<Catalog> previous = Catalog.read(root.resolve(Catalog.FILE));
         Map<String, Catalog.Plugin> previousPlugins = previous.map(c -> c.plugins().stream()
-                .collect(Collectors.toMap(Catalog.Plugin::id, Function.identity(), (a, b) -> a))).orElse(Map.of());
+                .collect(Collectors.toMap(Catalog.Plugin::repo, Function.identity(), (a, b) -> a))).orElse(Map.of());
         Map<String, Catalog.Bot> previousBots = previous.map(c -> c.bots().stream()
                 .collect(Collectors.toMap(Catalog.Bot::repo, Function.identity(), (a, b) -> a))).orElse(Map.of());
 
         List<Catalog.Plugin> plugins = new ArrayList<>();
-        for (PluginEntry entry : read(root, EntryPath.PLUGINS, PluginEntry::read, PluginEntry::id)) {
+        for (PluginEntry entry : read(root, EntryPath.PLUGINS, PluginEntry::read,
+                p -> p.repo().toLowerCase(Locale.ROOT))) {
             Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
             if (repo.isEmpty()) continue;
-            Catalog.Plugin before = previousPlugins.get(entry.id());
+            Catalog.Plugin before = previousPlugins.get(entry.repo());
             List<Catalog.Plugin.Release> releases = new ArrayList<>();
             String name = null;
             for (ApprovedRelease release : entry.releases().reversed()) {
                 if (!published(facts, entry.repo(), release.tag())) continue;
-                DerivedFacts.PluginFacts jar = derived.plugin(entry.id(), release.tag());
+                DerivedFacts.PluginFacts jar = derived.plugin(entry.repo(), release.tag());
                 Optional<Catalog.Plugin.Release> kept = before != null && before.repo().equalsIgnoreCase(entry.repo())
                         ? previous(before.releases(), release, Catalog.Plugin.Release::tag, Catalog.Plugin.Release::commit)
                         : Optional.empty();
@@ -74,7 +75,7 @@ public final class CatalogBuilder {
                 if (jar == null) continue;
                 String refusal = refusal(jar);
                 if (refusal != null) {
-                    System.err.println("left out plugins/" + entry.id() + ".json " + release.tag() + ": " + refusal);
+                    System.err.println("left out " + EntryPath.of(entry) + " " + release.tag() + ": " + refusal);
                     continue;
                 }
                 if (name == null) name = jar.name();
@@ -82,12 +83,12 @@ public final class CatalogBuilder {
                         release.pomSha256(), jar.minContractVersion(), jar.editorDependencies(), jar.plugins()));
             }
             if (releases.isEmpty()) continue;
-            plugins.add(new Catalog.Plugin(entry.id(), entry.repo(), publishers.rankOf(repo.get().ownerId()),
+            plugins.add(new Catalog.Plugin(entry.repo(), publishers.rankOf(repo.get().ownerId()),
                     repo.get().coordinate(), name, repo.get().description(), repo.get().topics(),
                     repo.get().stars(), releases));
         }
-        plugins.sort(Comparator.comparing(Catalog.Plugin::id));
-        Set<String> listed = plugins.stream().map(Catalog.Plugin::id).collect(Collectors.toSet());
+        plugins.sort(Comparator.comparing(p -> p.repo().toLowerCase(Locale.ROOT)));
+        Set<String> listed = plugins.stream().map(Catalog.Plugin::repo).collect(Collectors.toSet());
         plugins.replaceAll(plugin -> withListedPins(plugin, listed));
 
         List<Catalog.Bot> bots = new ArrayList<>();
@@ -103,7 +104,7 @@ public final class CatalogBuilder {
                     pins = previous(before.releases(), release, Catalog.Bot.Release::tag, Catalog.Bot.Release::commit)
                             .map(Catalog.Bot.Release::plugins).orElse(null);
                 }
-                if (pins == null || pins.isEmpty() || !pins.stream().allMatch(p -> listed.contains(p.id())
+                if (pins == null || pins.isEmpty() || !pins.stream().allMatch(p -> listed.contains(p.repo())
                         && VERSION.matcher(p.version() == null ? "" : p.version()).matches())) continue;
                 releases.add(new Catalog.Bot.Release(release.tag(), release.commit(), pins, release.bmkSha256()));
             }
@@ -121,7 +122,8 @@ public final class CatalogBuilder {
 
     /** Every entry {@link #build} reads: plugins first, then bots. */
     static List<Entry> entries(Path root) throws IOException {
-        List<Entry> entries = new ArrayList<>(read(root, EntryPath.PLUGINS, PluginEntry::read, PluginEntry::id));
+        List<Entry> entries = new ArrayList<>(read(root, EntryPath.PLUGINS, PluginEntry::read,
+                p -> p.repo().toLowerCase(Locale.ROOT)));
         entries.addAll(read(root, EntryPath.BOTS, BotEntry::read, b -> b.repo().toLowerCase(Locale.ROOT)));
         return entries;
     }
@@ -130,18 +132,18 @@ public final class CatalogBuilder {
     /**
      * {@code plugin} with each release's {@code plugins} cut to pins a reader can trust: another plugin this
      * catalog lists, at a version {@link #VERSION} accepts. The pom is the author's, so a pin naming the plugin
-     * itself, an id not listed or a version of any other shape is dropped — checked here, after the list is built,
+     * itself, a plugin not listed or a version of any other shape is dropped — checked here, after the list is built,
      * so a pin kept from the previous catalog is checked too.
      */
     private static Catalog.Plugin withListedPins(Catalog.Plugin plugin, Set<String> listed) {
         List<Catalog.Plugin.Release> releases = plugin.releases().stream()
                 .map(r -> new Catalog.Plugin.Release(r.tag(), r.commit(), r.jarSha256(), r.pomSha256(),
                         r.minContractVersion(), r.editorDependencies(), r.plugins().stream()
-                        .filter(p -> listed.contains(p.id()) && !p.id().equals(plugin.id())
+                        .filter(p -> listed.contains(p.repo()) && !p.repo().equals(plugin.repo())
                                 && VERSION.matcher(p.version() == null ? "" : p.version()).matches())
                         .toList()))
                 .toList();
-        return new Catalog.Plugin(plugin.id(), plugin.repo(), plugin.rank(), plugin.coordinate(), plugin.name(),
+        return new Catalog.Plugin(plugin.repo(), plugin.rank(), plugin.coordinate(), plugin.name(),
                 plugin.description(), plugin.tags(), plugin.stars(), releases);
     }
 

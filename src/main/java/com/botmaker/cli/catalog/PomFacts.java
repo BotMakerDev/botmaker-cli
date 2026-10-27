@@ -35,9 +35,9 @@ public final class PomFacts {
      * Every approved release's facts, each pom read at the release's pinned commit. A release whose pom could not
      * be fetched or parsed has none, which the builder answers with the previous row's while the pin holds.
      *
-     * @param pluginIds the catalog's plugin ids by {@code groupId:artifactId} ({@link #key})
+     * @param pluginRepos the catalog's plugins' {@code owner/repo} by {@code groupId:artifactId} ({@link #key})
      */
-    public static DerivedFacts read(List<? extends Entry> entries, Source poms, Map<String, String> pluginIds) {
+    public static DerivedFacts read(List<? extends Entry> entries, Source poms, Map<String, String> pluginRepos) {
         Map<String, Map<String, DerivedFacts.PluginFacts>> plugins = new HashMap<>();
         Map<String, Map<String, List<DerivedFacts.Pin>>> bots = new HashMap<>();
         for (Entry entry : entries) {
@@ -51,11 +51,11 @@ public final class PomFacts {
                         // Read before the maps are touched: a pom that does not parse leaves no empty row.
                         switch (entry) {
                             case PluginEntry plugin -> {
-                                DerivedFacts.PluginFacts read = plugin(pom, plugin, pluginIds);
-                                plugins.computeIfAbsent(plugin.id(), k -> new HashMap<>()).put(release.tag(), read);
+                                DerivedFacts.PluginFacts read = plugin(pom, plugin, pluginRepos);
+                                plugins.computeIfAbsent(plugin.repo(), k -> new HashMap<>()).put(release.tag(), read);
                             }
                             case BotEntry bot -> {
-                                List<DerivedFacts.Pin> read = pins(pom, pluginIds);
+                                List<DerivedFacts.Pin> read = pins(pom, pluginRepos);
                                 bots.computeIfAbsent(bot.repo(), k -> new HashMap<>()).put(release.tag(), read);
                             }
                         }
@@ -75,7 +75,7 @@ public final class PomFacts {
      * A plugin's name (its pom's {@code <name>}, else the repository name), contract floor, editor dependencies and
      * the catalog plugins it declares.
      */
-    static DerivedFacts.PluginFacts plugin(Path pom, PluginEntry entry, Map<String, String> pluginIds)
+    static DerivedFacts.PluginFacts plugin(Path pom, PluginEntry entry, Map<String, String> pluginRepos)
             throws IOException {
         Map<String, String> properties = Poms.properties(pom);
         String name = resolved(Poms.name(pom), properties).orElse(entry.name());
@@ -83,20 +83,20 @@ public final class PomFacts {
         String contract = Poms.find(declared, PluginValidator.CONTRACT_GROUP, PluginValidator.CONTRACT_ARTIFACT)
                 .flatMap(d -> resolved(d.version(), properties)).orElse(null);
         return new DerivedFacts.PluginFacts(name, contract, editorDependencies(declared, properties),
-                pins(pom, pluginIds));
+                pins(pom, pluginRepos));
     }
 
     /**
      * The catalog plugins a pom declares, each at its version with the pom's properties applied. An unresolved
      * version stays as written, so the check and the builder refuse it by name.
      */
-    public static List<DerivedFacts.Pin> pins(Path pom, Map<String, String> pluginIds) throws IOException {
+    public static List<DerivedFacts.Pin> pins(Path pom, Map<String, String> pluginRepos) throws IOException {
         Map<String, String> properties = Poms.properties(pom);
         List<DerivedFacts.Pin> pins = new ArrayList<>();
         for (Poms.Dependency dependency : Poms.dependencies(pom)) {
-            String id = pluginIds.get(key(dependency.groupId(), dependency.artifactId()));
-            if (id != null) {
-                pins.add(new DerivedFacts.Pin(id, Poms.interpolate(dependency.version(), properties).trim()));
+            String repo = pluginRepos.get(key(dependency.groupId(), dependency.artifactId()));
+            if (repo != null) {
+                pins.add(new DerivedFacts.Pin(repo, Poms.interpolate(dependency.version(), properties).trim()));
             }
         }
         return List.copyOf(pins);

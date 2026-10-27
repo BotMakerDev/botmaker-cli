@@ -20,7 +20,7 @@ class ListingPolicyTest {
     void a_green_single_entry_merges() {
         assertEquals(ListingPolicy.Kind.MERGE, decide(true, List.of(NEW_BOT), List.of()).decision());
         assertEquals(ListingPolicy.Kind.MERGE, decide(true,
-                List.of(new ListingPolicy.Change("plugins/com.botmaker.sdk.json", "removed")), List.of()).decision());
+                List.of(new ListingPolicy.Change("plugins/BotMakerDev__botmaker-sdk.json", "removed")), List.of()).decision());
     }
 
     @Test
@@ -82,7 +82,7 @@ class ListingPolicyTest {
 
     @Test
     void an_entry_checked_against_old_ranks_merges_only_for_an_admin_of_main() {
-        ListingPolicy.Change edit = new ListingPolicy.Change("plugins/com.botmaker.sdk.json", "modified");
+        ListingPolicy.Change edit = new ListingPolicy.Change("plugins/BotMakerDev__botmaker-sdk.json", "modified");
         assertEquals(ListingPolicy.Kind.HOLD, decide(List.of(edit), false, false).decision(),
                 "possibly passed as an admin demoted since");
         assertEquals(ListingPolicy.Kind.MERGE, decide(List.of(edit), false, true).decision());

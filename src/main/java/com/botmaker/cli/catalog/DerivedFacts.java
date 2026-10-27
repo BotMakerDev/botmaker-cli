@@ -13,7 +13,7 @@ import java.util.Map;
  * (2026-10-23 security review). Still untrusted: the author controls the pom, so {@link CatalogBuilder} checks
  * every value again.
  *
- * @param plugins    by plugin id, then by release tag
+ * @param plugins    by plugin {@code owner/repo}, then by release tag
  * @param botPlugins by bot {@code owner/repo}, then by release tag
  */
 public record DerivedFacts(Map<String, Map<String, PluginFacts>> plugins,
@@ -41,17 +41,17 @@ public record DerivedFacts(Map<String, Map<String, PluginFacts>> plugins,
         }
     }
 
-    /** A catalog plugin a bot's pom declares, at the version it pins. */
-    public record Pin(String id, String version) {}
+    /** A catalog plugin a pom declares, named by its entry's {@code owner/repo}, at the version it pins. */
+    public record Pin(String repo, String version) {}
 
     public DerivedFacts {
         plugins = plugins == null ? Map.of() : Map.copyOf(plugins);
         botPlugins = botPlugins == null ? Map.of() : Map.copyOf(botPlugins);
     }
 
-    /** The facts of plugin {@code id} at {@code tag}, or {@code null}. */
-    PluginFacts plugin(String id, String tag) {
-        return plugins.getOrDefault(id, Map.of()).get(tag);
+    /** The facts of the plugin at {@code repo} at {@code tag}, or {@code null}. */
+    PluginFacts plugin(String repo, String tag) {
+        return plugins.getOrDefault(repo, Map.of()).get(tag);
     }
 
     /** The plugins bot {@code repo} declares at {@code tag}, or {@code null}. */

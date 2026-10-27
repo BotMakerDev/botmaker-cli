@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PublishTest {
 
     private static final String REPO = "somedev/thing";
-    private static final String ID = "com.example.thing";
+    private static final String PLUGIN = "plugins/somedev__thing.json";
     private static final String ORIGIN = "https://github.com/somedev/thing.git";
 
     @TempDir
@@ -43,21 +43,20 @@ class PublishTest {
     private final FakeRunner runner = new FakeRunner(facts);
     private final Map<String, Entry> listed = new HashMap<>();
     private final List<String> checked = new ArrayList<>();
-    private Checks.Result folderResult = Checks.Result.passed(Optional.of(ID));
+    private Checks.Result folderResult = Checks.Result.passed();
     private Optional<String> jitpackFailure = Optional.empty();
 
     private final Checks checks = new Checks() {
         @Override
         public Result folder(PublishTarget target, Listener listener) {
             checked.add("folder after " + runner.commands());
-            return target.kind() == EntryPath.Kind.BOT && folderResult.pluginId().isPresent()
-                    ? Result.passed(Optional.empty()) : folderResult;
+            return folderResult;
         }
 
         @Override
         public Result published(String coordinate, Listener listener) {
             checked.add("jar " + coordinate);
-            return Result.passed(Optional.of(ID));
+            return Result.passed();
         }
     };
 
@@ -112,7 +111,7 @@ class PublishTest {
         ApprovedRelease release = opened.entry().newest();
         assertEquals("v0.1.0", release.tag());
         assertEquals(FakeFacts.commitOf("v0.1.0"), release.commit());
-        assertEquals(new PluginEntry(ID, REPO, List.of(release)), opened.entry());
+        assertEquals(new PluginEntry(REPO, List.of(release)), opened.entry());
 
         assertEquals("folder after []", checked.getFirst(), "the folder is checked before anything changes");
         assertEquals("jar com.github.somedev:thing:v0.1.0", checked.get(1));
@@ -159,7 +158,7 @@ class PublishTest {
     void a_dry_run_checks_and_changes_nothing() throws Exception {
         FakeRunner.repository(dir, ORIGIN);
         Publish.Outcome outcome = publish(EntryPath.Kind.PLUGIN, Optional.empty(), true);
-        assertEquals(new Publish.Outcome.WouldList(REPO, "v0.1.0", NextVersion.Listing.NEW, Optional.of(ID)), outcome);
+        assertEquals(new Publish.Outcome.WouldList(REPO, "v0.1.0", NextVersion.Listing.NEW), outcome);
         assertEquals(1, checked.size());
         assertEquals(List.of(), runner.changes);
     }
@@ -183,7 +182,7 @@ class PublishTest {
         FakeRunner.repository(dir, ORIGIN);
         FakeRunner.git(dir, "tag", "v0.1.0");
         facts.release(REPO, "v0.1.0", "somedev");
-        listed.put("plugins/" + ID + ".json", new PluginEntry(ID, REPO, List.of(FakeFacts.pluginRelease("v0.1.0"))));
+        listed.put(PLUGIN, new PluginEntry(REPO, List.of(FakeFacts.pluginRelease("v0.1.0"))));
         Publish.Outcome outcome = publish(EntryPath.Kind.PLUGIN, Optional.of("v0.1.0"), false);
         // The plugin's path is learnt from the jar for an EXISTING release, then the listed tag is seen.
         assertEquals(new Publish.Outcome.AlreadyListed(REPO, "v0.1.0"), outcome);
@@ -194,7 +193,7 @@ class PublishTest {
     void someone_elses_entry_is_refused_before_anything_is_tagged() throws Exception {
         FakeRunner.repository(dir, ORIGIN);
         facts.release(REPO, "v0.0.9", "otherdev");
-        listed.put("plugins/" + ID + ".json", new PluginEntry(ID, REPO, List.of(FakeFacts.pluginRelease("v0.0.9"))));
+        listed.put(PLUGIN, new PluginEntry(REPO, List.of(FakeFacts.pluginRelease("v0.0.9"))));
         Publish.Outcome.Refused refused = assertInstanceOf(Publish.Outcome.Refused.class, publish());
         assertTrue(refused.reason().contains("belongs to whoever controls"), refused.reason());
         assertEquals(List.of(), runner.changes);
@@ -299,7 +298,7 @@ class PublishTest {
         FakeRunner.repository(dir, ORIGIN);
         runner.login = "maintainer";
         facts.release(REPO, "v0.0.9", EntryGate.ACTIONS_BOT).release(REPO, "v0.1.0", EntryGate.ACTIONS_BOT);
-        listed.put("plugins/" + ID + ".json", new PluginEntry(ID, REPO, List.of(FakeFacts.pluginRelease("v0.0.9"))));
+        listed.put(PLUGIN, new PluginEntry(REPO, List.of(FakeFacts.pluginRelease("v0.0.9"))));
         Publish.Outcome refused = publish(EntryPath.Kind.PLUGIN, Optional.of("v0.1.0"), false);
         assertInstanceOf(Publish.Outcome.Refused.class, refused, "not an admin: " + refused);
 
@@ -315,8 +314,8 @@ class PublishTest {
     }
 
     private void catalogLists(String repo) {
-        index = Optional.of(new Catalog(4, "", List.of(new Catalog.Plugin(ID, repo, null, "com.github." + repo
-                .replace('/', ':'), ID, "", List.of(), 0, List.of())), List.of()));
+        index = Optional.of(new Catalog(Catalog.SCHEMA_VERSION, "", List.of(new Catalog.Plugin(repo, null,
+                "com.github." + repo.replace('/', ':'), "Thing", "", List.of(), 0, List.of())), List.of()));
     }
 
     @Test
@@ -338,7 +337,7 @@ class PublishTest {
         FakeRunner.commit(dir, "back-to-snapshot");
         catalogLists(REPO);
         facts.release(REPO, "v0.1.0", "somedev");
-        listed.put("plugins/" + ID + ".json", new PluginEntry(ID, REPO, List.of(FakeFacts.pluginRelease("v0.1.0"))));
+        listed.put(PLUGIN, new PluginEntry(REPO, List.of(FakeFacts.pluginRelease("v0.1.0"))));
         int[] slept = {0};
         Optional<Publish.Outcome> outcome = listRelease("v0.2.0", duration -> {
             if (++slept[0] == 2) facts.release(REPO, "v0.2.0", "somedev");

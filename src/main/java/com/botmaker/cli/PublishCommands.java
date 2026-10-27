@@ -58,7 +58,7 @@ final class PublishCommands {
                 yield 0;
             }
             case Publish.Outcome.WouldList would -> {
-                console.out("would list " + would.pluginId().map(id -> id + " ").orElse("") + would.repo() + " "
+                console.out("would list " + would.repo() + " "
                         + would.tag() + (would.listing() == NextVersion.Listing.NEW
                         ? " (tagged and released first)" : " (released already)"));
                 yield 0;

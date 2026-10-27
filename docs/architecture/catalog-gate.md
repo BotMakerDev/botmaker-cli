@@ -1,7 +1,8 @@
 # The catalog's check, merge and index are in this module (2026-10-23)
 
 `botmaker-catalog` holds one file per listed bot (`bots/<owner>__<repo>.json`) and per listed plugin
-(`plugins/<id>.json`), plus `publishers.json` (the ranks) and the generated `catalog.json`. Its three workflows
+(`plugins/<owner>__<repo>.json`, named by its id until 2026-10-27, when the pom's coordinate became a plugin's
+only identity), plus `publishers.json` (the ranks) and the generated `catalog.json`. Its three workflows
 call `com.botmaker.cli.catalog`, resolved from JitPack at this module's newest GitHub Release
 (`tools/resolve-cli.sh`; no version is stored there since 2026-10-23, so a release reaches open pull requests at
 their next run). The spec is the umbrella's `docs/superpowers/specs/2026-10-23-catalog-design.md`, changed by
