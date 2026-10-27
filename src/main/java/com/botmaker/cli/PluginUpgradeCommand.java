@@ -1,6 +1,7 @@
 package com.botmaker.cli;
 
 import com.botmaker.cli.project.Poms;
+import com.botmaker.cli.release.Module;
 import com.botmaker.cli.release.PomVersions;
 import com.botmaker.cli.validate.PluginValidator;
 import picocli.CommandLine.Command;
@@ -12,14 +13,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * {@code botmaker plugin upgrade [--to vX]} — the plugin's {@code botmaker-plugin-parent} moved to its newest release
  * (or {@code --to}'s), then compiled and validated (2026-10-27). The parent pins the contract, the toolkit and JavaFX
  * together, so this one version is everything a plugin builds against.
  *
- * <p>The pom changes by {@code versions:update-parent}, as the release library's goals move a module's pins; with
- * {@code skipResolution} it writes the tag named, which JitPack serves under that name and no version range finds.
+ * <p>The parent's version literal is moved as the release library moves a child's parent pin, not by
+ * {@code versions:update-parent}: any mojo first resolves the parent the pom names now, and the {@code -SNAPSHOT} that
+ * publish sends the author here to replace is in no {@code ~/.m2} but the one that built it.
  */
 @Command(name = "upgrade",
         header = "Move the plugin's botmaker-plugin-parent to its newest release, then check the plugin.",
@@ -30,6 +34,8 @@ final class PluginUpgradeCommand implements Callable<Integer> {
 
     /** Where the parent's releases are. */
     static final String PARENT_REPO = "BotMakerDev/" + PluginValidator.PARENT_ARTIFACT;
+
+    private static final Pattern TAG = Pattern.compile("[\\w.+-]+");
 
     @ParentCommand
     private PluginCommand parent;
@@ -63,14 +69,19 @@ final class PluginUpgradeCommand implements Callable<Integer> {
             console.out(PluginValidator.PARENT_ARTIFACT + " is at " + from + " already.");
             return 0;
         }
-        Mvn.Result moved = parent.main().mvn().run(dir, "-q", PomVersions.PLUGIN + ":update-parent",
-                "-DparentVersion=" + target, "-DskipResolution=true", "-DallowSnapshots=true",
-                "-DgenerateBackupPoms=false");
-        if (!moved.ok() || !Poms.parent(pom).map(Poms.Dependency::version).orElse("").equals(target)) {
-            console.error("could not move " + PluginValidator.PARENT_ARTIFACT + " from " + from + " to " + target
-                    + " (Maven must first read the parent the pom names now):\n" + moved.tail(10));
+        if (!TAG.matcher(target).matches()) {
+            console.error("'" + target + "' is not a release tag");
             return 1;
         }
+        String text = Files.readString(pom);
+        Matcher version = PomVersions.parentVersion(Module.PLUGIN_PARENT).matcher(text);
+        if (!version.find()) {
+            console.error("could not move " + PluginValidator.PARENT_ARTIFACT + " from " + from + ": its <version> "
+                    + "must come right after its <artifactId> in the <parent>, as `botmaker plugin new` writes it");
+            return 1;
+        }
+        Files.writeString(pom, text.substring(0, version.start()) + version.group(1) + target + version.group(2)
+                + text.substring(version.end()));
         console.out("Moved " + PluginValidator.PARENT_ARTIFACT + " from " + from + " to " + target + ".");
         return PluginValidateCommand.report(console, parent.main().subjects().fromDirectory(dir, true));
     }

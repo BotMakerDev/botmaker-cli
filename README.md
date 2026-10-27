@@ -102,8 +102,8 @@ top of `<properties>`. `validate` offers it when the property is missing or name
 
 ### `botmaker plugin upgrade [--to <tag>]`
 
-Moves the pom's `botmaker-plugin-parent` to its newest GitHub Release (or `--to`'s) by `versions:update-parent`,
-then compiles and runs `validate`'s checks. The parent pins the contract, the toolkit and JavaFX together.
+Moves the pom's `botmaker-plugin-parent` to its newest GitHub Release (or `--to`'s) by its version
+literal, as a release moves a parent pin (a `-SNAPSHOT` parent need not resolve), then compiles and runs `validate`'s checks. The parent pins the contract, the toolkit and JavaFX together.
 
 ### `botmaker plugin validate [dir]`
 

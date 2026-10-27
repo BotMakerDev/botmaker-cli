@@ -262,7 +262,7 @@ public final class PomVersions {
      * The {@code <version>} after {@code upstream}'s artifactId, which in a plugin's pom is its {@code <parent>}'s
      * (the parent is never a dependency); groups 1 and 2 keep everything but the version.
      */
-    static Pattern parentVersion(Module upstream) {
+    public static Pattern parentVersion(Module upstream) {
         return Pattern.compile("(<artifactId>\\s*" + upstream.directory()
                 + "\\s*</artifactId>\\s*<version>)\\s*[^<\\s]*\\s*(</version>)");
     }

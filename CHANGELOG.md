@@ -18,7 +18,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
     files when the folder's differ from the jar's (`PublishHost.commitFiles`; a host that publishes no plugin refuses
     it by default). Without them JitPack built a new plugin on its default JDK, which fails `release 25`.
   - New `botmaker plugin upgrade [--to <tag>]`: `botmaker-plugin-parent` moved to its newest GitHub Release by
-    `versions:update-parent -DskipResolution`, then compiled and validated.
+    its version literal, as a release moves a parent pin (a `-SNAPSHOT` parent no repository serves moves too),
+    then compiled and validated.
   - New `botmaker plugin declare [class]`: `botmaker.plugin` set to the one direct `DeclaredPlugin` subclass (or the
     one named) by `versions:set-property`, added to `<properties>` when missing. `LOADS` offers it, and words a pom
     without the property as "no `botmaker.plugin` in pom.xml" (a jar's: "in the pom in <jar>", with the flatten
