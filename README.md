@@ -98,8 +98,8 @@ CLI, so until this version is released it runs that release's checks, which may 
 |---|---|
 | `classpath` | the plugin's classpath resolves and every entry exists |
 | `contract-links` | every contract member the plugin's classes link exists in this build's contract — the check a host makes before loading it |
-| `loads` | `ServiceLoader` finds at least one `StudioPlugin` through the real loader |
-| `id` | every id is well formed and claimed by nobody else |
+| `loads` | a pom on the classpath sets `botmaker.plugin`, and the real loader constructs that plugin |
+| `declared` | every pom naming a plugin names one a host loads (one per jar, a `public final` direct `DeclaredPlugin`, each coordinate once), and a catalog entry's plugin is the one with its coordinate |
 | `palette` | `catalog().problems()` is empty and every entry names a real public member |
 | `records` | every recorded-input method can be filled from a recording |
 | `value-types` | every declared type answers a class and a fresh value, no class is declared by two plugins, and a component type takes its fresh value apart and puts it back |
@@ -112,8 +112,8 @@ CLI, so until this version is released it runs that release's checks, which may 
 `--coordinate G:A:V` validates a **published** artifact instead of your working copy. That is the one that
 catches a plugin which builds on your machine and publishes a pom nobody else can resolve.
 
-**A local pass is not a promise the pull request passes.** Two of the checks ask whether an id is already
-claimed, and locally nothing is claimed — the catalog holds those answers. The report says so.
+**A local pass is not a promise the pull request passes.** The catalog also asks that the published pom declare
+the coordinate JitPack serves for the repository, which a local run cannot know.
 
 **And a pass is never a safety claim.** A plugin runs arbitrary code inside Studio's process. Every check
 here asks whether a plugin *works*.
@@ -143,12 +143,12 @@ botmaker plugin publish                  # the next patch: v1.2.3 → v1.2.4 (v0
 botmaker plugin publish minor            # v1.2.3 → v1.3.0; `major` too
 botmaker plugin publish --tag v2.0.0     # the version exactly; one released already is listed as it is
 botmaker plugin publish --dry-run        # check and say what would be listed; tag nothing
-botmaker plugin unpublish --id com.example.discord [--release v1.2.3]   # the whole entry, or one release
+botmaker plugin unpublish --repo me/discord-notifier [--release v1.2.3]   # the whole entry, or one release
 botmaker plugin list                     # what catalog.json lists, with ranks
 ```
 
-**You name nothing.** The repository is the folder's `origin` (`--repo` must agree with it), the id is read from
-the jar, and the catalog derives the name, the description, the contract version and the editor dependencies from
+**You name nothing.** The repository is the folder's `origin` (`--repo` must agree with it), the plugin is the one the jar's pom
+declares, and the catalog derives the name, the description, the contract version and the editor dependencies from
 the pom at the release's commit. Each listed release is pinned: its commit, and the sha256 of the jar and pom
 JitPack built, so nobody can change what was approved.
 
