@@ -85,6 +85,11 @@ public record Forcing(Module upstream, Module downstream, String reason) {
                             + "what its tag pins"),
             new Forcing(Module.PLUGIN_PARENT, Module.PLUGIN_ARCHETYPE,
                     "the example plugin names the plugin parent, and a new plugin pins what its tag pins"),
+            // Plugin #2 names the parent too since 2026-10-28; the contract and the toolkit still force it
+            // directly, above, for the same reason as the example's.
+            new Forcing(Module.PLUGIN_PARENT, Module.PLUGIN_BASICS,
+                    "plugin #2 names the plugin parent, and flatten bakes the parent's pins into its published "
+                            + "pom"),
             new Forcing(Module.PLUGIN_ARCHETYPE, Module.CLI,
                     "`botmaker plugin new` copies the example plugin bundled into the cli at its build, so "
                             + "without a cli release new plugins keep starting from the previous one"),

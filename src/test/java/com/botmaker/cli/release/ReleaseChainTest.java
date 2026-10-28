@@ -138,8 +138,9 @@ class ReleaseChainTest {
     @Test
     void aStopMovesEachUnreachedDependentForEveryTaggedUpstream(@TempDir Path umbrella) throws Exception {
         // 2026-10-06: studio-api and the toolkit were tagged, the toolkit's JitPack build failed, and
-        // plugin-basics got the contract's pin but kept the toolkit's old snapshot.
-        for (Module module : List.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_BASICS)) {
+        // plugin-basics got the contract's pin but kept the toolkit's old snapshot. Basics names the plugin parent
+        // since 2026-10-28, so the SDK, which still pins both directly, stands in for it.
+        for (Module module : List.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.SDK)) {
             Path dir = Files.createDirectories(umbrella.resolve(module.directory()));
             Files.writeString(dir.resolve("pom.xml"), "<project><version>0.1.0-SNAPSHOT</version><properties>"
                     + "<botmaker.studioapi.version>0.1.0-SNAPSHOT</botmaker.studioapi.version>"
@@ -149,7 +150,7 @@ class ReleaseChainTest {
         Map<Module, Version> releasing = new EnumMap<>(Module.class);
         releasing.put(Module.STUDIO_API, new Version(0, 5, 0));
         releasing.put(Module.PLUGIN_TOOLKIT, new Version(0, 4, 0));
-        releasing.put(Module.PLUGIN_BASICS, new Version(0, 3, 0));
+        releasing.put(Module.SDK, new Version(0, 3, 0));
         List<String> said = new ArrayList<>();
 
         assertThrows(ReleaseRefusal.class, () ->
@@ -162,9 +163,9 @@ class ReleaseChainTest {
                             return ReleaseLog.Stage.BUILT;
                         }));
 
-        assertTrue(said.stream().anyMatch(line -> line.contains("botmaker-plugin-basics")
+        assertTrue(said.stream().anyMatch(line -> line.contains("botmaker-sdk")
                 && line.endsWith("commit -m 'pin studio-api 0.5.1-SNAPSHOT' -- pom.xml")), said.toString());
-        assertTrue(said.stream().anyMatch(line -> line.contains("botmaker-plugin-basics")
+        assertTrue(said.stream().anyMatch(line -> line.contains("botmaker-sdk")
                 && line.endsWith("commit -m 'pin plugin-toolkit 0.4.1-SNAPSHOT' -- pom.xml")), said.toString());
     }
 

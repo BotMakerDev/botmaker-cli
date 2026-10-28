@@ -39,6 +39,16 @@ public final class CiDepsGate {
     private static final Pattern SNAPSHOT_PIN =
             Pattern.compile("<botmaker\\.([a-z]*)\\.version>[^<]*-SNAPSHOT<");
 
+    /**
+     * A {@code <parent>} at a {@code -SNAPSHOT}: the archetype names {@code botmaker-plugin-parent} so (2026-10-27),
+     * by a version literal rather than a property, and its CI needs the parent from source just the same.
+     */
+    private static final Pattern SNAPSHOT_PARENT = Pattern.compile(
+            "<parent>(?:(?!</parent>).)*?<artifactId>([^<]+)</artifactId>(?:(?!</parent>).)*?"
+                    + "<version>[^<]*-SNAPSHOT</version>", Pattern.DOTALL);
+
+    private static final Pattern XML_COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);
+
     /** A YAML line that is only a comment; a trailing {@code #} on a step line is left, it may be in a string. */
     private static final Pattern WHOLE_LINE_COMMENT = Pattern.compile("(?m)^[ \\t]*#.*$");
 
@@ -75,6 +85,7 @@ public final class CiDepsGate {
                 missing.add(repo);
             }
         }
+        parentRepository(pom).filter(repo -> !steps.contains(repo)).ifPresent(missing::add);
         if (missing.isEmpty()) {
             return GateVerdict.ok("  " + module.shortName()
                     + ": ci.yml checks out every -SNAPSHOT upstream — ok");
@@ -108,6 +119,15 @@ public final class CiDepsGate {
             keys.add(matcher.group(1));
         }
         return keys;
+    }
+
+    /** The BotMaker module this pom names as its {@code <parent>} at a {@code -SNAPSHOT}, by its repository. */
+    public static Optional<String> parentRepository(String pom) {
+        // A commented-out <parent> names nothing this build resolves.
+        Matcher matcher = SNAPSHOT_PARENT.matcher(XML_COMMENT.matcher(pom).replaceAll(""));
+        return matcher.find()
+                ? Module.byDirectory(matcher.group(1).strip()).map(Module::directory)
+                : Optional.empty();
     }
 
     /** The repository a property key names — {@link Module#byPropertyKey}, which owns the table. */

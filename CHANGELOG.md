@@ -20,6 +20,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   constructor taking nothing, or one that throws, fails naming it (a surface that links JavaFX on a classpath with
   none is listed as not asked); `plugin-files` warns when the plugin's own output has no
   `META-INF/botmaker/changelog.md` or `icon.png`. A warning is the new `Status.WARN`, which never fails a run.
+- **The release's CI check knows a `<parent>`** (2026-10-28): `CiDepsGate` refuses a module whose pom names a
+  BotMaker module as its parent at a `-SNAPSHOT` (the archetype and basics name `botmaker-plugin-parent`) while its
+  `ci.yml` never checks that repository out.
+
+### Changed
+
+- **plugin-basics pins the plugin parent** (2026-10-28), not the contract and the toolkit: `Module.upstreams()`
+  says so, and a `--plugin-parent` release forces `--plugin-basics` (which still forces `--sdk`).
 
 ### Changed (breaking)
 

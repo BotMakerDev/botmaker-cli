@@ -83,7 +83,7 @@ public final class Order {
             Module.SHARED,
             Module.SESSION,
             // Plugin #2 is tagged immediately before the SDK, which resolves it. Nothing here waits on
-            // shared or session — it pins the contract and the toolkit, both tagged far above — but
+            // shared or session — it pins the plugin parent (2026-10-28), tagged far above — but
             // JitPack builds on demand and does not queue, so the SDK must not start building first.
             Module.PLUGIN_BASICS,
             Module.SDK,

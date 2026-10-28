@@ -195,13 +195,13 @@ public enum Module {
     public List<Module> upstreams() {
         return switch (this) {
             case PLUGIN_TOOLKIT, PLUGIN_HOST -> List.of(STUDIO_API);
-            // Plugin #2 pins two: the contract at `provided` and the toolkit at `compile`. Both reach the
-            // published pom, and that pom is what another plugin — the SDK — resolves. The plugin parent pins
-            // the same two, in the dependencyManagement every plugin inherits (2026-10-27).
-            case PLUGIN_BASICS, PLUGIN_PARENT -> List.of(STUDIO_API, PLUGIN_TOOLKIT);
-            // The example plugin pins its <parent> (2026-10-27; the two pins above until then), and its tag's
-            // pom is the one a new plugin starts from.
-            case PLUGIN_ARCHETYPE -> List.of(PLUGIN_PARENT);
+            // The plugin parent pins the contract and the toolkit, in the dependencyManagement every plugin
+            // inherits (2026-10-27).
+            case PLUGIN_PARENT -> List.of(STUDIO_API, PLUGIN_TOOLKIT);
+            // The example plugin pins its <parent> (2026-10-27), and its tag's pom is the one a new plugin
+            // starts from. Plugin #2 does too since 2026-10-28 (the contract and the toolkit directly until
+            // then); flatten writes the parent's two pins into the published pom the SDK resolves.
+            case PLUGIN_ARCHETYPE, PLUGIN_BASICS -> List.of(PLUGIN_PARENT);
             // The archetype is the example plugin's `template` zip, bundled for `botmaker plugin new`.
             case CLI -> List.of(STUDIO_API, PLUGIN_HOST, PLUGIN_ARCHETYPE);
             case SESSION -> List.of(SHARED);

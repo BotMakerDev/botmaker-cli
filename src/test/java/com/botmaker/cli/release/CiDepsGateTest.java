@@ -98,6 +98,43 @@ class CiDepsGateTest {
         }
     }
 
+    /** 2026-10-27: the archetype names the parent by a version literal, which no property key catches. */
+    @Test
+    void aSnapshotParentIsAnUpstreamTheWorkflowMustCheckOut() {
+        String pom = """
+                <project>
+                  <parent>
+                    <groupId>com.github.BotMakerDev</groupId>
+                    <artifactId>botmaker-plugin-parent</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                  </parent>
+                </project>
+                """;
+        assertEquals(Optional.of("botmaker-plugin-parent"), CiDepsGate.parentRepository(pom));
+        GateVerdict refused = CiDepsGate.check(Module.PLUGIN_ARCHETYPE, pom, Optional.of("steps: []"), false);
+        assertTrue(refused.refusal().startsWith(
+                "botmaker-plugin-archetype: pom.xml resolves botmaker-plugin-parent at a -SNAPSHOT"),
+                refused.refusal());
+        String ci = "steps:\n  - with:\n      repository: BotMakerDev/botmaker-plugin-parent\n";
+        assertEquals(GateVerdict.Status.OK,
+                CiDepsGate.check(Module.PLUGIN_ARCHETYPE, pom, Optional.of(ci), false).status());
+    }
+
+    @Test
+    void aReleasedOrForeignParentNeedsNoCheckout() {
+        String released = "<parent><artifactId>botmaker-plugin-parent</artifactId><version>0.1.0</version></parent>";
+        String foreign = "<parent><artifactId>spring-boot-starter-parent</artifactId>"
+                + "<version>3.0.0-SNAPSHOT</version></parent>";
+        String later = "<parent><artifactId>other</artifactId><version>1</version></parent>"
+                + "<botmaker.shared.version>1-SNAPSHOT</botmaker.shared.version>";
+        assertTrue(CiDepsGate.parentRepository(released).isEmpty());
+        assertTrue(CiDepsGate.parentRepository(foreign).isEmpty());
+        assertTrue(CiDepsGate.parentRepository(later).isEmpty());
+        String commented = "<!-- <parent><artifactId>botmaker-plugin-parent</artifactId>"
+                + "<version>0.1.0-SNAPSHOT</version></parent> -->" + released;
+        assertTrue(CiDepsGate.parentRepository(commented).isEmpty());
+    }
+
     @Test
     void theKeyTableIsAMappingAndNotADerivation() {
         assertEquals(Optional.of(Module.STUDIO_API), CiDepsGate.repositoryModule("studioapi"));
