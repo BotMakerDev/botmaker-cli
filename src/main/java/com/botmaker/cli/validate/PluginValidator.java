@@ -23,6 +23,7 @@ import com.botmaker.plugin.host.Palettes;
 import com.botmaker.plugin.host.PluginLoader;
 import com.botmaker.plugin.host.PluginPoms;
 
+import java.io.IOException;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
@@ -34,6 +35,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -41,13 +43,16 @@ import java.util.IdentityHashMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
+import java.util.zip.ZipFile;
 
 /**
- * The eight checks, run once, over a {@link PluginSubject}.
+ * Every {@link Check}, run once, over a {@link PluginSubject}.
  *
  * <p><b>This class is the reason {@code botmaker-cli}'s main artifact is a library.</b> It has two callers
  * in two repositories — the author's {@code botmaker validate} and the plugin registry's CI on a pull
@@ -106,12 +111,13 @@ public final class PluginValidator {
         CheckResult classpath = checkClasspath(subject);
         results.add(classpath);
         if (classpath.failed()) {
-            for (Check check : List.of(Check.CONTRACT_LINKS, Check.LOADS, Check.DECLARED, Check.PALETTE,
-                    Check.TYPES, Check.MANAGED, Check.EDITORS, Check.PICKERS)) {
+            for (Check check : List.of(Check.CONTRACT_LINKS, Check.LOADS, Check.DECLARED, Check.HOLDERS,
+                    Check.PALETTE, Check.TYPES, Check.MANAGED, Check.EDITORS, Check.PICKERS)) {
                 results.add(CheckResult.skip(check, "the classpath did not resolve"));
             }
             results.add(checkPomScopes(subject));
             results.add(checkPluginDeps(subject));
+            results.add(CheckResult.skip(Check.PLUGIN_FILES, "the classpath did not resolve"));
             return List.copyOf(results);
         }
         results.add(checkContractLinks(subject));
@@ -126,8 +132,8 @@ public final class PluginValidator {
             List<StudioPlugin> plugins = found.stream().map(LoadedPlugin::plugin).toList();
             if (plugins.isEmpty()) {
                 results.add(CheckResult.fail(Check.LOADS, Unloaded.why(subject.classpath(), opened.failures())));
-                for (Check check : List.of(Check.DECLARED, Check.PALETTE, Check.TYPES, Check.MANAGED,
-                        Check.EDITORS, Check.PICKERS)) {
+                for (Check check : List.of(Check.DECLARED, Check.HOLDERS, Check.PALETTE, Check.TYPES,
+                        Check.MANAGED, Check.EDITORS, Check.PICKERS)) {
                     results.add(CheckResult.skip(check, "nothing loaded"));
                 }
             } else {
@@ -137,6 +143,7 @@ public final class PluginValidator {
                 results.add(CheckResult.pass(Check.LOADS, plugins.size() + " plugin(s): " + String.join(", ",
                         found.stream().map(p -> p.coordinate().toString()).toList())));
                 results.add(checkDeclared(found, opened.failures(), subject));
+                results.add(checkHolders(plugins, judged));
                 results.add(checkPalette(plugins));
                 results.add(checkTypes(plugins, judged));
                 results.add(checkManaged(plugins, judged));
@@ -147,6 +154,7 @@ public final class PluginValidator {
 
         results.add(checkPomScopes(subject));
         results.add(checkPluginDeps(subject));
+        results.add(checkPluginFiles(subject));
         return List.copyOf(results);
     }
 
@@ -224,6 +232,69 @@ public final class PluginValidator {
                         .map(p -> p.coordinate() + " (" + p.name() + ", " + p.plugin().getClass().getName() + ")")
                         .toList()))
                 : CheckResult.fail(Check.DECLARED, problems);
+    }
+
+    // -------------------------------------------------------------------------------------------------
+    // 3b — holders
+    // -------------------------------------------------------------------------------------------------
+
+    /**
+     * Every surface of every judged plugin asked once, as a host asks it: each holder the declaration names is
+     * built then, and a holder with no constructor taking no arguments, or one that throws, fails with the
+     * holder's name (2026-10-28). The checks after this one ask only the surfaces they judge; the toolbar, the
+     * run overlay, the overlay and the assistant are asked nowhere else.
+     *
+     * <p>A surface that cannot even be linked without JavaFX — this CLI has none — is listed as not asked, the
+     * limit {@link #checkEditors} states, rather than blamed on the plugin.
+     */
+    private static CheckResult checkHolders(List<StudioPlugin> plugins, Set<StudioPlugin> judged) {
+        List<String> problems = new ArrayList<>();
+        Set<String> unlinked = new LinkedHashSet<>();
+        int asked = 0;
+        for (StudioPlugin plugin : plugins) {
+            if (!judged.contains(plugin)) continue;
+            Map<String, Supplier<?>> surfaces = new LinkedHashMap<>();
+            surfaces.put("types", plugin::types);
+            surfaces.put("types (components)", plugin::componentTypes);
+            surfaces.put("values", plugin::managedValues);
+            surfaces.put("editors", plugin::slotEditors);
+            surfaces.put("toolbar", plugin::toolbarItems);
+            surfaces.put("runOverlay", plugin::runOverlayParts);
+            surfaces.put("overlay", plugin::overlayPart);
+            surfaces.put("assistant", plugin::assistantTools);
+            surfaces.put("catalog", plugin::catalog);
+            for (Map.Entry<String, Supplier<?>> surface : surfaces.entrySet()) {
+                try {
+                    surface.getValue().get();
+                    asked++;
+                } catch (LinkageError | AssertionError e) {
+                    if (!javafx() && linksJavaFx(e)) {
+                        unlinked.add(surface.getKey());
+                    } else {
+                        problems.add(safeId(plugin) + " ." + surface.getKey() + ": " + e);
+                    }
+                } catch (RuntimeException e) {
+                    problems.add(safeId(plugin) + " ." + surface.getKey() + ": " + e.getMessage()
+                            + (e.getCause() == null ? "" : " (" + e.getCause() + ")"));
+                }
+            }
+        }
+        if (!problems.isEmpty()) return CheckResult.fail(Check.HOLDERS, problems);
+        return CheckResult.pass(Check.HOLDERS, asked + " surface(s) answered" + (unlinked.isEmpty() ? ""
+                : "; not asked, as they link JavaFX and this classpath has none: " + String.join(", ", unlinked)));
+    }
+
+    /**
+     * Whether {@code failure}, or what caused it, is a JavaFX class not found: the first link names it
+     * ({@code javafx/scene/Node}), and a class whose initialiser failed on it is "Could not initialize class …"
+     * afterwards, with the first failure as its cause.
+     */
+    private static boolean linksJavaFx(Throwable failure) {
+        for (Throwable each = failure; each != null; each = each.getCause()) {
+            if (String.valueOf(each.getMessage()).contains("javafx/")) return true;
+            if (each.getCause() == each) break;
+        }
+        return false;
     }
 
     // -------------------------------------------------------------------------------------------------
@@ -1312,6 +1383,53 @@ public final class PluginValidator {
                     "remove <optional>true</optional>; a plugin is nobody's dependency, so it buys nothing"));
         }
         return CheckResult.pass(Check.PLUGIN_DEPS, "toolkit is transitive");
+    }
+
+    // -------------------------------------------------------------------------------------------------
+    // 10 — plugin files
+    // -------------------------------------------------------------------------------------------------
+
+    /** Where {@code botmaker-plugin-parent} puts a plugin's {@code CHANGELOG.md} and {@code icon.png} in its jar. */
+    static final String CHANGELOG_ENTRY = "META-INF/botmaker/changelog.md";
+    static final String ICON_ENTRY = "META-INF/botmaker/icon.png";
+
+    /**
+     * The plugin's own output — the classpath's first entry, a classes directory or a jar — carries a changelog
+     * and an icon. A warning at most: Studio shows a plugin without either.
+     */
+    private static CheckResult checkPluginFiles(PluginSubject subject) {
+        Path own = subject.classpath().getFirst();
+        Set<String> present = new HashSet<>();
+        try {
+            if (Files.isDirectory(own)) {
+                for (String entry : List.of(CHANGELOG_ENTRY, ICON_ENTRY)) {
+                    if (Files.isRegularFile(own.resolve(entry))) present.add(entry);
+                }
+            } else {
+                try (ZipFile jar = new ZipFile(own.toFile())) {
+                    for (String entry : List.of(CHANGELOG_ENTRY, ICON_ENTRY)) {
+                        if (jar.getEntry(entry) != null) present.add(entry);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            return CheckResult.skip(Check.PLUGIN_FILES, "cannot read " + own + ": " + e.getMessage());
+        }
+        List<String> missing = new ArrayList<>();
+        if (!present.contains(CHANGELOG_ENTRY)) {
+            missing.add("no changelog: write CHANGELOG.md beside pom.xml (Keep a Changelog, `## [1.2.0] — date`"
+                    + " sections), and Studio's upgrade dialog shows what each release changed");
+        }
+        if (!present.contains(ICON_ENTRY)) {
+            missing.add("no icon: put a square icon.png (64 px) beside pom.xml, and Studio shows it beside the"
+                    + " plugin's name instead of a puzzle piece");
+        }
+        if (!missing.isEmpty()) {
+            missing.add("botmaker-plugin-parent copies both into the jar; a pom on another parent copies them to "
+                    + CHANGELOG_ENTRY + " and " + ICON_ENTRY + " itself");
+            return CheckResult.warn(Check.PLUGIN_FILES, missing);
+        }
+        return CheckResult.pass(Check.PLUGIN_FILES, "changelog and icon");
     }
 
     // -------------------------------------------------------------------------------------------------

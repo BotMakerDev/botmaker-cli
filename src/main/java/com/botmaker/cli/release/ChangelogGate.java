@@ -61,9 +61,9 @@ public final class ChangelogGate {
         }
         return GateVerdict.refused(module.directory() + ": CHANGELOG.md has no section for v" + version
                 + ".\n"
-                + "     That file is what this release TELLS PEOPLE — the GitHub Release body, and for the"
-                + " sdk the\n"
-                + "     whats-new.md inside the jar that Studio's upgrade dialog leads with. A pushed tag"
+                + "     That file is what this release TELLS PEOPLE — the GitHub Release body, and for a"
+                + " plugin the\n"
+                + "     changelog.md inside the jar that Studio's upgrade dialog leads with. A pushed tag"
                 + " cannot be edited.\n"
                 + "     " + hint(dir, module, version) + "  --force overrides.");
     }

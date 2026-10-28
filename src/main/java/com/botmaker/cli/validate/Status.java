@@ -13,5 +13,11 @@ public enum Status {
      * claim coverage it does not have, and the one check that skips routinely ({@link Check#EDITORS},
      * without JavaFX) is the one whose failure is hardest to find later.
      */
-    SKIP
+    SKIP,
+
+    /**
+     * Asked and answered, with something the author should fix that no host refuses — a plugin with no changelog
+     * or no icon (2026-10-28). Never a failure: {@link PluginValidator#passed} counts only {@link #FAIL}.
+     */
+    WARN
 }

@@ -10,6 +10,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
@@ -23,7 +26,8 @@ import java.util.concurrent.Callable;
  * and no Maven.
  *
  * <p>What it adds over copying the repository by hand is the renaming nobody gets right twice: package and
- * directories, the plugin's name, the pom's coordinates (the plugin's identity) and the class it names. And it
+ * directories, the classes named after the plugin, the plugin's name, the pom's coordinates (the plugin's identity)
+ * and the class it names. {@code --minimal} leaves the example out: a plugin class declaring nothing. And it
  * writes the JitPack build the cli owns ({@link JitpackFiles}), which {@code plugin publish} refreshes.
  */
 @Command(name = "new",
@@ -55,6 +59,16 @@ final class PluginNewCommand implements Callable<Integer> {
 
     @Option(names = "--plugin-name", description = "The name a user reads. Default: the artifact id, titled")
     private String pluginName;
+
+    @Option(names = "--class-prefix", paramLabel = "<Prefix>",
+            description = "What the classes are named after: <Prefix>Plugin, <Prefix>Types, … Default: the artifact "
+                    + "id in CamelCase, less a trailing -plugin")
+    private String classPrefix;
+
+    @Option(names = "--minimal",
+            description = "A plugin class that declares nothing, its one test, the pom, a changelog and an icon; no"
+                    + " example")
+    private boolean minimal;
 
     @Option(names = "--plugin-version", defaultValue = "0.1.0-SNAPSHOT",
             description = "The generated project's own version. Default: ${DEFAULT-VALUE}")
@@ -96,9 +110,10 @@ final class PluginNewCommand implements Callable<Integer> {
         try {
             answers = new PluginTemplate.Answers(group, name, pluginVersion, javaPackage,
                     pluginName != null ? pluginName : title(name),
+                    classPrefix != null ? classPrefix : classPrefix(name), minimal,
                     Optional.ofNullable(parentVersion));
         } catch (IllegalArgumentException e) {
-            console.error(e.getMessage() + " (see --package and --plugin-name)");
+            console.error(e.getMessage() + " (see --package, --plugin-name and --class-prefix)");
             return 1;
         }
         PluginTemplate.Made made;
@@ -108,6 +123,7 @@ final class PluginNewCommand implements Callable<Integer> {
         JitpackFiles.write(target, JitpackFiles.bundled());
         console.out("Created " + target + " as " + group + ":" + name + " (" + PluginTemplate.PARENT + " "
                 + made.parentVersion() + "), for the repository " + account + "/" + name);
+        console.out("  The plugin class is " + made.pluginClass() + ".");
         if (made.parentVersion().endsWith("-SNAPSHOT")) {
             console.out("  A -SNAPSHOT parent resolves from this computer's ~/.m2 only: run `mvn install` in the "
                     + "BotMaker umbrella first, or pass --parent a released tag (`botmaker plugin upgrade` moves it to"
@@ -115,7 +131,8 @@ final class PluginNewCommand implements Callable<Integer> {
         }
         console.out("");
         console.out("  cd " + name);
-        console.out("  mvn verify               # the example's tests pass unedited");
+        console.out("  mvn verify               # the " + (minimal ? "plugin's test passes" : "example's tests pass")
+                + " unedited");
         console.out("  botmaker plugin validate # the checks the plugin registry runs");
         return 0;
     }
@@ -124,6 +141,20 @@ final class PluginNewCommand implements Callable<Integer> {
     static String identifier(String word) {
         String lower = word.toLowerCase().replaceAll("[^a-z0-9_]", "_");
         return lower.isEmpty() || Character.isDigit(lower.charAt(0)) ? "_" + lower : lower;
+    }
+
+    /**
+     * {@code discord-notifier} to {@code DiscordNotifier}, what the classes are named after; a trailing
+     * {@code plugin} word is dropped ({@code demo-plugin} makes {@code DemoPlugin}, not {@code DemoPluginPlugin}),
+     * and a name that would not start with a letter gets {@code My} in front.
+     */
+    static String classPrefix(String artifactId) {
+        List<String> words = new ArrayList<>(Arrays.stream(artifactId.split("[^A-Za-z0-9]+"))
+                .filter(word -> !word.isEmpty()).toList());
+        if (words.size() > 1 && words.getLast().equalsIgnoreCase("plugin")) words.removeLast();
+        StringBuilder out = new StringBuilder();
+        for (String word : words) out.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        return out.isEmpty() || !Character.isLetter(out.charAt(0)) ? "My" + out : out.toString();
     }
 
     /** {@code discord-notifier} to {@code Discord Notifier} — the name a user reads in Studio. */

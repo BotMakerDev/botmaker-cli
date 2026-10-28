@@ -1,7 +1,7 @@
 package com.botmaker.cli.validate;
 
 /**
- * The eight things asked of a plugin, in the order they are asked.
+ * The things asked of a plugin, in the order they are asked.
  *
  * <p><b>An enum rather than seven strings, and the reason is the whole point of this package.</b> Two
  * programs in two repositories report these: the author's {@code botmaker validate} and the registry's CI on
@@ -34,6 +34,13 @@ public enum Check {
      * coordinate. Was {@code id} until 2026-10-27, when the coordinate became a plugin's only identity.
      */
     DECLARED("declared", "Each plugin is declared once, by its own pom"),
+
+    /**
+     * Every holder class a plugin's declaration names builds through its constructor with no arguments and
+     * answers without throwing, on every surface (2026-10-28). A host builds a holder only when it first asks for
+     * that surface, so one that cannot be built is otherwise a toolbar or an overlay that silently never appears.
+     */
+    HOLDERS("holders", "Every holder the declaration names builds and answers"),
 
     /** {@code catalog().problems()} is empty and every entry names a real public member. */
     PALETTE("palette", "The palette catalog is clean and every entry resolves"),
@@ -81,7 +88,15 @@ public enum Check {
      * author runs and absent from the classpath a host loads the plugin onto, which is why this one has
      * shipped three times and is the last check rather than a clause in the previous one.
      */
-    PLUGIN_DEPS("plugin-deps", "Nothing the plugin needs is declared optional");
+    PLUGIN_DEPS("plugin-deps", "Nothing the plugin needs is declared optional"),
+
+    /**
+     * The plugin's own classpath entry carries {@code META-INF/botmaker/changelog.md} and {@code icon.png}, which
+     * {@code botmaker-plugin-parent} copies from {@code CHANGELOG.md} and {@code icon.png} beside the pom
+     * (2026-10-28). Only ever a {@link Status#WARN}: Studio shows a plugin without them, with no "what's new" in
+     * its upgrade dialog and a default icon.
+     */
+    PLUGIN_FILES("plugin-files", "The plugin carries a changelog and an icon");
 
     private final String id;
     private final String title;

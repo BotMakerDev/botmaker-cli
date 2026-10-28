@@ -64,8 +64,8 @@ class ChangeKindTest {
 
     @Test
     void theSdksChangelogIsDocsEvenThoughItsJarCarriesIt() {
-        // botmaker-sdk/pom.xml copies the whole CHANGELOG.md into the jar as
-        // META-INF/botmaker/whats-new.md, so editing it does change the artifact. It stays excluded: a
+        // botmaker-plugin-parent and botmaker-sdk/pom.xml copy the whole CHANGELOG.md into the jar as
+        // META-INF/botmaker/changelog.md, so editing it does change the artifact. It stays excluded: a
         // release authors its own section, so counting it would make every release justify itself.
         assertEquals(ChangeKind.DOCS, ChangeKind.classify(List.of("CHANGELOG.md")));
     }

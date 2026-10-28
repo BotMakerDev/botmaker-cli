@@ -86,6 +86,7 @@ public final class Console {
             case PASS -> paint("32", "  ok  ");
             case FAIL -> paint("31", " FAIL ");
             case SKIP -> paint("33", " skip ");
+            case WARN -> paint("33", " warn ");
         };
     }
 

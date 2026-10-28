@@ -8,6 +8,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,8 +28,11 @@ import java.util.zip.ZipInputStream;
  * <p>What a copy changes is the whole of what makes the example the author's, each found by an anchor the
  * example keeps, and a template without one is refused rather than copied half-renamed:
  * <ul>
- *   <li>the package {@value #PACKAGE}, in every source and in the pom's {@code botmaker.plugin} class, and the
- *       directories under {@code src/main/java} and {@code src/test/java};</li>
+ *   <li>the package {@value #PACKAGE}, in every source and page and in the pom's {@code botmaker.plugin} class,
+ *       and the directories under {@code src/main/java} and {@code src/test/java};</li>
+ *   <li>the classes named {@value #CLASS_PREFIX}<i>Something</i> — {@code ExamplePlugin}, {@code ExampleTypes}, … —
+ *       named after the plugin instead (2026-10-28), in the sources, the pages, the file names and the pom's
+ *       {@code botmaker.plugin};</li>
  *   <li>the name a user reads, the literal {@value #NAME} in the sources and the pom's {@code <name>};</li>
  *   <li>the pom's region marked {@code coordinates}, replaced, and its region marked {@code drop} (the build
  *       of this zip), removed; its {@code <parent>}, {@code botmaker-plugin-parent}, found from the
@@ -36,6 +41,10 @@ import java.util.zip.ZipInputStream;
  *   <li>{@code gitignore}, stored without its dot because a jar's default excludes drop a {@code .gitignore}.</li>
  * </ul>
  * There is no plugin id to rename (2026-10-27): the pom's {@code groupId:artifactId} is the plugin's identity.
+ *
+ * <p>Entries under {@value #MINIMAL} are the {@code --minimal} variant: a plugin class that declares nothing, its
+ * one test and a README. A minimal copy writes them in place of the example's {@code src/} and README, and keeps the
+ * rest (the pom, the changelog, the icon, {@code DECLARE.md}); a full copy skips them.
  */
 final class PluginTemplate {
 
@@ -45,11 +54,20 @@ final class PluginTemplate {
     /** The example's package. */
     static final String PACKAGE = "com.example.greetings";
 
+    /** What the example's class names start with, each renamed to the plugin's own prefix. */
+    static final String CLASS_PREFIX = "Example";
+
     /** The example's display name, as the literal it is spelled with. */
     static final String NAME = "\"Greeter\"";
 
+    /** The zip's folder holding the {@code --minimal} variant's files, at the paths they take in the copy. */
+    static final String MINIMAL = "minimal/";
+
     private static final String PACKAGE_PATH = PACKAGE.replace('.', '/') + "/";
     private static final String GITIGNORE = "gitignore";
+
+    /** {@code ExampleTypes}, never the word {@code Example} in a sentence: the prefix followed by a capital. */
+    private static final Pattern CLASS_NAME = Pattern.compile("\\b" + CLASS_PREFIX + "(?=[A-Z])");
 
     /** A marked region of the pom, with the indentation before it and the line break after it. */
     private static final Pattern REGION = Pattern.compile(
@@ -69,10 +87,11 @@ final class PluginTemplate {
 
     /**
      * What the new plugin is called. An empty parent version keeps the one the template carries, which is the
-     * release this {@code botmaker} was built with.
+     * release this {@code botmaker} was built with. {@code classPrefix} replaces {@value #CLASS_PREFIX} in every
+     * class name ({@code DiscordNotifier} makes {@code DiscordNotifierPlugin}).
      */
     record Answers(String groupId, String artifactId, String version, String javaPackage,
-                   String pluginName, Optional<String> parentVersion) {
+                   String pluginName, String classPrefix, boolean minimal, Optional<String> parentVersion) {
         Answers {
             if (!SourceVersion.isName(javaPackage)) {
                 throw new IllegalArgumentException("not a Java package name: " + javaPackage);
@@ -81,11 +100,16 @@ final class PluginTemplate {
             if (pluginName.chars().anyMatch(Character::isISOControl) || pluginName.contains("*/")) {
                 throw new IllegalArgumentException("a plugin name holds no line break and no */: " + pluginName);
             }
+            if (classPrefix.isEmpty() || !Character.isUpperCase(classPrefix.charAt(0))
+                    || !SourceVersion.isIdentifier(classPrefix) || SourceVersion.isKeyword(classPrefix)) {
+                throw new IllegalArgumentException("not a class name prefix (a Java name starting with a capital): "
+                        + classPrefix);
+            }
         }
     }
 
-    /** The parent version the new plugin's pom names. */
-    record Made(String parentVersion) {
+    /** The parent version the new plugin's pom names, and the plugin class it declares. */
+    record Made(String parentVersion, String pluginClass) {
     }
 
     private PluginTemplate() {
@@ -104,33 +128,64 @@ final class PluginTemplate {
     static Made write(InputStream template, Path target, Answers answers) throws IOException {
         String packagePath = answers.javaPackage().replace('.', '/') + "/";
         Made made = null;
-        try (ZipInputStream zip = new ZipInputStream(template)) {
-            for (ZipEntry entry; (entry = zip.getNextEntry()) != null; ) {
-                if (entry.isDirectory()) {
-                    continue;
-                }
-                String name = entry.getName();
-                String text = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
-                if (name.equals(GITIGNORE)) {
-                    name = "." + GITIGNORE;
-                } else if (name.equals("pom.xml")) {
-                    text = pom(text, answers);
-                    made = new Made(parentVersion(text));
-                } else if (name.endsWith(".java")) {
-                    text = text.replace(PACKAGE, answers.javaPackage())
-                            .replace(NAME, javaString(answers.pluginName()));
-                    name = name.replace(PACKAGE_PATH, packagePath);
-                }
-                Path file = target.resolve(name).normalize();
-                if (!file.startsWith(target)) {
-                    throw new IllegalStateException("the template names a file outside the project: " + name);
-                }
-                Files.createDirectories(file.getParent());
-                Files.writeString(file, text);
+        for (Map.Entry<String, byte[]> entry : chosen(template, answers.minimal()).entrySet()) {
+            String name = entry.getKey();
+            byte[] bytes = entry.getValue();
+            if (name.equals(GITIGNORE)) {
+                name = "." + GITIGNORE;
+            } else if (name.equals("pom.xml")) {
+                String pom = pom(new String(bytes, StandardCharsets.UTF_8), answers);
+                bytes = pom.getBytes(StandardCharsets.UTF_8);
+                made = new Made(parentVersion(pom), pluginClassOf(pom));
+            } else if (name.endsWith(".java") || name.endsWith(".md")) {
+                String text = new String(bytes, StandardCharsets.UTF_8).replace(PACKAGE, answers.javaPackage())
+                        .replace(NAME, javaString(answers.pluginName()));
+                bytes = classNames(text, answers.classPrefix()).getBytes(StandardCharsets.UTF_8);
+                name = classNames(name.replace(PACKAGE_PATH, packagePath), answers.classPrefix());
             }
+            Path file = target.resolve(name).normalize();
+            if (!file.startsWith(target)) {
+                throw new IllegalStateException("the template names a file outside the project: " + name);
+            }
+            Files.createDirectories(file.getParent());
+            Files.write(file, bytes);
         }
         if (made == null) throw new IllegalStateException("not the example plugin's template: no pom.xml");
         return made;
+    }
+
+    /**
+     * The zip's files the copy writes, by the path they take: for a full copy every file outside {@value #MINIMAL};
+     * for a minimal one each {@value #MINIMAL} file in place of the example's {@code src/} and of the file at its
+     * path, beside the rest. Bytes, not text: the icon is a PNG.
+     */
+    private static Map<String, byte[]> chosen(InputStream template, boolean minimal) throws IOException {
+        Map<String, byte[]> full = new LinkedHashMap<>();
+        Map<String, byte[]> variant = new LinkedHashMap<>();
+        try (ZipInputStream zip = new ZipInputStream(template)) {
+            for (ZipEntry entry; (entry = zip.getNextEntry()) != null; ) {
+                if (entry.isDirectory()) continue;
+                String name = entry.getName();
+                if (name.startsWith(MINIMAL)) {
+                    variant.put(name.substring(MINIMAL.length()), zip.readAllBytes());
+                } else {
+                    full.put(name, zip.readAllBytes());
+                }
+            }
+        }
+        if (!minimal) return full;
+        if (variant.isEmpty()) throw new IllegalStateException("the template has no " + MINIMAL + " variant");
+        Map<String, byte[]> out = new LinkedHashMap<>();
+        full.forEach((name, bytes) -> {
+            if (!name.startsWith("src/") && !variant.containsKey(name)) out.put(name, bytes);
+        });
+        out.putAll(variant);
+        return out;
+    }
+
+    /** {@code text} with every {@code ExampleSomething} class name made {@code <prefix>Something}. */
+    private static String classNames(String text, String prefix) {
+        return CLASS_NAME.matcher(text).replaceAll(Matcher.quoteReplacement(prefix));
     }
 
     /** The template's pom with the new coordinates, without the template's own build, and on its parent. */
@@ -162,7 +217,7 @@ final class PluginTemplate {
             throw new IllegalStateException("the template's pom has no region marked "
                     + (coordinates ? "drop" : "coordinates"));
         }
-        return parent(pluginClass(out.toString(), answers.javaPackage()), answers.parentVersion());
+        return parent(pluginClass(out.toString(), answers), answers.parentVersion());
     }
 
     /**
@@ -195,21 +250,28 @@ final class PluginTemplate {
     }
 
     /**
-     * The pom with its one {@code botmaker.plugin} class moved into {@code javaPackage}, as the sources are: the
-     * class a host constructs is the one the copy holds. The example's must be in {@value #PACKAGE}, or the copy
-     * would name a class it does not have.
+     * The pom with its one {@code botmaker.plugin} class moved into the new package and renamed by the new prefix,
+     * as the sources are: the class a host constructs is the one the copy holds. The example's must be in
+     * {@value #PACKAGE}, or the copy would name a class it does not have.
      */
-    private static String pluginClass(String pom, String javaPackage) {
+    private static String pluginClass(String pom, Answers answers) {
         Matcher match = PLUGIN_CLASS.matcher(pom);
         if (!match.find()) throw new IllegalStateException("the template's pom sets no botmaker.plugin");
         String example = match.group(2);
         if (!example.startsWith(PACKAGE + ".")) {
             throw new IllegalStateException("the template's botmaker.plugin, " + example + ", is not in " + PACKAGE);
         }
-        String replaced = pom.substring(0, match.start()) + match.group(1)
-                + javaPackage + example.substring(PACKAGE.length()) + match.group(3) + pom.substring(match.end());
+        String renamed = answers.javaPackage() + classNames(example.substring(PACKAGE.length()), answers.classPrefix());
+        String replaced = pom.substring(0, match.start()) + match.group(1) + renamed + match.group(3)
+                + pom.substring(match.end());
         if (match.find()) throw new IllegalStateException("the template's pom sets botmaker.plugin twice");
         return replaced;
+    }
+
+    private static String pluginClassOf(String pom) {
+        Matcher match = PLUGIN_CLASS.matcher(pom);
+        if (!match.find()) throw new IllegalStateException("the template's pom sets no botmaker.plugin");
+        return match.group(2);
     }
 
     private static String javaString(String value) {

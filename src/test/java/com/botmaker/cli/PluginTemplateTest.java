@@ -55,8 +55,12 @@ class PluginTemplateTest {
     private static final String PLUGIN_NAME = "Demo \"Plugin\"";
 
     private static PluginTemplate.Answers answers(Optional<String> parent) {
+        return answers(parent, false);
+    }
+
+    private static PluginTemplate.Answers answers(Optional<String> parent, boolean minimal) {
         return new PluginTemplate.Answers("com.acme", "demo-plugin", "0.1.0-SNAPSHOT", PACKAGE,
-                PLUGIN_NAME, parent);
+                PLUGIN_NAME, PluginNewCommand.classPrefix("demo-plugin"), minimal, parent);
     }
 
     @Test
@@ -67,16 +71,27 @@ class PluginTemplateTest {
             made = PluginTemplate.write(template, project, answers(Optional.of("v0.1.0")));
         }
         assertEquals("v0.1.0", made.parentVersion());
+        assertEquals("com.acme.demo.plugin.DemoPlugin", made.pluginClass());
 
         assertTrue(Files.isRegularFile(project.resolve(".gitignore")), "the .gitignore lost its dot");
         assertTrue(Files.isRegularFile(project.resolve("README.md")));
-        assertTrue(Files.isRegularFile(project.resolve("src/main/java/com/acme/demo/plugin/ExamplePlugin.java")));
-        assertTrue(Files.isRegularFile(project.resolve("src/test/java/com/acme/demo/plugin/ExamplePluginTest.java")));
+        assertTrue(Files.readString(project.resolve("CHANGELOG.md")).contains("## [Unreleased]"),
+                "the starter changelog, not the archetype's own");
+        assertTrue(Files.readString(project.resolve("CHANGELOG.md")).contains("botmaker plugin new"));
+        byte[] icon = Files.readAllBytes(project.resolve("icon.png"));
+        assertEquals("PNG", new String(icon, 1, 3, StandardCharsets.US_ASCII), "the icon was copied as bytes");
+        assertTrue(Files.isRegularFile(project.resolve("src/main/java/com/acme/demo/plugin/DemoPlugin.java")));
+        assertTrue(Files.isRegularFile(project.resolve("src/main/java/com/acme/demo/plugin/types/DemoTypes.java")));
+        assertTrue(Files.isRegularFile(project.resolve("src/test/java/com/acme/demo/plugin/DemoPluginTest.java")));
+        assertFalse(Files.exists(project.resolve("minimal")), "the --minimal variant reached a full copy");
         for (Path file : files(project)) {
+            if (file.toString().endsWith(".png")) continue;
             String text = Files.readString(file);
             assertFalse(text.contains(PluginTemplate.PACKAGE), file + " still names the example's package");
             assertFalse(text.contains(PluginTemplate.NAME), file + " still names the example plugin");
             assertFalse(text.contains("botmaker plugin new:"), file + " kept a template region's marker");
+            assertFalse(text.matches("(?s).*\\bExample[A-Z].*"), file + " still names an example class");
+            assertFalse(file.getFileName().toString().startsWith("Example"), file + " kept the example's name");
         }
 
         String pom = Files.readString(project.resolve("pom.xml"));
@@ -89,12 +104,51 @@ class PluginTemplateTest {
                 + "<artifactId>botmaker-plugin-parent</artifactId>\\s*<version>v0.1.0</version>\\s*"
                 + "<relativePath/>\\s*</parent>.*"), pom);
         assertFalse(pom.contains("<botmaker.studioapi.version>"), "the parent pins the contract: " + pom);
-        assertTrue(pom.contains("<botmaker.plugin>com.acme.demo.plugin.ExamplePlugin</botmaker.plugin>"),
+        assertTrue(pom.contains("<botmaker.plugin>com.acme.demo.plugin.DemoPlugin</botmaker.plugin>"),
                 "the pom names the renamed class: " + pom);
+    }
+
+    /** {@code --minimal}: the plugin class and its test in place of the example, the pom and the files kept. */
+    @Test
+    void a_minimal_copy_has_no_example(@TempDir Path work) throws IOException {
+        Path project = work.resolve("demo-plugin");
+        try (InputStream template = PluginTemplate.bundled()) {
+            PluginTemplate.write(template, project, answers(Optional.empty(), true));
+        }
+        List<String> sources = files(project.resolve("src")).stream()
+                .map(f -> project.relativize(f).toString().replace(File.separatorChar, '/')).sorted().toList();
+        assertEquals(List.of("src/main/java/com/acme/demo/plugin/DemoPlugin.java",
+                "src/test/java/com/acme/demo/plugin/DemoPluginTest.java"), sources);
+        assertTrue(Files.readString(project.resolve("README.md")).contains("--minimal"), "the minimal README");
+        for (String kept : List.of("pom.xml", "CHANGELOG.md", "icon.png", "DECLARE.md", ".gitignore")) {
+            assertTrue(Files.isRegularFile(project.resolve(kept)), kept);
+        }
+        assertFalse(Files.exists(project.resolve("minimal")));
     }
 
     @Test
     void the_copy_compiles_loads_and_passes_every_check(@TempDir Path work) throws IOException {
+        CheckResult types = compileLoadAndValidate(work, false);
+        // The example's one type is what an author copies, so it has to be the round-tripping kind.
+        assertEquals(Status.PASS, types.status(), types::toString);
+        assertTrue(types.detail().getFirst().contains("1 round-tripped"), types.detail()::toString);
+    }
+
+    @Test
+    void the_minimal_copy_compiles_loads_and_passes_every_check(@TempDir Path work) throws IOException {
+        compileLoadAndValidate(work, true);
+    }
+
+    @Test
+    void the_classes_are_named_after_the_artifact() {
+        assertEquals("DiscordNotifier", PluginNewCommand.classPrefix("discord-notifier"));
+        assertEquals("Demo", PluginNewCommand.classPrefix("demo-plugin"));
+        assertEquals("Plugin", PluginNewCommand.classPrefix("plugin"));
+        assertEquals("My2fa", PluginNewCommand.classPrefix("2fa"));
+    }
+
+    /** Writes the template, compiles it and its test, loads it and validates it; the types check's result. */
+    private static CheckResult compileLoadAndValidate(Path work, boolean minimal) throws IOException {
         Path toolkitClasses = Path.of("..", "botmaker-plugin-toolkit", "target", "classes");
         assumeTrue(Files.isDirectory(toolkitClasses),
                 "botmaker-plugin-toolkit is not built; run the reactor rather than this module alone");
@@ -103,7 +157,7 @@ class PluginTemplateTest {
 
         Path project = work.resolve("demo-plugin");
         try (InputStream template = PluginTemplate.bundled()) {
-            PluginTemplate.write(template, project, answers(Optional.empty()));
+            PluginTemplate.write(template, project, answers(Optional.empty(), minimal));
         }
         // target/classes: the loader reads the module's pom two levels up, as `plugin validate` does.
         Path classes = Files.createDirectories(project.resolve("target/classes"));
@@ -137,14 +191,13 @@ class PluginTemplateTest {
                 + results.stream().filter(CheckResult::failed).map(r -> r.check().id() + " " + r.detail()).toList());
         // Every check ran on something rather than skipping: a green run of skips proves nothing.
         assertEquals(Check.values().length, results.size(), "a check was not run at all");
-        // The example's one type is what an author copies, so it has to be the round-tripping kind.
-        CheckResult types = results.stream().filter(r -> r.check() == Check.TYPES).findFirst().orElseThrow();
-        assertEquals(Status.PASS, types.status(), types::toString);
-        assertTrue(types.detail().getFirst().contains("1 round-tripped"), types.detail()::toString);
-        // So is its one managed value, level 3 of the example.
-        CheckResult managed = results.stream().filter(r -> r.check() == Check.MANAGED).findFirst().orElseThrow();
-        assertEquals(Status.PASS, managed.status(), managed::toString);
-        assertTrue(managed.detail().getFirst().startsWith("1 managed value"), managed.detail()::toString);
+        if (!minimal) {
+            // Its one managed value, level 3 of the example.
+            CheckResult managed = results.stream().filter(r -> r.check() == Check.MANAGED).findFirst().orElseThrow();
+            assertEquals(Status.PASS, managed.status(), managed::toString);
+            assertTrue(managed.detail().getFirst().startsWith("1 managed value"), managed.detail()::toString);
+        }
+        return results.stream().filter(r -> r.check() == Check.TYPES).findFirst().orElseThrow();
     }
 
     /** A template that lost an anchor is refused, not copied half-renamed. */
@@ -181,7 +234,15 @@ class PluginTemplateTest {
     @Test
     void a_package_that_is_not_java_is_refused() {
         assertThrows(IllegalArgumentException.class, () -> new PluginTemplate.Answers("com.acme", "2fa",
-                "0.1.0", "com.acme.2fa", "2FA", Optional.empty()));
+                "0.1.0", "com.acme.2fa", "2FA", "My2fa", false, Optional.empty()));
+    }
+
+    @Test
+    void a_class_prefix_that_is_not_a_class_name_is_refused() {
+        for (String prefix : new String[]{"", "demo", "Two Words", "My-Plugin"}) {
+            assertThrows(IllegalArgumentException.class, () -> new PluginTemplate.Answers("com.acme", "demo",
+                    "0.1.0", PACKAGE, "Demo", prefix, false, Optional.empty()), prefix);
+        }
     }
 
     /** The name lands in string literals and a Javadoc comment. */
@@ -189,7 +250,7 @@ class PluginTemplateTest {
     void a_name_that_would_break_the_source_is_refused() {
         for (String name : new String[]{"Two\nLines", "Ends */ here"}) {
             assertThrows(IllegalArgumentException.class, () -> new PluginTemplate.Answers("com.acme", "demo",
-                    "0.1.0", PACKAGE, name, Optional.empty()), name);
+                    "0.1.0", PACKAGE, name, "Demo", false, Optional.empty()), name);
         }
     }
 

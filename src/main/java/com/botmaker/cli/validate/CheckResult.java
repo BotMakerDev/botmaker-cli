@@ -39,6 +39,11 @@ public record CheckResult(Check check, Status status, List<String> detail) {
         return new CheckResult(check, Status.SKIP, List.of(why));
     }
 
+    /** The check passed with something worth fixing that no host refuses. */
+    public static CheckResult warn(Check check, List<String> detail) {
+        return new CheckResult(check, Status.WARN, detail);
+    }
+
     public boolean failed() {
         return status == Status.FAIL;
     }

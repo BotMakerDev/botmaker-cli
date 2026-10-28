@@ -7,6 +7,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- **`botmaker plugin new` names the classes after the plugin** (2026-10-28): `discord-notifier` makes
+  `DiscordNotifierPlugin`, `DiscordNotifierTypes`, … (`--class-prefix` to choose; a trailing `-plugin` is dropped),
+  in the sources, the pages, the file names and the pom's `botmaker.plugin`. The copy carries a starter
+  `CHANGELOG.md` and the default `icon.png`, copied as bytes.
+- **`botmaker plugin new --minimal`**: the pom, a plugin class with an empty `declare()`, its one
+  `PluginTests.assertDeclared` test, a short README, the changelog and the icon; no example. The archetype's
+  template zip carries the variant under `minimal/`.
+- **Two validator checks** (2026-10-28): `holders` asks every surface of every judged plugin, so a holder with no
+  constructor taking nothing, or one that throws, fails naming it (a surface that links JavaFX on a classpath with
+  none is listed as not asked); `plugin-files` warns when the plugin's own output has no
+  `META-INF/botmaker/changelog.md` or `icon.png`. A warning is the new `Status.WARN`, which never fails a run.
+
 ### Changed (breaking)
 
 - **The cli owns a plugin's pom and its JitPack build** (2026-10-27).

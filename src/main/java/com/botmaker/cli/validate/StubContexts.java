@@ -133,6 +133,9 @@ final class StubContexts {
             throw unsupported("dialogs()");
         }
 
+        // log() keeps the contract's default, which writes to standard error and never throws (2026-10-28): a
+        // predicate that logs why it declined is doing nothing a headless host cannot support.
+
         private UnsupportedOperationException unsupported(String member) {
             return new UnsupportedOperationException("a slot editor's predicate called StudioServices."
                     + member + "; deciding whether an editor applies must use the slot's type and call site"

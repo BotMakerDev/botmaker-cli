@@ -44,8 +44,11 @@ class PluginValidatorTest {
      */
     private static final String GOOD_PLUGIN = """
             package p;
+            import com.botmaker.plugin.api.CatalogHolder;
             import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.TypeHolder;
+            import com.botmaker.plugin.api.ValueHolder;
             import com.botmaker.plugin.api.catalog.PaletteCatalog;
             import com.botmaker.plugin.api.slot.ValueContext;
             import com.botmaker.plugin.api.source.ManagedValue;
@@ -56,8 +59,17 @@ class PluginValidatorTest {
             public final class GoodPlugin extends DeclaredPlugin {
                 public GoodPlugin() {
                     super(StudioPlugin.declare()
-                            .catalog(() -> PaletteCatalog.of(Api.class))
-                            .types(GoodPlugin::declaredTypes).values(GoodPlugin::declaredValues));
+                            .catalog(Catalog.class)
+                            .types(Types.class).values(Values.class));
+                }
+                public static final class Catalog implements CatalogHolder {
+                    @Override public PaletteCatalog catalog() { return PaletteCatalog.of(Api.class); }
+                }
+                public static final class Types implements TypeHolder {
+                    @Override public List<PluginType<?>> types() { return declaredTypes(); }
+                }
+                public static final class Values implements ValueHolder {
+                    @Override public List<ManagedValue<?>> values() { return declaredValues(); }
                 }
                 public static List<ManagedValue<?>> declaredValues() { return List.of(); }
                 public static List<PluginType<?>> declaredTypes() { return List.of(new GreetingType()); }
@@ -86,10 +98,15 @@ class PluginValidatorTest {
             package p;
             import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.TypeHolder;
+            import com.botmaker.plugin.api.value.PluginType;
             import java.util.List;
             public final class OtherPlugin extends DeclaredPlugin {
                 public OtherPlugin() {
-                    super(StudioPlugin.declare().types(() -> List.of(new GoodPlugin.GreetingType())));
+                    super(StudioPlugin.declare().types(Types.class));
+                }
+                public static final class Types implements TypeHolder {
+                    @Override public List<PluginType<?>> types() { return List.of(new GoodPlugin.GreetingType()); }
                 }
             }
             """;
@@ -150,6 +167,7 @@ class PluginValidatorTest {
         // POM_SCOPES and PLUGIN_DEPS still run — both read a file and need nothing loaded, so a broken
         // classpath is no reason to leave the author's likeliest mistakes unmentioned.
         assertEquals(Status.SKIP, result(results, Check.POM_SCOPES).status());
+        assertEquals(Status.SKIP, result(results, Check.PLUGIN_DEPS).status());
         assertEquals(Status.SKIP, last(results).status());
     }
 
@@ -275,6 +293,50 @@ class PluginValidatorTest {
     }
 
     // ------------------------------------------------------------------------------------------------
+    // holders and files
+    // ------------------------------------------------------------------------------------------------
+
+    @Test
+    void every_surface_of_the_good_plugin_answers(@TempDir Path dir) throws IOException {
+        CheckResult holders = result(PluginValidator.validate(subject(dir, GOOD_POM)), Check.HOLDERS);
+        assertEquals(Status.PASS, holders.status(), holders::toString);
+    }
+
+    /** A host builds a holder only when it first asks, so one it cannot build is said here, by name. */
+    @Test
+    void a_holder_with_no_constructor_taking_nothing_fails(@TempDir Path dir) throws IOException {
+        PluginSubject subject = subject(dir, GOOD_POM, GOOD_PLUGIN.replace(
+                "public static final class Catalog implements CatalogHolder {",
+                "public static final class Catalog implements CatalogHolder { public Catalog(int size) { }"),
+                GOOD_API);
+        CheckResult holders = result(PluginValidator.validate(subject), Check.HOLDERS);
+        assertEquals(Status.FAIL, holders.status());
+        assertTrue(holders.detail().getFirst().contains(
+                "p.GoodPlugin .catalog: p.GoodPlugin$Catalog needs a constructor with no arguments"),
+                holders.detail()::toString);
+    }
+
+    @Test
+    void a_plugin_without_a_changelog_or_an_icon_is_warned_and_passes(@TempDir Path dir) throws IOException {
+        List<CheckResult> results = PluginValidator.validate(subject(dir, GOOD_POM));
+        CheckResult files = result(results, Check.PLUGIN_FILES);
+        assertEquals(Status.WARN, files.status());
+        assertTrue(files.detail().get(0).startsWith("no changelog"), files.detail()::toString);
+        assertTrue(files.detail().get(1).startsWith("no icon"), files.detail()::toString);
+        assertTrue(PluginValidator.passed(results), "a warning is never a failure");
+    }
+
+    @Test
+    void a_plugin_carrying_both_passes_the_files_check(@TempDir Path dir) throws IOException {
+        PluginSubject subject = subject(dir, GOOD_POM);
+        Path own = subject.classpath().getFirst();
+        Files.createDirectories(own.resolve("META-INF/botmaker"));
+        Files.writeString(own.resolve(PluginValidator.CHANGELOG_ENTRY), "# Changelog\n");
+        Files.write(own.resolve(PluginValidator.ICON_ENTRY), new byte[]{1});
+        assertEquals(Status.PASS, result(PluginValidator.validate(subject), Check.PLUGIN_FILES).status());
+    }
+
+    // ------------------------------------------------------------------------------------------------
     // palette
     // ------------------------------------------------------------------------------------------------
 
@@ -297,7 +359,7 @@ class PluginValidatorTest {
     @Test
     void a_plugin_with_no_catalog_is_judged_on_the_discovered_palette(@TempDir Path dir) throws IOException {
         PluginSubject subject = subject(dir, GOOD_POM, GOOD_PLUGIN.replace(
-                ".catalog(() -> PaletteCatalog.of(Api.class))", ""),
+                ".catalog(Catalog.class)", ""),
                 GOOD_API);
         CheckResult palette = result(PluginValidator.validate(subject), Check.PALETTE);
         assertEquals(Status.PASS, palette.status(), palette.detail()::toString);
@@ -342,11 +404,17 @@ class PluginValidatorTest {
             package p;
             import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.TypeHolder;
             import com.botmaker.plugin.api.value.ComponentType;
             import com.botmaker.plugin.api.value.DeclaredCall;
+            import com.botmaker.plugin.api.value.PluginType;
             import java.util.List;
             public final class TaskPlugin extends DeclaredPlugin {
-                public TaskPlugin() { super(StudioPlugin.declare().parts(() -> List.of(TASK))); }
+                public TaskPlugin() { super(StudioPlugin.declare().types(Parts.class)); }
+                public static final class Parts implements TypeHolder {
+                    @Override public List<PluginType<?>> types() { return List.of(); }
+                    @Override public List<ComponentType<?>> components() { return List.of(TASK); }
+                }
                 public record Task(String name, String note, boolean home) {
                     public static Task of(String name) { return new Task(name, "", false); }
                     public Task described(String note) { return new Task(name, note, home); }
@@ -387,6 +455,8 @@ class PluginValidatorTest {
             package p;
             import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.TypeHolder;
+            import com.botmaker.plugin.api.ValueHolder;
             import com.botmaker.plugin.api.slot.ValueContext;
             import com.botmaker.plugin.api.source.ManagedValue;
             import com.botmaker.plugin.api.value.ComponentType;
@@ -395,7 +465,13 @@ class PluginValidatorTest {
             import java.util.List;
             public final class BagPlugin extends DeclaredPlugin {
                 public BagPlugin() {
-                    super(StudioPlugin.declare().types(BagPlugin::declaredTypes).values(BagPlugin::declaredValues));
+                    super(StudioPlugin.declare().types(Types.class).values(Values.class));
+                }
+                public static final class Types implements TypeHolder {
+                    @Override public List<PluginType<?>> types() { return declaredTypes(); }
+                }
+                public static final class Values implements ValueHolder {
+                    @Override public List<ManagedValue<?>> values() { return declaredValues(); }
                 }
                 public static List<ManagedValue<?>> declaredValues() { return List.of(); }
                 public static List<PluginType<?>> declaredTypes() { return List.of(new BagType()); }
@@ -846,10 +922,14 @@ class PluginValidatorTest {
             package p;
             import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.TypeHolder;
             import com.botmaker.plugin.api.value.PluginType;
             import java.util.List;
             public final class PlainPlugin extends DeclaredPlugin {
-                public PlainPlugin() { super(StudioPlugin.declare().types(() -> List.of(new PlainType()))); }
+                public PlainPlugin() { super(StudioPlugin.declare().types(Types.class)); }
+                public static final class Types implements TypeHolder {
+                    @Override public List<PluginType<?>> types() { return List.of(new PlainType()); }
+                }
                 public static final class Plain {}
                 public static final class PlainType implements PluginType<Plain> {
                     @Override public Class<Plain> type() { return Plain.class; }
@@ -863,12 +943,17 @@ class PluginValidatorTest {
             package p;
             import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.EditorHolder;
             import com.botmaker.plugin.api.slot.SlotEditor;
             import java.util.List;
             public final class DrawerPlugin extends DeclaredPlugin {
                 public DrawerPlugin() {
-                    super(StudioPlugin.declare().editors(() -> List.of(
-                            SlotEditor.forType(PlainPlugin.Plain.class).draw(() -> ctx -> null))));
+                    super(StudioPlugin.declare().editors(Editors.class));
+                }
+                public static final class Editors implements EditorHolder {
+                    @Override public List<SlotEditor> editors() {
+                        return List.of(SlotEditor.forType(PlainPlugin.Plain.class).draw(() -> ctx -> null));
+                    }
                 }
             }
             """;
@@ -878,13 +963,18 @@ class PluginValidatorTest {
             package p;
             import com.botmaker.plugin.api.DeclaredPlugin;
             import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.EditorHolder;
             import com.botmaker.plugin.api.slot.SlotEditor;
             import java.util.List;
             public final class ThrowingDrawer extends DeclaredPlugin {
                 public ThrowingDrawer() {
-                    super(StudioPlugin.declare().editors(() -> List.of(
-                            SlotEditor.when(ctx -> { throw new IllegalStateException("boom"); })
-                                    .draw(() -> ctx -> null))));
+                    super(StudioPlugin.declare().editors(Editors.class));
+                }
+                public static final class Editors implements EditorHolder {
+                    @Override public List<SlotEditor> editors() {
+                        return List.of(SlotEditor.when(ctx -> { throw new IllegalStateException("boom"); })
+                                .draw(() -> ctx -> null));
+                    }
                 }
             }
             """;

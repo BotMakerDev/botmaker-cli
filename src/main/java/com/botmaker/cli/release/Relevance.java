@@ -18,8 +18,9 @@ package com.botmaker.cli.release;
  * <p>Markdown is never release-relevant, anywhere in the tree — including under {@code .github/}, whose
  * <i>scripts and workflows</i> build the artifact and therefore do count.
  *
- * <p><b>The edge worth knowing is the SDK's</b>: its pom copies the whole {@code CHANGELOG.md} into the jar
- * as {@code META-INF/botmaker/whats-new.md}, so editing it really does change that artifact. It is still
+ * <p><b>The edge worth knowing is every plugin's</b>: {@code botmaker-plugin-parent} (and the SDK's own pom) copies
+ * the whole {@code CHANGELOG.md} into the jar as {@code META-INF/botmaker/changelog.md} ({@code whats-new.md}, SDK
+ * only, until 2026-10-28), so editing it really does change that artifact. It is still
  * excluded here, because a release <i>authors</i> its own section — counting it would mean every release
  * trivially justifies itself — and because {@code check_changelog} already refuses a release with no
  * section.
