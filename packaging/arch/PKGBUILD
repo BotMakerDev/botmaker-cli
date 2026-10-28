@@ -1,0 +1,39 @@
+# Maintainer: LiQiyeDev <bgroisne@proton.me>
+#
+# The `botmaker` command on Arch, published to the AUR as botmaker-bin (2026-10-28).
+#
+# A template: @PKGVER@, @JAR_SHA256@ and @LAUNCHER_SHA256@ are filled in by .github/scripts/aur-publish.sh in the
+# `aur` job of each version tag, which pushes the result and its .SRCINFO to
+# ssh://aur@aur.archlinux.org/botmaker-bin.git. Never edit the AUR copy; the next release overwrites it.
+#
+# The same three files packaging/nfpm.yaml puts in the rpm and deb: the release's jar, the packaging/botmaker
+# launcher at the tag, and the bash completion the jar generates. It provides `botmaker`, which the AUR's
+# botmaker-studio-bin depends on, as the rpm and deb do.
+pkgname=botmaker-bin
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc='The botmaker command: create, validate, run and publish BotMaker plugins and bots'
+arch=('any')
+url='https://github.com/BotMakerDev/botmaker-cli'
+license=('CC0-1.0')
+# 25: the jar is compiled for Java 25 (nfpm.yaml says why). Headless, like the rpm's and deb's; the full JRE
+# provides it too. build() runs the jar, so it is a make dependency as well.
+depends=('java-runtime-headless>=25')
+optdepends=('maven: every verb that resolves a dependency runs mvn')
+provides=('botmaker')
+conflicts=('botmaker')
+source=("botmaker-cli-all-${pkgver}.jar::${url}/releases/download/v${pkgver}/botmaker-cli-all.jar"
+        "botmaker-${pkgver}::https://raw.githubusercontent.com/BotMakerDev/botmaker-cli/v${pkgver}/packaging/botmaker")
+noextract=("botmaker-cli-all-${pkgver}.jar")
+sha256sums=('@JAR_SHA256@'
+            '@LAUNCHER_SHA256@')
+
+build() {
+  java -jar "botmaker-cli-all-${pkgver}.jar" completion > botmaker.bash
+}
+
+package() {
+  install -Dm644 "botmaker-cli-all-${pkgver}.jar" "${pkgdir}/usr/share/botmaker/botmaker-cli-all.jar"
+  install -Dm755 "botmaker-${pkgver}" "${pkgdir}/usr/bin/botmaker"
+  install -Dm644 botmaker.bash "${pkgdir}/usr/share/bash-completion/completions/botmaker"
+}

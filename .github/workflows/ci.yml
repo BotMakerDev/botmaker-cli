@@ -322,3 +322,26 @@ jobs:
       - name: Trigger JitPack build for ${{ github.ref_name }}
         run: |
           curl -sf "https://jitpack.io/api/builds/com.github.${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.ref_name }}" || true
+
+  # Arch: botmaker-bin on the AUR (2026-10-28), from packaging/arch/PKGBUILD with this tag's version, the sha256
+  # of the jar users will download (fetched from the published Release, so `needs: release`) and of the launcher
+  # at this tag. Without the AUR_SSH_PRIVATE_KEY secret the package is checked and not pushed; see
+  # .github/scripts/aur-publish.sh, a copy of botmaker-studio's. Not for a pre-release (`v1.0.0-rc1`): a hyphen
+  # is not valid in pkgver, and the AUR would offer it as the latest.
+  aur:
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Publish botmaker-bin
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          curl -fsSL -o /tmp/botmaker-cli-all.jar \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/botmaker-cli-all.jar"
+          bash .github/scripts/aur-publish.sh packaging/arch/PKGBUILD botmaker-bin \
+            "PKGVER=${GITHUB_REF_NAME#v}" \
+            "JAR_SHA256=$(sha256sum /tmp/botmaker-cli-all.jar | cut -d' ' -f1)" \
+            "LAUNCHER_SHA256=$(sha256sum packaging/botmaker | cut -d' ' -f1)"

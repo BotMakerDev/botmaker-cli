@@ -7,6 +7,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- **Arch Linux: `botmaker-bin` on the AUR** (`packaging/arch/PKGBUILD`): each version tag's `aur` job fills in the
+  version and the sha256 of the release jar and the launcher, and pushes the package. It installs the same jar,
+  `/usr/bin/botmaker` launcher and bash completion as the rpm and deb, and provides the `botmaker` that the AUR's
+  `botmaker-studio-bin` depends on. Without the `AUR_SSH_PRIVATE_KEY` secret the job checks the package and
+  pushes nothing.
+
 ### Fixed
 
 - **The release's JitPack check probes `botmaker-plugin-parent` as a plugin inherits it** (`CleanRoom`): the
