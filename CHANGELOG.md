@@ -5,6 +5,14 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- **The release's JitPack check probes `botmaker-plugin-parent` as a plugin inherits it** (`CleanRoom`): the
+  probe names it as its `<parent>` and resolves the contract and toolkit it manages, instead of asking for a jar
+  a pom-only module never ships. plugin-parent v0.1.0 was reported broken though JitPack served it.
+
 ## [0.9.0] — 2026-10-28
 
 ### Added

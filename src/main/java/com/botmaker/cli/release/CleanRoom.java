@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -70,8 +71,33 @@ public final class CleanRoom {
         }
     }
 
-    /** The probe pom: one dependency, one repository, nothing else to go wrong. */
+    /**
+     * The probe pom: one dependency, one repository, nothing else to go wrong. A module pinned as a
+     * {@code <parent>} ships a pom and no jar, so the probe is its child instead, as a plugin is, and resolves the
+     * upstreams it manages without naming their versions.
+     */
     static String pom(Module module, Version version) {
+        if (module.pinnedAsParent()) {
+            String managed = module.upstreams().stream()
+                    .map(upstream -> "<dependency><groupId>com.github.%s</groupId><artifactId>%s</artifactId></dependency>"
+                            .formatted(COORDINATE_OWNER, upstream.directory()))
+                    .collect(Collectors.joining("\n    "));
+            return """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                        <groupId>com.github.%s</groupId><artifactId>%s</artifactId><version>%s</version>
+                        <relativePath/>
+                      </parent>
+                      <groupId>com.botmaker.releasecheck</groupId><artifactId>probe</artifactId><version>1</version>
+                      <packaging>pom</packaging>
+                      <repositories><repository><id>jitpack.io</id><url>https://jitpack.io</url></repository></repositories>
+                      <dependencies>
+                        %s
+                      </dependencies>
+                    </project>
+                    """.formatted(COORDINATE_OWNER, module.directory(), version.tag(), managed);
+        }
         return """
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                   <modelVersion>4.0.0</modelVersion>
