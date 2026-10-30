@@ -11,6 +11,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - A publish refuses from a `botmaker/saved/*` branch, Studio's saved states.
 
+- **`com.botmaker.cli.repair`, a silent library:** a project on disk against its repair point gives a typed damage
+  report, one row per damaged thing, pom first. Members are read by JDT's recovered tree, trusted only as far as the
+  damage can be bounded. Nothing uses it from the command line yet. `all` jar now carries JDT; the main artifact does
+  not bring it (`optional`).
+
 - **Arch Linux: `botmaker-bin` on the AUR** (`packaging/arch/PKGBUILD`): each version tag's `aur` job fills in the
   version and the sha256 of the release jar and the launcher, and pushes the package. It installs the same jar,
   `/usr/bin/botmaker` launcher and bash completion as the rpm and deb, and provides the `botmaker` that the AUR's

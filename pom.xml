@@ -117,6 +117,18 @@
             <optional>true</optional>
         </dependency>
 
+        <!--
+          com.botmaker.cli.repair reads a damaged file's members by JDT's recovered tree. Optional like picocli: the
+          `all` jar carries it, and the catalog's CI resolving the main artifact does not download it. Studio brings
+          its own, the same version.
+        -->
+        <dependency>
+            <groupId>org.eclipse.jdt</groupId>
+            <artifactId>org.eclipse.jdt.core</artifactId>
+            <version>3.47.0</version>
+            <optional>true</optional>
+        </dependency>
+
         <!-- index.json, and the entry `botmaker publish` composes. -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
