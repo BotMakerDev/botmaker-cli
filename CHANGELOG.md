@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- A publish refuses from a `botmaker/saved/*` branch, Studio's saved states.
+
 - **Arch Linux: `botmaker-bin` on the AUR** (`packaging/arch/PKGBUILD`): each version tag's `aur` job fills in the
   version and the sha256 of the release jar and the launcher, and pushes the package. It installs the same jar,
   `/usr/bin/botmaker` launcher and bash completion as the rpm and deb, and provides the `botmaker` that the AUR's

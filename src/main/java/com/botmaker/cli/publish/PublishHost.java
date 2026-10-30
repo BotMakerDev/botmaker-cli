@@ -33,6 +33,11 @@ public interface PublishHost {
     /** The commit {@code HEAD} is, or empty. */
     Optional<String> head();
 
+    /** The current branch; empty when this host cannot say. */
+    default Optional<String> branch() {
+        return Optional.empty();
+    }
+
     /** The tags on {@code HEAD}. */
     List<String> tagsAtHead();
 

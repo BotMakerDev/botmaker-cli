@@ -60,6 +60,11 @@ final class CommandHost implements PublishHost {
     }
 
     @Override
+    public Optional<String> branch() {
+        return git("rev-parse", "--abbrev-ref", "HEAD");
+    }
+
+    @Override
     public List<String> tagsAtHead() {
         return lines(git("tag", "--points-at", "HEAD"));
     }

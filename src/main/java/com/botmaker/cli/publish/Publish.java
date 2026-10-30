@@ -69,6 +69,9 @@ public final class Publish {
         record Refused(String reason) implements Outcome {}
     }
 
+    /** Where Studio keeps a saved state: possibly broken code, never a release. */
+    public static final String SAVED_BRANCH = "botmaker/saved/";
+
     private static final Duration PIN_EVERY = Duration.ofSeconds(5);
     private static final int PIN_TRIES = 6;
 
@@ -93,6 +96,9 @@ public final class Publish {
 
     public Outcome run(PublishRequest request, Listener listener, PublishHost host) {
         try {
+            if (host.branch().filter(b -> b.startsWith(SAVED_BRANCH)).isPresent()) {
+                return new Outcome.Refused("this is a saved state, not your bot's line: switch back to your branch.");
+            }
             return steps(request, listener, host);
         } catch (Refusal e) {
             return new Outcome.Refused(e.getMessage());

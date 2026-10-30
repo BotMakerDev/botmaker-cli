@@ -137,6 +137,15 @@ class PublishTest {
         assertEquals("git push origin HEAD", runner.commands().getFirst());
     }
 
+    @Test
+    void a_saved_state_is_refused_before_anything_is_pushed() throws Exception {
+        FakeRunner.repository(dir, ORIGIN);
+        FakeRunner.git(dir, "checkout", "-qb", "botmaker/saved/2026-10-30-1200");
+        Publish.Outcome.Refused refused = assertInstanceOf(Publish.Outcome.Refused.class, publish());
+        assertTrue(refused.reason().contains("saved state"), refused.reason());
+        assertTrue(runner.commands().stream().noneMatch(c -> c.startsWith("git push")), runner.commands().toString());
+    }
+
     /** JitPack serves no -SNAPSHOT, so a tag on one would build Error for good. */
     @Test
     void a_snapshot_parent_is_refused_before_anything_is_tagged() throws Exception {
