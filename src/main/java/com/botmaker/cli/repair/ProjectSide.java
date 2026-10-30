@@ -1,6 +1,7 @@
 package com.botmaker.cli.repair;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -12,6 +13,9 @@ import java.util.TreeSet;
 
 /** One side of a {@link Damage} comparison, a project's files by path with {@code /}: a folder, or a commit. */
 public interface ProjectSide {
+
+    /** Only a source file or a pom is ever read; one past this is no such thing, and its row says it can't be read. */
+    long MOST_READ = 64L * 1024 * 1024;
 
     Set<String> paths() throws IOException;
 
@@ -63,7 +67,13 @@ public interface ProjectSide {
             @Override
             public byte[] read(String path) throws IOException {
                 Path file = dir.resolve(path);
-                if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) throw new IOException(path + " is gone");
+                // A link reads as its target's name, as git holds it, and never as what it points at.
+                if (Files.isSymbolicLink(file)) {
+                    return Files.readSymbolicLink(file).toString().getBytes(StandardCharsets.UTF_8);
+                }
+                // A FIFO would block for good, and a device has no end.
+                if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) throw new IOException(path + " is no file");
+                if (Files.size(file) > MOST_READ) throw new IOException(path + " is too large to read");
                 return Files.readAllBytes(file);
             }
         };

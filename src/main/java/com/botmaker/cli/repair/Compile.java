@@ -101,16 +101,19 @@ public record Compile(State state, List<Problem> problems) {
     /**
      * Whether the project in a folder compiles, by Maven alone: a commit put in a folder of its own has no state of
      * Studio's to compile with, and its pom may pin other versions than the project does now. An old pom's build
-     * plugins are code nobody looked at, and may be another author's, so it runs as {@link Mvn#runUntrusted} does:
-     * no token and no settings reach it, only the local repository, so each commit downloads nothing twice.
+     * plugins are code nobody looked at, and may be another author's, so it runs as {@link Mvn#runUntrusted} does: no
+     * token or settings by environment, and at most a time limit. It writes to a repository of its own, reading the
+     * user's as a tail, so it can leave nothing there for a trusted build to load. This is no sandbox: the plugins
+     * still run as the user, and can read what the user can.
      *
      * @throws UncheckedIOException when Maven could not be run, which says nothing about the commit
      */
     public static boolean compiles(Path folder) {
-        String repository = Path.of(System.getProperty("user.home"), ".m2", "repository").toString();
+        Path home = Path.of(System.getProperty("user.home"));
         try {
             return new Mvn(new Console(true)).runUntrusted(folder, BUILD_LIMIT, "-q",
-                    "-Dmaven.repo.local=" + repository, "compile").ok();
+                    "-Dmaven.repo.local=" + home.resolve(".cache/botmaker/repair-repository"),
+                    "-Dmaven.repo.local.tail=" + home.resolve(".m2/repository"), "compile").ok();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

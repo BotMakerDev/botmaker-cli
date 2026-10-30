@@ -19,6 +19,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** One damaged fixture per row of §4 of the data-safety spec, and how far recovery is trusted past a bad bracket. */
@@ -368,6 +369,18 @@ class DamageTest {
         Files.createDirectories(dir.resolve("src/target"));
         Files.writeString(dir.resolve("src/target/kept.txt"), "x");
         assertEquals(Set.of("src/target/kept.txt"), ProjectSide.folder(dir).paths());
+    }
+
+    @Test
+    void a_folder_side_reads_a_link_as_its_target_name_and_refuses_what_is_no_file(@TempDir Path dir)
+            throws IOException {
+        Path secret = dir.resolve("secret.txt");
+        Files.writeString(secret, "never read");
+        Files.createSymbolicLink(dir.resolve("L.java"), secret);
+        Files.createDirectory(dir.resolve("folder.java"));
+        ProjectSide side = ProjectSide.folder(dir);
+        assertEquals(secret.toString(), new String(side.read("L.java"), StandardCharsets.UTF_8));
+        assertThrows(IOException.class, () -> side.read("folder.java"));
     }
 
     @Test
