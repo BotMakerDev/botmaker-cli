@@ -513,6 +513,16 @@ public final class PluginValidator {
                     problems.addAll(found);
                 }
             }
+            // A class written by several factories: one of them, at least, writes the fresh value.
+            for (Map.Entry<String, Object> each : fresh.entrySet()) {
+                List<ComponentType<?>> own = shapes.stream()
+                        .filter(shape -> each.getKey().equals(typeName(shape)))
+                        .toList();
+                if (!own.isEmpty() && own.stream().noneMatch(shape -> writesQuietly(shape, each.getValue()))) {
+                    problems.add(id + ": " + each.getKey() + " fresh() is a value none of its declarations writes"
+                            + " (when), so a host cannot write a new one");
+                }
+            }
         }
         if (!problems.isEmpty()) {
             return CheckResult.fail(Check.TYPES, problems);
@@ -595,6 +605,25 @@ public final class PluginValidator {
      * What is wrong with one component type, or {@code null} when it took a fresh value apart and put it
      * back. An empty list means it answered and there was no value to try it on.
      */
+    /** {@code shape}'s class name; null when it throws, which {@link #shapeProblems} reports. */
+    private static String typeName(ComponentType<?> shape) {
+        try {
+            Class<?> cls = shape.type();
+            return cls == null ? null : cls.getName();
+        } catch (RuntimeException | LinkageError e) {
+            return null;
+        }
+    }
+
+    /** Whether {@code shape} writes {@code value}; false when it throws, which {@link #shapeProblems} reports. */
+    private static boolean writesQuietly(ComponentType<?> shape, Object value) {
+        try {
+            return shape.writesAny(value);
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
+
     private static List<String> shapeProblems(String id, ComponentType<?> shape, Map<String, Object> fresh,
                                               List<Class<?>> known, List<Class<?>> literals) {
         List<String> problems = new ArrayList<>();
@@ -667,6 +696,13 @@ public final class PluginValidator {
         }
         Object value = fresh.get(name);
         if (value == null) {
+            return problems;
+        }
+        // A class written by several factories: the fresh value may be another declaration's to write (writes).
+        try {
+            if (!shape.writesAny(value)) return problems;
+        } catch (RuntimeException | LinkageError e) {
+            problems.add(id + ": " + name + " writes(fresh()) threw " + e);
             return problems;
         }
         try {

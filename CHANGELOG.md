@@ -24,6 +24,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- `plugin validate` round-trips a type's fresh value only through the declaration that writes it (`writes`), so a
+  class written by several factories, each `when` its own values, passes: the SDK's `Element`.
+
 - **The release's JitPack check probes `botmaker-plugin-parent` as a plugin inherits it** (`CleanRoom`): the
   probe names it as its `<parent>` and resolves the contract and toolkit it manages, instead of asking for a jar
   a pom-only module never ships. plugin-parent v0.1.0 was reported broken though JitPack served it.

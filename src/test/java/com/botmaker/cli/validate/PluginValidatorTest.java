@@ -436,6 +436,78 @@ class PluginValidatorTest {
         assertEquals(Status.PASS, types.status(), types::toString);
     }
 
+    /**
+     * A type written by two factories, each {@code when} its own values: {@code Tag.named("x")} for the fresh one,
+     * {@code Tag.numbered(n)} for a numbered one, which refuses 0. The fresh value is the first's to write.
+     */
+    private static final String TAG_PLUGIN = """
+            package p;
+            import com.botmaker.plugin.api.DeclaredPlugin;
+            import com.botmaker.plugin.api.StudioPlugin;
+            import com.botmaker.plugin.api.TypeHolder;
+            import com.botmaker.plugin.api.slot.ValueContext;
+            import com.botmaker.plugin.api.value.ComponentType;
+            import com.botmaker.plugin.api.value.DeclaredCall;
+            import com.botmaker.plugin.api.value.DeclaredCallType;
+            import com.botmaker.plugin.api.value.PluginType;
+            import java.util.List;
+            public final class TagPlugin extends DeclaredPlugin {
+                public TagPlugin() { super(StudioPlugin.declare().types(Parts.class)); }
+                public static final class Parts implements TypeHolder {
+                    @Override public List<PluginType<?>> types() { return List.of(TAG); }
+                    @Override public List<ComponentType<?>> components() { return List.of(NUMBERED); }
+                }
+                public record Tag(String name, int number) {
+                    public static Tag named(String name) { return new Tag(name, 0); }
+                    public static Tag numbered(int number) {
+                        if (number <= 0) throw new IllegalArgumentException("a number from 1");
+                        return new Tag("", number);
+                    }
+                }
+                static javafx.scene.Node editor(ValueContext ctx) { return null; }
+                public static final DeclaredCallType<Tag> TAG = PluginType.value(Tag.class)
+                        .fresh(() -> Tag.named("x"))
+                        .editor(() -> TagPlugin::editor)
+                        .writtenAs(Tag::named, Tag::name)
+                        .when(tag -> tag.number() == 0);
+                public static final DeclaredCall<Tag> NUMBERED = ComponentType.part(Tag.class)
+                        .writtenAs(Tag::numbered, Tag::number)
+                        .when(tag -> tag.number() != 0);
+            }
+            """;
+
+    @Test
+    void a_fresh_value_round_trips_through_the_declaration_that_writes_it(@TempDir Path dir) throws IOException {
+        Path classes = compile(dir, GOOD_PLUGIN, GOOD_API, TAG_PLUGIN);
+        List<Path> classpath = declare(classes, "p.GoodPlugin", "p.TagPlugin");
+        CheckResult types = result(PluginValidator.validate(PluginSubject.local(classpath, null)),
+                Check.TYPES);
+        assertEquals(Status.PASS, types.status(), types::toString);
+    }
+
+    @Test
+    void a_fresh_value_no_declaration_writes_fails(@TempDir Path dir) throws IOException {
+        String declinesIt = TAG_PLUGIN.replace(".when(tag -> tag.number() == 0)", ".when(tag -> tag.number() == 7)");
+        Path classes = compile(dir, GOOD_PLUGIN, GOOD_API, declinesIt);
+        List<Path> classpath = declare(classes, "p.GoodPlugin", "p.TagPlugin");
+        CheckResult types = result(PluginValidator.validate(PluginSubject.local(classpath, null)),
+                Check.TYPES);
+        assertEquals(Status.FAIL, types.status());
+        assertTrue(types.detail().getFirst().contains("none of its declarations writes"), types.detail()::toString);
+    }
+
+    @Test
+    void a_when_that_throws_is_reported_not_thrown(@TempDir Path dir) throws IOException {
+        String throwsIt = TAG_PLUGIN.replace(".when(tag -> tag.number() != 0)",
+                ".when(tag -> { throw new IllegalStateException(\"boom\"); })");
+        Path classes = compile(dir, GOOD_PLUGIN, GOOD_API, throwsIt);
+        List<Path> classpath = declare(classes, "p.GoodPlugin", "p.TagPlugin");
+        CheckResult types = result(PluginValidator.validate(PluginSubject.local(classpath, null)),
+                Check.TYPES);
+        assertEquals(Status.FAIL, types.status());
+        assertTrue(types.detail().getFirst().contains("writes(fresh()) threw"), types.detail()::toString);
+    }
+
     @Test
     void a_type_with_no_fresh_value_fails(@TempDir Path dir) throws IOException {
         PluginSubject subject = subject(dir, GOOD_POM,
