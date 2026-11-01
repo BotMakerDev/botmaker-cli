@@ -506,7 +506,12 @@ public final class PluginValidator {
             }
             for (String problem : filled.problems()) problems.add(id + ": " + problem);
             for (ComponentType<?> shape : shapes) {
-                List<String> found = shapeProblems(id, shape, fresh, known, literals);
+                // A class written by several factories: the fresh value is tried on the one a host writes it with.
+                String typeName = typeName(shape);
+                Object value = typeName == null ? null : fresh.get(typeName);
+                ComponentType<?> writer = value == null ? null : ComponentType.writer(shapes.stream()
+                        .filter(each -> typeName.equals(typeName(each))).toList(), value);
+                List<String> found = shapeProblems(id, shape, writer, fresh, known, literals);
                 if (found == null) {
                     roundTrips++;
                 } else {
@@ -601,10 +606,6 @@ public final class PluginValidator {
         return types.stream().map(Class::getName).toList().toString();
     }
 
-    /**
-     * What is wrong with one component type, or {@code null} when it took a fresh value apart and put it
-     * back. An empty list means it answered and there was no value to try it on.
-     */
     /** {@code shape}'s class name; null when it throws, which {@link #shapeProblems} reports. */
     private static String typeName(ComponentType<?> shape) {
         try {
@@ -624,8 +625,14 @@ public final class PluginValidator {
         }
     }
 
-    private static List<String> shapeProblems(String id, ComponentType<?> shape, Map<String, Object> fresh,
-                                              List<Class<?>> known, List<Class<?>> literals) {
+    /**
+     * What is wrong with one component type, or {@code null} when it took a fresh value apart and put it back.
+     * An empty list means it answered and there was no value to try it on. The fresh value is tried only when {@code writer} — the declaration of its class a host writes it with,
+     * {@link ComponentType#writer} — is this one.
+     */
+    private static List<String> shapeProblems(String id, ComponentType<?> shape, ComponentType<?> writer,
+                                              Map<String, Object> fresh, List<Class<?>> known,
+                                              List<Class<?>> literals) {
         List<String> problems = new ArrayList<>();
         Class<?> cls;
         List<Class<?>> kinds;
@@ -698,13 +705,14 @@ public final class PluginValidator {
         if (value == null) {
             return problems;
         }
-        // A class written by several factories: the fresh value may be another declaration's to write (writes).
+        // A class written by several factories: the fresh value may be another declaration's to write (writer).
         try {
             if (!shape.writesAny(value)) return problems;
         } catch (RuntimeException | LinkageError e) {
             problems.add(id + ": " + name + " writes(fresh()) threw " + e);
             return problems;
         }
+        if (writer != null && writer != shape) return problems;
         try {
             List<Object> parts = shape.componentsOf(value);
             if (parts == null) {

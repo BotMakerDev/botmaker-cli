@@ -5,6 +5,14 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- `plugin validate` tries a class's fresh value on the declaration a host writes it with (the contract's
+  `ComponentType.writer`), so a class written by several factories with no `.when` is not refused for the
+  factories that do not rebuild it.
+
 ## [0.10.0] — 2026-11-01
 
 ### Added
