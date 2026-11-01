@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- `plugin validate` has a `migrations` check: it warns, and never refuses, on each element of the plugin marked
+  `@Deprecated(forRemoval = true)` with neither a `@Migrate` rule in its sources nor `@Migrate.Dropped("why")`.
+
 ### Changed
 
 - `plugin validate` tries a class's fresh value on the declaration a host writes it with (the contract's

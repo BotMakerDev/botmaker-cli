@@ -118,6 +118,7 @@ public final class PluginValidator {
             results.add(checkPomScopes(subject));
             results.add(checkPluginDeps(subject));
             results.add(CheckResult.skip(Check.PLUGIN_FILES, "the classpath did not resolve"));
+            results.add(CheckResult.skip(Check.MIGRATIONS, "the classpath did not resolve"));
             return List.copyOf(results);
         }
         results.add(checkContractLinks(subject));
@@ -155,6 +156,7 @@ public final class PluginValidator {
         results.add(checkPomScopes(subject));
         results.add(checkPluginDeps(subject));
         results.add(checkPluginFiles(subject));
+        results.add(checkMigrations(subject));
         return List.copyOf(results);
     }
 
@@ -1436,6 +1438,18 @@ public final class PluginValidator {
     /** Where {@code botmaker-plugin-parent} puts a plugin's {@code CHANGELOG.md} and {@code icon.png} in its jar. */
     static final String CHANGELOG_ENTRY = "META-INF/botmaker/changelog.md";
     static final String ICON_ENTRY = "META-INF/botmaker/icon.png";
+
+    /**
+     * {@link MigrationCheck}, a warning at most: anything it cannot read is a skip, never a failure — JDT, optional
+     * in this artifact and absent from a consumer that left it out, included.
+     */
+    private static CheckResult checkMigrations(PluginSubject subject) {
+        try {
+            return MigrationCheck.run(subject);
+        } catch (RuntimeException | LinkageError unreadable) {
+            return CheckResult.skip(Check.MIGRATIONS, "could not be read: " + unreadable);
+        }
+    }
 
     /**
      * The plugin's own output — the classpath's first entry, a classes directory or a jar — carries a changelog

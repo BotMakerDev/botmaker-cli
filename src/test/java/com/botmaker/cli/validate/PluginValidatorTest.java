@@ -337,6 +337,103 @@ class PluginValidatorTest {
     }
 
     // ------------------------------------------------------------------------------------------------
+    // migrations
+    // ------------------------------------------------------------------------------------------------
+
+    /** {@link #GOOD_API} with a static method, an instance method, a constructor and a field deprecated for removal. */
+    private static final String DEPRECATING_API = GOOD_API.replace("public final class Api {", """
+            public final class Api {
+                @Deprecated(forRemoval = true) public static String old(String who) { return who; }
+                @Deprecated(forRemoval = true) public Api twice(int times, java.util.List<String> names) { return this; }
+                @Deprecated(forRemoval = true) public Api(String name) { }
+                public Api() { }
+                @Deprecated(forRemoval = true) public static final String NAME = "n";
+            """);
+
+    private static final String ALL_RULES = """
+            package p;
+            import com.botmaker.plugin.api.meta.Migrate;
+            import java.util.List;
+            public final class Migrations {
+                @Migrate(Api.class) static String old(String who) { return Api.greet(who); }
+                @Migrate(Api.class) static Api twice(@Migrate.Self Api self, int times, List<String> names) { return self; }
+                @Migrate(value = Api.class, kind = Migrate.Kind.CONSTRUCTOR) static Api api(String name) { return new Api(); }
+                @Migrate(value = Api.class, kind = Migrate.Kind.FIELD) static String NAME() { return "n"; }
+            }
+            """;
+
+    @Test
+    void a_plugin_deprecating_nothing_passes_the_migrations_check(@TempDir Path dir) throws IOException {
+        CheckResult migrations = result(PluginValidator.validate(subject(dir, GOOD_POM)), Check.MIGRATIONS);
+        assertEquals(Status.PASS, migrations.status(), migrations::toString);
+    }
+
+    @Test
+    void an_element_deprecated_for_removal_with_no_rule_is_warned_and_passes(@TempDir Path dir) throws IOException {
+        List<CheckResult> results = PluginValidator.validate(subject(dir, GOOD_POM, GOOD_PLUGIN, DEPRECATING_API));
+        CheckResult migrations = result(results, Check.MIGRATIONS);
+        assertEquals(Status.WARN, migrations.status(), migrations::toString);
+        assertEquals(4, migrations.detail().size(), migrations.detail()::toString);
+        assertTrue(migrations.detail().stream().anyMatch(line -> line.startsWith("p.Api#old(String) is deprecated"
+                + " for removal with no @Migrate rule") && line.contains("@Migrate.Dropped(\"why\")")),
+                migrations.detail()::toString);
+        assertTrue(PluginValidator.passed(results), "a warning is never a failure");
+    }
+
+    @Test
+    void a_rule_for_each_deprecated_element_passes(@TempDir Path dir) throws IOException {
+        CheckResult migrations = result(PluginValidator.validate(
+                subject(dir, GOOD_POM, GOOD_PLUGIN, DEPRECATING_API, ALL_RULES)), Check.MIGRATIONS);
+        assertEquals(Status.PASS, migrations.status(), migrations::toString);
+    }
+
+    @Test
+    void an_element_marked_dropped_needs_no_rule(@TempDir Path dir) throws IOException {
+        String dropped = DEPRECATING_API.replace("@Deprecated(forRemoval = true) public static String old",
+                "@Deprecated(forRemoval = true) @com.botmaker.plugin.api.meta.Migrate.Dropped(\"nothing replaces it\")"
+                        + " public static String old");
+        String rules = ALL_RULES.replace("@Migrate(Api.class) static String old(String who) { return Api.greet(who); }",
+                "");
+        CheckResult migrations = result(PluginValidator.validate(
+                subject(dir, GOOD_POM, GOOD_PLUGIN, dropped, rules)), Check.MIGRATIONS);
+        assertEquals(Status.PASS, migrations.status(), migrations::toString);
+    }
+
+    /** A rule writes a type variable by name and an inner class's constructor without its enclosing instance. */
+    @Test
+    void a_generic_method_and_an_inner_constructor_match_their_rules(@TempDir Path dir) throws IOException {
+        String api = GOOD_API.replace("public final class Api {", """
+                public final class Api {
+                    @Deprecated(forRemoval = true) public static <T extends Number> T first(T value) { return value; }
+                    public class Inner { @Deprecated(forRemoval = true) public Inner(String name) { } }
+                    @Deprecated(forRemoval = true) static void hidden() { }
+                """);
+        String rules = """
+                package p;
+                import com.botmaker.plugin.api.meta.Migrate;
+                public final class Migrations {
+                    @Migrate(Api.class) static <T extends Number> T first(T value) { return value; }
+                    @Migrate(value = Api.Inner.class, kind = Migrate.Kind.CONSTRUCTOR) static Object inner(String name) { return name; }
+                }
+                """;
+        CheckResult migrations = result(PluginValidator.validate(subject(dir, GOOD_POM, GOOD_PLUGIN, api, rules)),
+                Check.MIGRATIONS);
+        assertEquals(Status.PASS, migrations.status(), migrations::toString);
+        assertTrue(migrations.detail().getFirst().startsWith("2 element(s)"), migrations.detail()::toString);
+    }
+
+    @Test
+    void a_rule_for_another_overload_leaves_the_element_warned(@TempDir Path dir) throws IOException {
+        String rules = ALL_RULES.replace("static String old(String who)", "static String old(int who)")
+                .replace("return Api.greet(who);", "return \"\";");
+        CheckResult migrations = result(PluginValidator.validate(
+                subject(dir, GOOD_POM, GOOD_PLUGIN, DEPRECATING_API, rules)), Check.MIGRATIONS);
+        assertEquals(Status.WARN, migrations.status(), migrations::toString);
+        assertEquals(1, migrations.detail().size(), migrations.detail()::toString);
+        assertTrue(migrations.detail().getFirst().startsWith("p.Api#old(String)"), migrations.detail()::toString);
+    }
+
+    // ------------------------------------------------------------------------------------------------
     // palette
     // ------------------------------------------------------------------------------------------------
 

@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * {@code botmaker plugin validate} — the eight checks, against a working copy or a published coordinate.
+ * {@code botmaker plugin validate} — every {@code Check}, against a working copy or a published coordinate.
  *
  * <p>This class is a <em>front end</em>: it resolves a subject, calls
  * {@link PluginValidator#validate(PluginSubject)} and prints. Every rule it appears to enforce lives in that
@@ -23,7 +23,7 @@ import java.util.concurrent.Callable;
  * the author sees and the gate does not.
  */
 @Command(name = "validate",
-        header = "Run the eight checks the plugin registry runs.",
+        header = "Run the checks the plugin catalog runs.",
         description = "A local pass is not a promise the pull request passes: the catalog also asks that the "
                 + "published pom declare the coordinate JitPack serves for the repository, which a local run "
                 + "cannot know.",

@@ -96,7 +96,14 @@ public enum Check {
      * (2026-10-28). Only ever a {@link Status#WARN}: Studio shows a plugin without them, with no "what's new" in
      * its upgrade dialog and a default icon.
      */
-    PLUGIN_FILES("plugin-files", "The plugin carries a changelog and an icon");
+    PLUGIN_FILES("plugin-files", "The plugin carries a changelog and an icon"),
+
+    /**
+     * Each element of the plugin marked {@code @Deprecated(forRemoval = true)} has a {@code @Migrate} rule in its
+     * sources, or is marked {@code @Migrate.Dropped} (2026-11-01). Only ever a {@link Status#WARN}: Studio repairs a
+     * bot's uses of an element removed with neither by its default, with nothing from the plugin.
+     */
+    MIGRATIONS("migrations", "Every element deprecated for removal has a @Migrate rule or is dropped");
 
     private final String id;
     private final String title;
