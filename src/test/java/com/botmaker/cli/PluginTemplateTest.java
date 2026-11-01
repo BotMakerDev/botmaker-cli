@@ -255,7 +255,8 @@ class PluginTemplateTest {
     }
 
     private static int javac(JavaCompiler javac, String classpath, Path out, Path sources) throws IOException {
-        List<String> arguments = new ArrayList<>(List.of("-cp", classpath, "-d", out.toString()));
+        // -parameters as botmaker-plugin-parent compiles: the example's writtenAs(Greeting::to) reads its names.
+        List<String> arguments = new ArrayList<>(List.of("-parameters", "-cp", classpath, "-d", out.toString()));
         files(sources).stream().filter(p -> p.toString().endsWith(".java")).map(Path::toString)
                 .forEach(arguments::add);
         return javac.run(null, null, null, arguments.toArray(String[]::new));
