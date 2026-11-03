@@ -138,7 +138,8 @@ class OrderTest {
     void theForcedSetsAreTheScriptsExpressions() {
         assertEquals(Set.of(Module.STUDIO_API), upstreamsOf(Module.PLUGIN_TOOLKIT));
         assertEquals(Set.of(Module.STUDIO_API), upstreamsOf(Module.PLUGIN_HOST));
-        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_HOST, Module.PLUGIN_ARCHETYPE), upstreamsOf(Module.CLI));
+        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_HOST, Module.PLUGIN_ARCHETYPE, Module.RUNLOG),
+                upstreamsOf(Module.CLI));
         assertEquals(Set.of(Module.SHARED), upstreamsOf(Module.SESSION));
         assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_PARENT),
                 upstreamsOf(Module.PLUGIN_BASICS));

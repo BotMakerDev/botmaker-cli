@@ -84,9 +84,11 @@ class VersionsGateTest {
                 + "<botmaker.studioapi.version>0.4.3-SNAPSHOT</botmaker.studioapi.version>"
                 + "<botmaker.pluginhost.version>0.3.3-SNAPSHOT</botmaker.pluginhost.version>"
                 + "<botmaker.pluginarchetype.version>0.3.1-SNAPSHOT</botmaker.pluginarchetype.version>"
+                + "<botmaker.runlog.version>0.1.0-SNAPSHOT</botmaker.runlog.version>"
                 + "<botmaker.remote.version>dev</botmaker.remote.version></properties></project>";
         GateVerdict verdict = VersionsGate.check(Module.CLI, cli, Map.of(Module.STUDIO_API, "0.4.3-SNAPSHOT",
-                Module.PLUGIN_HOST, "0.3.3-SNAPSHOT", Module.PLUGIN_ARCHETYPE, "0.3.1-SNAPSHOT"), false);
+                Module.PLUGIN_HOST, "0.3.3-SNAPSHOT", Module.PLUGIN_ARCHETYPE, "0.3.1-SNAPSHOT",
+                Module.RUNLOG, "0.1.0-SNAPSHOT"), false);
         assertEquals(GateVerdict.Status.OK, verdict.status(), verdict.refusal());
     }
 }

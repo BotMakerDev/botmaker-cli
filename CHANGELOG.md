@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`botmaker reports [--repo o/r | --run <folder>] [--group-by <dim>] [--level warn|error] [--since <date>]
+  [--json]`**: counts a bot's problems from the GitHub issues its runners sent (through `gh api`) or from run logs
+  on this computer. `com.botmaker.cli.reports` (`IssueReports`, `RunReports`, `ReportsText`) is a library Studio
+  uses too. Issues are cached in `~/.cache/botmaker/reports/<owner>/<repo>/`, refreshed by `updated_at`, rebuilt
+  when deleted, and read alone when GitHub cannot be. The cli pins `botmaker-runlog`, so runlog forces cli.
 - **`botmaker release --runlog`**: `botmaker-runlog`, the run log's format, is a module of the release. It pins
   nothing, is decided and tagged before the cli, and forces shared, which pins it.
 

@@ -142,7 +142,8 @@ class PomVersionsTest {
         write(umbrella, Module.CLI, "0.2.2-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
                 + "</botmaker.studioapi.version><botmaker.pluginhost.version>0.4.1-SNAPSHOT"
                 + "</botmaker.pluginhost.version><botmaker.pluginarchetype.version>0.2.1-SNAPSHOT"
-                + "</botmaker.pluginarchetype.version>");
+                + "</botmaker.pluginarchetype.version><botmaker.runlog.version>0.1.0-SNAPSHOT"
+                + "</botmaker.runlog.version>");
         write(umbrella, Module.DASHBOARD, "0.2.1-SNAPSHOT", "<botmaker.shared.version>0.1.3-SNAPSHOT"
                 + "</botmaker.shared.version><botmaker.cli.version>0.2.1-SNAPSHOT</botmaker.cli.version>");
         List<String> said = new ArrayList<>();

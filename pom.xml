@@ -62,6 +62,7 @@
         <botmaker.studioapi.version>0.14.2-SNAPSHOT</botmaker.studioapi.version>
         <botmaker.pluginhost.version>0.10.2-SNAPSHOT</botmaker.pluginhost.version>
         <botmaker.pluginarchetype.version>0.7.2-SNAPSHOT</botmaker.pluginarchetype.version>
+        <botmaker.runlog.version>0.1.0-SNAPSHOT</botmaker.runlog.version>
     </properties>
 
     <repositories>
@@ -93,6 +94,13 @@
             <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-studio-api</artifactId>
             <version>${botmaker.studioapi.version}</version>
+        </dependency>
+
+        <!-- The run log's format: `botmaker reports` reads issues and run logs through its api (2026-11-03). -->
+        <dependency>
+            <groupId>com.github.BotMakerDev</groupId>
+            <artifactId>botmaker-runlog</artifactId>
+            <version>${botmaker.runlog.version}</version>
         </dependency>
 
         <!--

@@ -205,7 +205,8 @@ public enum Module {
             // then); flatten writes the parent's two pins into the published pom the SDK resolves.
             case PLUGIN_ARCHETYPE, PLUGIN_BASICS -> List.of(PLUGIN_PARENT);
             // The archetype is the example plugin's `template` zip, bundled for `botmaker plugin new`.
-            case CLI -> List.of(STUDIO_API, PLUGIN_HOST, PLUGIN_ARCHETYPE);
+            // The run log's format since 2026-11-03: `botmaker reports` reads issues and logs through it.
+            case CLI -> List.of(STUDIO_API, PLUGIN_HOST, PLUGIN_ARCHETYPE, RUNLOG);
             // The run log's format (2026-11-03): shared's Diag writes it.
             case SHARED -> List.of(RUNLOG);
             case SESSION -> List.of(SHARED);
