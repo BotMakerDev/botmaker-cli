@@ -125,11 +125,12 @@ class OrderTest {
     @Test
     void theModulesForcedByNothingAreForcedByNothing() {
         Set<Module> everythingElse = EnumSet.complementOf(EnumSet.of(
-                Module.PILOT, Module.SHARED, Module.STUDIO_API));
-        // The pilot has no pom pin; shared and the contract pin nothing of ours. Nothing upstream can
-        // invalidate any of them. The archetype was the fourth until it became the example plugin (2026-10-19).
+                Module.PILOT, Module.RUNLOG, Module.STUDIO_API));
+        // The pilot has no pom pin; the run log and the contract pin nothing of ours. Nothing upstream can
+        // invalidate any of them. The archetype was the fourth until it became the example plugin (2026-10-19);
+        // shared was one until it pinned the run log (2026-11-03).
         assertFalse(Forcing.forced(Module.PILOT, everythingElse));
-        assertFalse(Forcing.forced(Module.SHARED, everythingElse));
+        assertFalse(Forcing.forced(Module.RUNLOG, everythingElse));
         assertFalse(Forcing.forced(Module.STUDIO_API, everythingElse));
     }
 

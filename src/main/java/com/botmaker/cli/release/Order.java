@@ -57,6 +57,7 @@ public final class Order {
             Module.PLUGIN_HOST,
             Module.PLUGIN_ARCHETYPE,
             Module.PLUGIN_BASICS,
+            Module.RUNLOG,
             Module.CLI,
             Module.REMOTE_SERVER,
             Module.SHARED,
@@ -78,6 +79,8 @@ public final class Order {
             Module.PLUGIN_PARENT,
             Module.PLUGIN_HOST,
             Module.PLUGIN_ARCHETYPE,
+            // The run log's format pins nothing; shared resolves it, and the cli reads logs through it.
+            Module.RUNLOG,
             Module.CLI,
             Module.REMOTE_SERVER,
             Module.SHARED,

@@ -5,6 +5,13 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- **`botmaker release --runlog`**: `botmaker-runlog`, the run log's format, is a module of the release. It pins
+  nothing, is decided and tagged before the cli, and forces shared, which pins it.
+
 ## [0.10.1] — 2026-11-01
 
 ### Added

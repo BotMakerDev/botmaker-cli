@@ -136,7 +136,9 @@ class PomVersionsTest {
                 + "</botmaker.studioapi.version><botmaker.plugintoolkit.version>0.4.2-SNAPSHOT"
                 + "</botmaker.plugintoolkit.version>");
         writeOnParent(umbrella, Module.PLUGIN_ARCHETYPE, "0.2.1-SNAPSHOT", "0.1.1-SNAPSHOT");
-        write(umbrella, Module.SHARED, "0.1.3-SNAPSHOT", "");
+        write(umbrella, Module.RUNLOG, "0.1.0-SNAPSHOT", "");
+        write(umbrella, Module.SHARED, "0.1.3-SNAPSHOT", "<botmaker.runlog.version>0.1.0-SNAPSHOT"
+                + "</botmaker.runlog.version>");
         write(umbrella, Module.CLI, "0.2.2-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
                 + "</botmaker.studioapi.version><botmaker.pluginhost.version>0.4.1-SNAPSHOT"
                 + "</botmaker.pluginhost.version><botmaker.pluginarchetype.version>0.2.1-SNAPSHOT"

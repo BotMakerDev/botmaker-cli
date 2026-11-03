@@ -83,6 +83,10 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "The botmaker command and the validator. " + SPEC_HELP)
     private String cli;
 
+    @Option(names = "--runlog", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
+            description = "The run log's format. " + SPEC_HELP)
+    private String runlog;
+
     @Option(names = "--shared", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
             description = "The host platform layer. " + SPEC_HELP)
     private String shared;
@@ -255,6 +259,7 @@ public final class ReleaseCommand implements Callable<Integer> {
         put(explicit, Module.PLUGIN_ARCHETYPE, pluginArchetype);
         put(explicit, Module.PLUGIN_BASICS, pluginBasics);
         put(explicit, Module.CLI, cli);
+        put(explicit, Module.RUNLOG, runlog);
         put(explicit, Module.SHARED, shared);
         put(explicit, Module.SESSION, session);
         put(explicit, Module.SDK, sdk);

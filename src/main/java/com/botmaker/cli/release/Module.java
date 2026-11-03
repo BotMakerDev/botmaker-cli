@@ -36,6 +36,7 @@ public enum Module {
     PLUGIN_ARCHETYPE("botmaker-plugin-archetype"),
     PLUGIN_BASICS("botmaker-plugin-basics"),
     CLI("botmaker-cli"),
+    RUNLOG("botmaker-runlog"),
     SHARED("botmaker-shared"),
     SESSION("botmaker-session"),
     SDK("botmaker-sdk"),
@@ -155,6 +156,7 @@ public enum Module {
             case PLUGIN_ARCHETYPE -> "pluginarchetype";
             case PLUGIN_BASICS -> "pluginbasics";
             case CLI -> "cli";
+            case RUNLOG -> "runlog";
             case SHARED -> "shared";
             case SESSION -> "session";
             case SDK -> "sdk";
@@ -204,6 +206,8 @@ public enum Module {
             case PLUGIN_ARCHETYPE, PLUGIN_BASICS -> List.of(PLUGIN_PARENT);
             // The archetype is the example plugin's `template` zip, bundled for `botmaker plugin new`.
             case CLI -> List.of(STUDIO_API, PLUGIN_HOST, PLUGIN_ARCHETYPE);
+            // The run log's format (2026-11-03): shared's Diag writes it.
+            case SHARED -> List.of(RUNLOG);
             case SESSION -> List.of(SHARED);
             case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS);
             // The cli's main jar since 2026-10-24: Studio's Publish runs the cli's publish library.

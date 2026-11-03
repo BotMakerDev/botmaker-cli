@@ -96,6 +96,8 @@ public record Forcing(Module upstream, Module downstream, String reason) {
 
             // JitPack's build cache is per-tag, so a downstream must be re-tagged to be rebuilt against the
             // new upstream at all.
+            new Forcing(Module.RUNLOG, Module.SHARED,
+                    "shared pins the run log's format, and JitPack rebuilds per tag"),
             new Forcing(Module.SHARED, Module.SESSION,
                     "session pins shared, and JitPack's build cache is per-tag: without a new tag nothing "
                             + "rebuilds against the new shared"),
