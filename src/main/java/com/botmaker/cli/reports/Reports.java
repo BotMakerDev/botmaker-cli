@@ -36,12 +36,19 @@ public record Reports(String source, Report report, Map<String, List<Issue>> iss
         notes = List.copyOf(notes);
     }
 
-    /** Only the occurrences at {@code level} (null: every level) and from {@code since} on (null: all). */
+    /**
+     * Only the occurrences, and the report's other lines, at {@code level} (null: every level) and from
+     * {@code since} on (null: all).
+     */
     public Reports filtered(Level level, Instant since) {
-        List<Occurrence> kept = report.occurrences().stream()
+        return new Reports(source, new Report(report.dimensions(), kept(report.occurrences(), level, since),
+                kept(report.lines(), level, since)), issues, notes);
+    }
+
+    private static List<Occurrence> kept(List<Occurrence> all, Level level, Instant since) {
+        return all.stream()
                 .filter(o -> level == null || o.level() == level)
                 .filter(o -> since == null || !o.time().isBefore(since))
                 .toList();
-        return new Reports(source, new Report(report.dimensions(), kept), issues, notes);
     }
 }

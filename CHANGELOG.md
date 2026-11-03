@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `Reports.filtered` keeps a report's other lines (`Report.lines`), filtered alike.
 - **`botmaker reports [--repo o/r | --run <folder>] [--group-by <dim>] [--level warn|error] [--since <date>]
   [--json]`**: counts a bot's problems from the GitHub issues its runners sent (through `gh api`) or from run logs
   on this computer. `com.botmaker.cli.reports` (`IssueReports`, `RunReports`, `ReportsText`) is a library Studio
