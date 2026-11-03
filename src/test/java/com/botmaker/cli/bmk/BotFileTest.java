@@ -175,6 +175,15 @@ class BotFileTest {
         }
     }
 
+    /** A plugin's state of the bot is this machine's: even committed, no {@code .bmk} takes it (2026-11-03). */
+    @Test
+    void aBmkHasNoPluginState() throws IOException {
+        String tree = String.join("\u0000", "100644 blob aaa1\tpom.xml",
+                "100644 blob bbb2\t.botmaker/plugins/com_github_botmakerdev/botmaker_sdk/targets/t/game.json",
+                "100644 blob ccc3\t.botmaker/settings.json");
+        assertEquals(Map.of("pom.xml", "aaa1"), BotFiles.sources(tree));
+    }
+
     @Test
     void sourcesComeFromTheCommitsTree() throws IOException {
         String tree = String.join("\u0000", "100644 blob aaa1\tpom.xml", "100644 blob bbb2\tREADME.md",

@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- A test pins that a `.bmk` takes nothing under `.botmaker/`, a plugin's state of the bot included.
 - `Reports.filtered` keeps a report's other lines (`Report.lines`), filtered alike.
 - **`botmaker reports [--repo o/r | --run <folder>] [--group-by <dim>] [--level warn|error] [--since <date>]
   [--json]`**: counts a bot's problems from the GitHub issues its runners sent (through `gh api`) or from run logs
