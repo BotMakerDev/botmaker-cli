@@ -57,7 +57,7 @@ class IssueReportsTest {
 
     private static String issues() {
         ArrayNode list = JSON.createArrayNode();
-        list.addObject().put("number", 1).put("state", "open").put("title", IssueText.title(PROBLEM))
+        list.addObject().put("number", 1).put("state", "open").put("title", IssueText.title(PROBLEM, SCRUB))
                 .put("body", IssueText.body(PROBLEM, facts("v1"), SCRUB)).put("comments", 1)
                 .put("created_at", "2026-11-01T10:00:00Z").put("updated_at", "2026-11-02T10:00:00Z");
         list.addObject().put("number", 2).put("state", "open").put("title", "Feature request")
@@ -90,7 +90,7 @@ class IssueReportsTest {
         Reports first = new IssueReports(github, cache).read(BOT);
         assertEquals(2, first.report().occurrences().size(), "the issue and its BotMaker comment, nothing else");
         assertEquals(4, first.report().occurrences().stream().mapToInt(o -> o.count()).sum());
-        assertEquals(List.of(new Reports.Issue(1, true, IssueText.title(PROBLEM))),
+        assertEquals(List.of(new Reports.Issue(1, true, IssueText.title(PROBLEM, SCRUB))),
                 first.issues().get(PROBLEM.fingerprint()));
         assertEquals(List.of(), first.notes());
         assertTrue(github.asked.stream().noneMatch(p -> p.contains("/issues/2/")), "no comments of a non-report");
