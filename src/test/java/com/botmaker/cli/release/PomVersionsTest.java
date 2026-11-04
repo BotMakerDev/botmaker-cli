@@ -128,8 +128,11 @@ class PomVersionsTest {
     void syncPinsMovesExactlyThePinsTheGateRefuses(@TempDir Path umbrella) throws Exception {
         // 2026-10-07: cli's push failed after its back-to-snapshot, and the dashboard kept cli 0.2.1-SNAPSHOT.
         write(umbrella, Module.STUDIO_API, "0.5.1-SNAPSHOT", "");
-        write(umbrella, Module.PLUGIN_HOST, "0.4.1-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
+        write(umbrella, Module.JAVA, "0.1.0-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
                 + "</botmaker.studioapi.version>");
+        write(umbrella, Module.PLUGIN_HOST, "0.4.1-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
+                + "</botmaker.studioapi.version><botmaker.java.version>0.1.0-SNAPSHOT"
+                + "</botmaker.java.version>");
         write(umbrella, Module.PLUGIN_TOOLKIT, "0.4.2-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
                 + "</botmaker.studioapi.version>");
         write(umbrella, Module.PLUGIN_PARENT, "0.1.1-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
@@ -140,7 +143,8 @@ class PomVersionsTest {
         write(umbrella, Module.SHARED, "0.1.3-SNAPSHOT", "<botmaker.runlog.version>0.1.0-SNAPSHOT"
                 + "</botmaker.runlog.version>");
         write(umbrella, Module.CLI, "0.2.2-SNAPSHOT", "<botmaker.studioapi.version>0.5.1-SNAPSHOT"
-                + "</botmaker.studioapi.version><botmaker.pluginhost.version>0.4.1-SNAPSHOT"
+                + "</botmaker.studioapi.version><botmaker.java.version>0.1.0-SNAPSHOT"
+                + "</botmaker.java.version><botmaker.pluginhost.version>0.4.1-SNAPSHOT"
                 + "</botmaker.pluginhost.version><botmaker.pluginarchetype.version>0.2.1-SNAPSHOT"
                 + "</botmaker.pluginarchetype.version><botmaker.runlog.version>0.1.0-SNAPSHOT"
                 + "</botmaker.runlog.version>");

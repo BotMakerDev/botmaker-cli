@@ -22,7 +22,7 @@
  * <h2>What is here so far — slices 1 to 6</h2>
  *
  * <ul>
- *   <li>{@link com.botmaker.cli.release.Module} — the fourteen modules a tag can be cut for, with the flag
+ *   <li>{@link com.botmaker.cli.release.Module} — the modules a tag can be cut for, with the flag
  *       derived from the directory name. This package is the <i>owner</i> of that list, which is why it
  *       keeps one where {@code botmaker-dashboard}, a reader, deliberately does not. What a module is
  *       <i>exempt</i> from is asked of it ({@code mavenBuild}, {@code onJitpack}, {@code hasChangelog},

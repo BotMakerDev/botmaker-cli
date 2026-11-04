@@ -36,7 +36,7 @@ class WritesTest {
         String before = Files.readString(umbrella.resolve("botmaker-sdk/pom.xml"));
         List<String> log = new ArrayList<>();
 
-        // All six of the SDK's upstreams are being cut in this run. An upstream that is NOT being cut would
+        // All seven of the SDK's upstreams are being cut in this run. An upstream that is NOT being cut would
         // be looked up in the checkout, which a temp directory cannot answer — see the refusal in DepTag.
         Map<Module, Version> releasing = Map.of(
                 Module.SHARED, new Version(0, 1, 3),
@@ -44,6 +44,7 @@ class WritesTest {
                 Module.STUDIO_API, new Version(0, 5, 0),
                 Module.PLUGIN_TOOLKIT, new Version(0, 3, 3),
                 Module.PLUGIN_BASICS, new Version(0, 2, 1),
+                Module.JAVA, new Version(0, 1, 0),
                 Module.PLUGIN_HOST, new Version(0, 2, 2),
                 Module.SDK, new Version(1, 4, 0));
         PomVersions.release(recording(log), umbrella, Module.SDK, new Version(1, 4, 0), releasing);
@@ -58,7 +59,7 @@ class WritesTest {
                 + " -DnewVersion=v0.5.0 ")), log.toString());
         assertFalse(log.stream().anyMatch(l -> l.contains("-DnewVersion=0.5.0 ")), log.toString());
         assertTrue(log.stream().anyMatch(l -> l.equals("  botmaker-sdk 1.4.0 pinning shared v0.1.3, session"
-                + " v0.1.3, studio-api v0.5.0, plugin-toolkit v0.3.3, plugin-basics v0.2.1, plugin-host v0.2.2")),
+                + " v0.1.3, studio-api v0.5.0, plugin-toolkit v0.3.3, plugin-basics v0.2.1, java v0.1.0, plugin-host v0.2.2")),
                 log.toString());
         // Back on main: the next patch snapshot, and each pin at the snapshot its upstream moved to.
         assertTrue(log.stream().anyMatch(l -> l.contains(":set -DnewVersion=1.4.1-SNAPSHOT ")), log.toString());

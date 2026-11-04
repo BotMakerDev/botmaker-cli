@@ -13,10 +13,12 @@ class VersionsGateTest {
 
     private static String pom(String own, String studioApi) {
         return "<project><version>" + own + "</version><properties><botmaker.studioapi.version>" + studioApi
-                + "</botmaker.studioapi.version></properties></project>";
+                + "</botmaker.studioapi.version><botmaker.java.version>0.1.0-SNAPSHOT"
+                + "</botmaker.java.version></properties></project>";
     }
 
-    private static final Map<Module, String> CONTRACT_ON_MAIN = Map.of(Module.STUDIO_API, "0.4.3-SNAPSHOT");
+    private static final Map<Module, String> CONTRACT_ON_MAIN =
+            Map.of(Module.STUDIO_API, "0.4.3-SNAPSHOT", Module.JAVA, "0.1.0-SNAPSHOT");
 
     @Test
     void aPomAtItsSnapshotWithEveryPinAtItsUpstreamsMainPasses() {
@@ -82,13 +84,14 @@ class VersionsGateTest {
         String cli = "<project><version>0.2.1-SNAPSHOT</version><properties>"
                 + "<botmaker.cli.version>dev</botmaker.cli.version>"
                 + "<botmaker.studioapi.version>0.4.3-SNAPSHOT</botmaker.studioapi.version>"
+                + "<botmaker.java.version>0.1.0-SNAPSHOT</botmaker.java.version>"
                 + "<botmaker.pluginhost.version>0.3.3-SNAPSHOT</botmaker.pluginhost.version>"
                 + "<botmaker.pluginarchetype.version>0.3.1-SNAPSHOT</botmaker.pluginarchetype.version>"
                 + "<botmaker.runlog.version>0.1.0-SNAPSHOT</botmaker.runlog.version>"
                 + "<botmaker.remote.version>dev</botmaker.remote.version></properties></project>";
         GateVerdict verdict = VersionsGate.check(Module.CLI, cli, Map.of(Module.STUDIO_API, "0.4.3-SNAPSHOT",
-                Module.PLUGIN_HOST, "0.3.3-SNAPSHOT", Module.PLUGIN_ARCHETYPE, "0.3.1-SNAPSHOT",
-                Module.RUNLOG, "0.1.0-SNAPSHOT"), false);
+                Module.JAVA, "0.1.0-SNAPSHOT", Module.PLUGIN_HOST, "0.3.3-SNAPSHOT",
+                Module.PLUGIN_ARCHETYPE, "0.3.1-SNAPSHOT", Module.RUNLOG, "0.1.0-SNAPSHOT"), false);
         assertEquals(GateVerdict.Status.OK, verdict.status(), verdict.refusal());
     }
 }

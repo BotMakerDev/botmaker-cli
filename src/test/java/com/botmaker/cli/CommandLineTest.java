@@ -261,7 +261,7 @@ class CommandLineTest {
         assertEquals("minor", explicit.matchedOptionValue("--all", ""));
 
         // Every module the script has a flag for, and nothing it does not: --gallery is not a release.
-        for (String flag : new String[]{"--studio-api", "--plugin-toolkit", "--plugin-host",
+        for (String flag : new String[]{"--studio-api", "--plugin-toolkit", "--java", "--plugin-host",
                 "--plugin-archetype", "--cli", "--shared", "--session", "--sdk", "--studio", "--pilot"}) {
             assertTrue(parse("release", flag).subcommand().hasMatchedOption(flag), flag);
         }

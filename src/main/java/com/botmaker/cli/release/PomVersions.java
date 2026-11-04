@@ -258,6 +258,14 @@ public final class PomVersions {
         return m.find() ? Optional.of(m.group(1)) : Optional.empty();
     }
 
+    /** The release a never-tagged module's checked-out pom is heading for; empty when it has no such pom. */
+    static Optional<Version> firstRelease(Path umbrella, Module module) {
+        Path pom = pom(umbrella, module);
+        return Files.isRegularFile(pom)
+                ? projectVersion(read(pom)).flatMap(own -> Version.parse(own.replace("-SNAPSHOT", "")))
+                : Optional.empty();
+    }
+
     /**
      * The {@code <version>} after {@code upstream}'s artifactId, which in a plugin's pom is its {@code <parent>}'s
      * (the parent is never a dependency); groups 1 and 2 keep everything but the version.

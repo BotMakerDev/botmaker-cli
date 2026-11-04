@@ -55,12 +55,12 @@ class ForcingGateTest {
 
     @Test
     void aContractReleaseAloneNamesEveryDownstreamItForces() {
-        // studio-api forces the toolkit, the plugin parent, the host, the example plugin, the cli, the sdk and
-        // studio — seven flags, one refusal.
+        // studio-api forces the toolkit, the plugin parent, the Java library, the host, the example plugin, the cli,
+        // the sdk and studio — eight flags, one refusal.
         GateVerdict verdict = ForcingGate.check(of(Module.STUDIO_API), of(Module.STUDIO_API), false);
 
         assertTrue(verdict.stops());
-        for (String flag : new String[]{"--plugin-toolkit", "--plugin-parent", "--plugin-host", "--plugin-archetype",
+        for (String flag : new String[]{"--plugin-toolkit", "--plugin-parent", "--java", "--plugin-host", "--plugin-archetype",
                 "--cli", "--sdk", "--studio"}) {
             assertTrue(verdict.refusal().contains(flag), flag + " missing from: " + verdict.refusal());
         }

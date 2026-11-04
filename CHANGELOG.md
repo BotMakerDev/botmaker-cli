@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- The release library knows `botmaker-java` (2026-11-04): `botmaker release --java`, tagged after the plugin parent
+  and before plugin-host. The contract forces it; it forces plugin-host, the cli, the SDK and Studio. A bump level on
+  a module never tagged now releases the version its pom says rather than v0.0.1.
+
 - `SourceParser` comes from `botmaker-java` (2026-11-04), an `optional` dependency like JDT: the main artifact's
   consumers download neither, and the `all` jar carries both.
 

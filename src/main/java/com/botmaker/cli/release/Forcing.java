@@ -45,6 +45,20 @@ public record Forcing(Module upstream, Module downstream, String reason) {
     public static final List<Forcing> EDGES = List.of(
             new Forcing(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, "the toolkit " + BAKED),
             new Forcing(Module.STUDIO_API, Module.PLUGIN_HOST, "the loader " + BAKED),
+            new Forcing(Module.STUDIO_API, Module.JAVA, "the Java library " + BAKED),
+
+            // botmaker-java (2026-11-04) holds the value grammar and the parser every one of these builds on.
+            new Forcing(Module.JAVA, Module.PLUGIN_HOST,
+                    "the loader's ClasspathGrammar builds on botmaker-java's grammar, and flatten bakes that pin "
+                            + "into its published pom"),
+            new Forcing(Module.JAVA, Module.CLI,
+                    "`bot repair` and `plugin validate`'s migration check parse through botmaker-java, and the "
+                            + "`all` jar bundles the version the cli's pom pins"),
+            new Forcing(Module.JAVA, Module.SDK,
+                    "a running bot writes its own values through botmaker-java's grammar, and flatten bakes that "
+                            + "pin into the SDK's published pom"),
+            new Forcing(Module.JAVA, Module.STUDIO, "Studio's pom pins botmaker-java at a released version, "
+                    + "which this release moves"),
 
             // Plugin #2 pins the contract at `provided` and the toolkit at `compile`, and flatten bakes
             // both into the pom another plugin — the SDK — resolves.

@@ -137,8 +137,9 @@ class OrderTest {
     @Test
     void theForcedSetsAreTheScriptsExpressions() {
         assertEquals(Set.of(Module.STUDIO_API), upstreamsOf(Module.PLUGIN_TOOLKIT));
-        assertEquals(Set.of(Module.STUDIO_API), upstreamsOf(Module.PLUGIN_HOST));
-        assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_HOST, Module.PLUGIN_ARCHETYPE, Module.RUNLOG),
+        assertEquals(Set.of(Module.STUDIO_API), upstreamsOf(Module.JAVA));
+        assertEquals(Set.of(Module.STUDIO_API, Module.JAVA), upstreamsOf(Module.PLUGIN_HOST));
+        assertEquals(Set.of(Module.STUDIO_API, Module.JAVA, Module.PLUGIN_HOST, Module.PLUGIN_ARCHETYPE, Module.RUNLOG),
                 upstreamsOf(Module.CLI));
         assertEquals(Set.of(Module.SHARED), upstreamsOf(Module.SESSION));
         assertEquals(Set.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_PARENT),
@@ -151,13 +152,25 @@ class OrderTest {
         // dependency — a plugin depending on another plugin, which PluginLoader's single classloader makes
         // possible and which costs plugin-basics its freedom to break.
         assertEquals(Set.of(Module.SHARED, Module.SESSION, Module.STUDIO_API, Module.PLUGIN_TOOLKIT,
-                Module.PLUGIN_BASICS, Module.PLUGIN_HOST), upstreamsOf(Module.SDK));
+                Module.PLUGIN_BASICS, Module.JAVA, Module.PLUGIN_HOST), upstreamsOf(Module.SDK));
         // The toolkit is deliberately NOT here since 2026-09-06: a generated bot's pom stopped declaring it,
         // MavenService.TOOLKIT_FALLBACK_VERSION went with the entry, and with no toolkit version written
         // anywhere in Studio's source a toolkit release changes nothing here.
         // The cli since 2026-10-24: Studio's Publish runs its publish library.
         assertEquals(Set.of(Module.SHARED, Module.SESSION, Module.SDK, Module.STUDIO_API,
-                Module.PLUGIN_HOST, Module.CLI), upstreamsOf(Module.STUDIO));
+                Module.JAVA, Module.PLUGIN_HOST, Module.CLI), upstreamsOf(Module.STUDIO));
+    }
+
+    @Test
+    void theJavaLibraryIsTaggedBeforeEveryModuleThatPinsIt() {
+        // A consumer whose tag builds first dies resolving a version JitPack has not built: a tag lost for good.
+        List<Module> consumers = Module.JAVA.dependents();
+        assertEquals(List.of(Module.PLUGIN_HOST, Module.CLI, Module.SDK, Module.STUDIO), consumers);
+        for (Module consumer : consumers) {
+            assertTrue(Order.TAG.indexOf(Module.JAVA) < Order.TAG.indexOf(consumer), consumer.directory());
+        }
+        assertTrue(Order.TAG.indexOf(Module.STUDIO_API) < Order.TAG.indexOf(Module.JAVA));
+        assertTrue(Module.JAVA.onJitpack());
     }
 
     @Test

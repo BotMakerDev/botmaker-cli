@@ -67,6 +67,17 @@ public sealed interface VersionSpec {
     default Version resolve(Path umbrella, Module module) {
         return this instanceof Exact exact
                 ? exact.version()
-                : against(Tags.latest(umbrella, module));
+                : inCheckout(umbrella, module, Tags.latest(umbrella, module));
+    }
+
+    /**
+     * {@link #against}, except that a bump of a module never tagged is the version its pom already says: a bump
+     * off nothing would tag {@code botmaker-java}'s first release v0.0.1, below the 0.1.0-SNAPSHOT on its main. A
+     * module with no readable pom (an APK) bumps off {@link Version#ZERO} as before.
+     */
+    default Version inCheckout(Path umbrella, Module module, Optional<Version> latest) {
+        return this instanceof Bump && latest.isEmpty()
+                ? PomVersions.firstRelease(umbrella, module).orElseGet(() -> against(latest))
+                : against(latest);
     }
 }

@@ -1,7 +1,11 @@
 package com.botmaker.cli.release;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,6 +31,21 @@ class VersionSpecTest {
         assertEquals("2.0.0", VersionSpec.parse(Module.SDK, "major")
                 .against(Optional.of(new Version(1, 1, 1))).toString());
         assertEquals("0.0.1", VersionSpec.parse(Module.SDK, "patch").against(Optional.empty()).toString());
+    }
+
+    @Test
+    void aBumpOfANeverTaggedModuleIsTheVersionItsPomSays(@TempDir Path umbrella) throws IOException {
+        Path dir = Files.createDirectories(umbrella.resolve(Module.JAVA.directory()));
+        Files.writeString(dir.resolve("pom.xml"), "<project><version>0.1.0-SNAPSHOT</version></project>");
+        VersionSpec patch = VersionSpec.parse(Module.JAVA, "patch");
+
+        assertEquals("0.1.0", patch.inCheckout(umbrella, Module.JAVA, Optional.empty()).toString());
+        // A tag exists: the ordinary bump. An exact version: what the operator said.
+        assertEquals("0.1.1", patch.inCheckout(umbrella, Module.JAVA, Optional.of(new Version(0, 1, 0))).toString());
+        assertEquals("0.3.0", VersionSpec.parse(Module.JAVA, "0.3.0")
+                .inCheckout(umbrella, Module.JAVA, Optional.empty()).toString());
+        // No pom, as an APK has: a bump off nothing.
+        assertEquals("0.0.1", patch.inCheckout(umbrella, Module.PILOT, Optional.empty()).toString());
     }
 
     @Test

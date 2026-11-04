@@ -32,13 +32,14 @@ import java.util.stream.Collectors;
 public final class Plan {
 
     /** The label and parenthetical each module gets in the plan block, spaced as the script spaces them. */
-    // Map.ofEntries rather than Map.of: there are fifteen modules and Map.of stops at ten pairs.
+    // Map.ofEntries rather than Map.of: there are seventeen modules and Map.of stops at ten pairs.
     // Package-private for the one test that asserts it is total: a module missing here printed `null:
     // 0.3.0 -> v0.3.0` in the plan block, which is the kind of defect only the next new module finds.
     static final Map<Module, String> LABEL = new EnumMap<>(Map.ofEntries(
             Map.entry(Module.STUDIO_API, "studio-api"),
             Map.entry(Module.PLUGIN_TOOLKIT, "toolkit   "),
             Map.entry(Module.PLUGIN_PARENT, "parent    "),
+            Map.entry(Module.JAVA, "java      "),
             Map.entry(Module.PLUGIN_HOST, "host      "),
             Map.entry(Module.PLUGIN_ARCHETYPE, "archetype "),
             Map.entry(Module.PLUGIN_BASICS, "basics    "),
@@ -58,6 +59,7 @@ public final class Plan {
             Map.entry(Module.STUDIO_API, "  (the plugin contract)"),
             Map.entry(Module.PLUGIN_TOOLKIT, "  (the plugin widget toolkit)"),
             Map.entry(Module.PLUGIN_PARENT, "  (the parent pom a plugin names)"),
+            Map.entry(Module.JAVA, "  (reads and writes a bot's Java)"),
             Map.entry(Module.PLUGIN_HOST, "  (the plugin loader)"),
             Map.entry(Module.PLUGIN_ARCHETYPE, "  (the example plugin `botmaker plugin new` copies)"),
             Map.entry(Module.PLUGIN_BASICS, "  (plugin #2: values, Settings, the store)"),
@@ -101,7 +103,7 @@ public final class Plan {
             }
             VersionSpec parsed = VersionSpec.parse(module, spec);
             Optional<Version> latest = Tags.latest(umbrella, module);
-            Version version = parsed.against(latest);
+            Version version = parsed.inCheckout(umbrella, module, latest);
 
             List<Forcing> forcedBy = Forcing.forcedBy(module, cutting.keySet());
             ReleaseDecision verdict = ReleaseDecision.read(umbrella, module, force,

@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /**
  * Which modules of a release are owed a JitPack wait — the question {@link Jitpack} exists to answer for,
- * asked per module rather than for all nine.
+ * asked per module rather than for all of them.
  *
  * <p><b>The wait has exactly one reason</b>, and {@link Jitpack}'s javadoc is it: a downstream tagged seconds
  * after its upstream starts a JitPack build that resolves an upstream still building, and a build result is
@@ -26,13 +26,13 @@ import java.util.Optional;
  * only the tag on origin; since doc 43 they resolve the released pins their tag's pom names from JitPack,
  * and are owed the wait like any JitPack build.
  *
- * <p>For a full fourteen-module release that answers: owed — studio-api, plugin-toolkit, plugin-host,
- * plugin-archetype (the cli bundles its zip, since 2026-10-19), cli, shared, session, plugin-basics. Not owed
+ * <p>For a full release that answers: owed — studio-api, plugin-toolkit, plugin-parent, java, plugin-host,
+ * plugin-archetype (the cli bundles its zip, since 2026-10-19), runlog, cli, shared, session, plugin-basics. Not owed
  * — sdk (nothing tagged after it resolves it; Studio's {@code SDK_FALLBACK_VERSION} is text naming a tag,
  * checked by {@link FallbackVersionsGate} as a tag).
  *
- * <p><b>A skipped wait is not a skipped check.</b> The clean-room verify pass still resolves all nine
- * artifacts after the chain, so a module whose build is broken is still reported — later, and without the
+ * <p><b>A skipped wait is not a skipped check.</b> The clean-room verify pass still resolves every
+ * artifact after the chain, so a module whose build is broken is still reported — later, and without the
  * release having paid for the discovery.
  */
 public final class Waits {

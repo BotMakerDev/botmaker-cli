@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The modules {@code release.sh} can cut a tag for — fifteen, and this is now the list that owns that fact.
+ * The modules {@code release.sh} can cut a tag for — seventeen, and this is now the list that owns that fact.
  *
  * <p><b>Keeping the list here is the opposite of the rule {@code botmaker-dashboard} follows, and both are
  * right.</b> The dashboard refuses to keep it because it is a <i>reader</i>: a second copy there would go
@@ -32,6 +32,7 @@ public enum Module {
     STUDIO_API("botmaker-studio-api"),
     PLUGIN_TOOLKIT("botmaker-plugin-toolkit"),
     PLUGIN_PARENT("botmaker-plugin-parent"),
+    JAVA("botmaker-java"),
     PLUGIN_HOST("botmaker-plugin-host"),
     PLUGIN_ARCHETYPE("botmaker-plugin-archetype"),
     PLUGIN_BASICS("botmaker-plugin-basics"),
@@ -61,7 +62,7 @@ public enum Module {
 
     /**
      * The command-line flag, derived rather than tabulated: {@code --plugin-toolkit} is the directory
-     * without the {@code botmaker-} prefix, for all fourteen.
+     * without the {@code botmaker-} prefix, for every module.
      */
     public String flag() {
         return "--" + directory.substring(PREFIX.length());
@@ -152,6 +153,7 @@ public enum Module {
             case STUDIO_API -> "studioapi";
             case PLUGIN_TOOLKIT -> "plugintoolkit";
             case PLUGIN_PARENT -> "pluginparent";
+            case JAVA -> "java";
             case PLUGIN_HOST -> "pluginhost";
             case PLUGIN_ARCHETYPE -> "pluginarchetype";
             case PLUGIN_BASICS -> "pluginbasics";
@@ -191,12 +193,14 @@ public enum Module {
      * ({@link PomVersions}, umbrella {@code docs/refactor/43-real-versions.md}); {@link VersionsGate} holds the
      * pom to this list. <b>The empties are as deliberate as the entries.</b> Studio pins no SDK and no toolkit: it
      * has had no {@code botmaker-sdk} dependency since 2026-09-02, and the toolkit is a <i>plugin's</i>
-     * dependency, never the host's; it pins the cli's main jar too since 2026-10-24 (five now). The dashboard pins
+     * dependency, never the host's; it pins the cli's main jar too since 2026-10-24 (six now). The dashboard pins
      * shared and the cli's main jar, whose own pins it excludes. {@code botmaker-studio-api} pins nothing: it has no upstream of ours.
      */
     public List<Module> upstreams() {
         return switch (this) {
-            case PLUGIN_TOOLKIT, PLUGIN_HOST -> List.of(STUDIO_API);
+            case PLUGIN_TOOLKIT, JAVA -> List.of(STUDIO_API);
+            // botmaker-java since 2026-11-04: the grammar moved there, and ClasspathGrammar builds on it.
+            case PLUGIN_HOST -> List.of(STUDIO_API, JAVA);
             // The plugin parent pins the contract and the toolkit, in the dependencyManagement every plugin
             // inherits (2026-10-27).
             case PLUGIN_PARENT -> List.of(STUDIO_API, PLUGIN_TOOLKIT);
@@ -206,13 +210,14 @@ public enum Module {
             case PLUGIN_ARCHETYPE, PLUGIN_BASICS -> List.of(PLUGIN_PARENT);
             // The archetype is the example plugin's `template` zip, bundled for `botmaker plugin new`.
             // The run log's format since 2026-11-03: `botmaker reports` reads issues and logs through it.
-            case CLI -> List.of(STUDIO_API, PLUGIN_HOST, PLUGIN_ARCHETYPE, RUNLOG);
+            // botmaker-java since 2026-11-04: `repair` and `plugin validate`'s migration check parse through it.
+            case CLI -> List.of(STUDIO_API, JAVA, PLUGIN_HOST, PLUGIN_ARCHETYPE, RUNLOG);
             // The run log's format (2026-11-03): shared's Diag writes it.
             case SHARED -> List.of(RUNLOG);
             case SESSION -> List.of(SHARED);
-            case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS, PLUGIN_HOST);
+            case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS, JAVA, PLUGIN_HOST);
             // The cli's main jar since 2026-10-24: Studio's Publish runs the cli's publish library.
-            case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_HOST, CLI);
+            case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, JAVA, PLUGIN_HOST, CLI);
             case DASHBOARD -> List.of(SHARED, CLI);
             default -> List.of();
         };

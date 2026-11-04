@@ -67,6 +67,10 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "The parent pom a plugin names. " + SPEC_HELP)
     private String pluginParent;
 
+    @Option(names = "--java", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
+            description = "The library that reads and writes a bot's Java. " + SPEC_HELP)
+    private String java;
+
     @Option(names = "--plugin-host", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
             description = "The plugin loader. " + SPEC_HELP)
     private String pluginHost;
@@ -255,6 +259,7 @@ public final class ReleaseCommand implements Callable<Integer> {
         put(explicit, Module.STUDIO_API, studioApi);
         put(explicit, Module.PLUGIN_TOOLKIT, pluginToolkit);
         put(explicit, Module.PLUGIN_PARENT, pluginParent);
+        put(explicit, Module.JAVA, java);
         put(explicit, Module.PLUGIN_HOST, pluginHost);
         put(explicit, Module.PLUGIN_ARCHETYPE, pluginArchetype);
         put(explicit, Module.PLUGIN_BASICS, pluginBasics);
