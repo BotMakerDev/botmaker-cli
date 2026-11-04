@@ -717,7 +717,7 @@ class PluginValidatorTest {
                         + "public static List<ManagedValue<?>> declaredValues() {"
                         + " return List.of(ManagedValue.openSet(GreetingValue.Id.GREETINGS)"
                         + ".ofEnumGroups(Tag.class, BagPlugin::tag).groupedAs(Loose.class, BagPlugin::group)"
-                        + ".in(\"Tags\").because(\"why\")); }");
+                        + ".in(GreetingValue.Holder.TAGS).because(\"why\")); }");
         Path classes = compile(dir, plugin);
         CheckResult types = result(PluginValidator.validate(PluginSubject.local(declare(classes, "p.BagPlugin"),
                 null)), Check.TYPES);
@@ -738,7 +738,9 @@ class PluginValidatorTest {
     /** The plugin's own managed marker, nested in the plugin class: each test's id is one of its constants. */
     private static final String MARKER = "@com.botmaker.plugin.api.managed.ManagedMarker"
             + " @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)"
-            + " public @interface GreetingValue { Id value(); enum Id { GREETING, CLOCK, GREETINGS, CLOCKS } } ";
+            + " public @interface GreetingValue { Id value();"
+            + " enum Id implements com.botmaker.plugin.api.managed.ManagedId<Holder> { GREETING, CLOCK, GREETINGS, CLOCKS }"
+            + " enum Holder { VALUES, GREETINGS, CLOCKS, SHEETS, TAGS } } ";
 
     /**
      * The good plugin, declaring {@code values} (Java expressions of {@code ManagedValue}) as its managed values,
@@ -779,14 +781,16 @@ class PluginValidatorTest {
     @Test
     void a_value_of_a_declared_type_passes(@TempDir Path dir) throws IOException {
         CheckResult managed = managed(dir, method("GREETING")
-                + ".in(\"Values\").holds(Greeting.class, null).because(\"Edit it in the Greeting window.\")");
+                + ".in(GreetingValue.Holder.VALUES).holds(Greeting.class, null)"
+                + ".because(\"Edit it in the Greeting window.\")");
         assertEquals(Status.PASS, managed.status(), managed::toString);
     }
 
     @Test
     void a_type_no_plugin_declares_cannot_be_written(@TempDir Path dir) throws IOException {
         CheckResult managed = managed(dir, method("CLOCK")
-                + ".in(\"Values\").holds(java.time.Clock.class, java.time.Clock.systemUTC()).because(\"why\")");
+                + ".in(GreetingValue.Holder.VALUES).holds(java.time.Clock.class, java.time.Clock.systemUTC())"
+                + ".because(\"why\")");
         assertEquals(Status.FAIL, managed.status());
         assertTrue(managed.detail().getFirst().contains("no loaded plugin declares"), managed.detail()::toString);
     }
@@ -795,7 +799,8 @@ class PluginValidatorTest {
     @Test
     void a_method_holding_a_list_passes(@TempDir Path dir) throws IOException {
         CheckResult managed = managed(dir, method("CLOCK")
-                + ".in(\"Values\").holds(java.util.List.class, java.util.List.of()).because(\"why\")");
+                + ".in(GreetingValue.Holder.VALUES).holds(java.util.List.class, java.util.List.of())"
+                + ".because(\"why\")");
         assertEquals(Status.PASS, managed.status(), managed::toString);
     }
 
@@ -803,14 +808,14 @@ class PluginValidatorTest {
     @Test
     void an_open_set_of_a_declared_type_passes(@TempDir Path dir) throws IOException {
         CheckResult managed = managed(dir, openSet("GREETINGS")
-                + ".of(Greeting.class).in(\"Greetings\").because(\"why\")");
+                + ".of(Greeting.class).in(GreetingValue.Holder.GREETINGS).because(\"why\")");
         assertEquals(Status.PASS, managed.status(), managed::toString);
     }
 
     @Test
     void an_open_set_of_a_type_no_plugin_declares_fails(@TempDir Path dir) throws IOException {
         CheckResult managed = managed(dir, openSet("CLOCKS")
-                + ".of(java.time.Clock.class).in(\"Clocks\").because(\"why\")");
+                + ".of(java.time.Clock.class).in(GreetingValue.Holder.CLOCKS).because(\"why\")");
         assertEquals(Status.FAIL, managed.status());
         assertTrue(managed.detail().getFirst().contains("holds constants of java.time.Clock"),
                 managed.detail()::toString);
@@ -819,7 +824,7 @@ class PluginValidatorTest {
     /** A sheet of nested classes ({@code ofClasses}), each returning a {@code setup} of {@code returns}. */
     private static CheckResult classes(Path dir, String returns) throws IOException {
         String plugin = managing(openSet("GREETINGS") + ".ofClasses(Sheet.class).fields(Object.class, GoodPlugin::cell)"
-                + ".setup(Sheet::setup).in(\"Sheets\").because(\"why\")").replace(
+                + ".setup(Sheet::setup).in(GreetingValue.Holder.SHEETS).because(\"why\")").replace(
                 TYPES,
                 "public abstract static class Sheet { public abstract " + returns + " setup(); } "
                         + "public static Object cell(String sheet, String name) { return name; } " + TYPES);
@@ -849,19 +854,41 @@ class PluginValidatorTest {
         assertEquals(Status.PASS, managed.status(), managed::toString);
     }
 
+    /** A holder is an UPPER_SNAKE constant of the marker's {@code Holder} enum (2026-11-04). */
     @Test
-    void a_holder_is_a_simple_class_name(@TempDir Path dir) throws IOException {
-        CheckResult managed = managed(dir, method("GREETING")
-                + ".in(\"plugins.Values\").holds(Greeting.class, null).because(\"why\")");
+    void a_holder_is_an_upper_snake_constant(@TempDir Path dir) throws IOException {
+        String plugin = managing(method("GREETING")
+                + ".in(GreetingValue.Holder.Values).holds(Greeting.class, null).because(\"why\")")
+                .replace("enum Holder { VALUES,", "enum Holder { Values, VALUES,");
+        CheckResult managed = result(PluginValidator.validate(subject(dir, GOOD_POM, plugin, GOOD_API)), Check.MANAGED);
         assertEquals(Status.FAIL, managed.status());
-        // The contract refuses it while the plugin declares it (2026-10-21), so the check reports the throw.
-        assertTrue(managed.detail().getFirst().contains("the holder is a class's simple name"),
+        // The contract refuses it while the plugin declares it, so the check reports the throw.
+        assertTrue(managed.detail().getFirst().contains("is not UPPER_SNAKE"), managed.detail()::toString);
+    }
+
+    /** The host writes a missing holder from its first value, so an open set shares its holder with nothing. */
+    @Test
+    void an_open_set_beside_a_method_in_one_holder_fails(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir,
+                method("GREETING") + ".in(GreetingValue.Holder.VALUES).holds(Greeting.class, null).because(\"why\")",
+                openSet("GREETINGS") + ".of(Greeting.class).in(GreetingValue.Holder.VALUES).because(\"why\")");
+        assertEquals(Status.FAIL, managed.status());
+        assertTrue(managed.detail().getFirst().contains("an open set is a holder of its own"),
                 managed.detail()::toString);
     }
 
     @Test
+    void methods_sharing_a_holder_pass(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir,
+                method("GREETING") + ".in(GreetingValue.Holder.VALUES).holds(Greeting.class, null).because(\"why\")",
+                method("CLOCK") + ".in(GreetingValue.Holder.VALUES).holds(java.util.List.class, java.util.List.of())"
+                        + ".because(\"why\")");
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+    }
+
+    @Test
     void one_id_is_one_value(@TempDir Path dir) throws IOException {
-        String value = method("GREETING") + ".in(\"Values\")"
+        String value = method("GREETING") + ".in(GreetingValue.Holder.VALUES)"
                 + ".holds(Greeting.class, null).because(\"why\")";
         CheckResult managed = managed(dir, value, value);
         assertEquals(Status.FAIL, managed.status());

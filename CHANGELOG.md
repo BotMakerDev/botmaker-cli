@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`plugin validate` refuses an open set sharing its holder** (2026-11-04): a holder is one open set or marked
+  methods, with parameters beside either, because the host writes a missing holder from its first value.
+
 - A `.bmk` carries `starting-params/`, so a run copy fills its private `params/`. The hash changes only for a bot with
   that folder. A Studio older than this release refuses such a file.
 - `plugin validate`'s `managed` check passes a method value holding a list or other container the host's grammar

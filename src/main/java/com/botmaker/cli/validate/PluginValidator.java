@@ -1036,10 +1036,32 @@ public final class PluginValidator {
                 if (found.isEmpty()) sound++;
                 problems.addAll(found);
             }
+            problems.addAll(mixedHolders(id, values));
         }
         if (!problems.isEmpty()) return CheckResult.fail(Check.MANAGED, problems);
         return CheckResult.pass(Check.MANAGED, sound == 0 ? "declares no managed values"
                 : sound + " managed value(s), each a method or a set of constants a host can write");
+    }
+
+    /**
+     * A holder is one open set or the class of marked methods; parameters beside either go to their own group in
+     * {@code params/}. The host writes a missing holder from its first value, so an open set beside anything else
+     * of the holder's would leave the rest unwritten (2026-11-04).
+     */
+    private static List<String> mixedHolders(String plugin, List<ManagedValue<?>> values) {
+        Map<String, List<ManagedValue<?>>> byHolder = new LinkedHashMap<>();
+        for (ManagedValue<?> value : values) {
+            if (value == null || value.holder() == null || value instanceof ManagedParam<?>) continue;
+            byHolder.computeIfAbsent(value.holder(), holder -> new ArrayList<>()).add(value);
+        }
+        List<String> problems = new ArrayList<>();
+        byHolder.forEach((holder, held) -> {
+            if (held.size() > 1 && held.stream().anyMatch(ManagedOpenSet.class::isInstance)) {
+                problems.add(plugin + ": the holder " + holder + " holds " + held.stream().map(ManagedValue::id)
+                        .toList() + "; an open set is a holder of its own, so give each one its own constant");
+            }
+        });
+        return problems;
     }
 
     private static List<String> managedProblems(String plugin, ManagedValue<?> value,
