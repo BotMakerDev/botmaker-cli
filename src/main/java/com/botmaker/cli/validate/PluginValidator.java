@@ -1101,7 +1101,8 @@ public final class PluginValidator {
         }
         Class<?> raw = value.type();
         boolean hostWrites = raw.isPrimitive() || raw.isEnum() || raw == String.class
-                || Number.class.isAssignableFrom(boxed(raw)) || boxed(raw) == Boolean.class;
+                || Number.class.isAssignableFrom(boxed(raw)) || boxed(raw) == Boolean.class
+                || HOST_CONTAINERS.contains(raw);
         PluginType<?> declared = types.get(raw.getName());
         ComponentType<?> shape = shapes.get(raw.getName());
         if (!hostWrites && declared == null && shape == null) {

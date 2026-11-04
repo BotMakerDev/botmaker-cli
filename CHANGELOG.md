@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `plugin validate`'s `managed` check passes a method value holding a list or other container the host's grammar
+  writes, as it does a generic parameter; the SDK's `launchTargets` is one since 2026-11-04.
 - A release of `botmaker-plugin-host` forces the SDK, which now pins it: a running bot writes its own during-a-run
   values through the host's grammar.
 - A test pins that a `.bmk` takes nothing under `.botmaker/`, a plugin's state of the bot included.

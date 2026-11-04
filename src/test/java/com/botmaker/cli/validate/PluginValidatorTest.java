@@ -791,6 +791,14 @@ class PluginValidatorTest {
         assertTrue(managed.detail().getFirst().contains("no loaded plugin declares"), managed.detail()::toString);
     }
 
+    /** The host's grammar writes a list itself, as it does a generic parameter's: the method a bot's data sits in. */
+    @Test
+    void a_method_holding_a_list_passes(@TempDir Path dir) throws IOException {
+        CheckResult managed = managed(dir, method("CLOCK")
+                + ".in(\"Values\").holds(java.util.List.class, java.util.List.of()).because(\"why\")");
+        assertEquals(Status.PASS, managed.status(), managed::toString);
+    }
+
     /** An open set's constants are written as values of its element type: a declared one passes. */
     @Test
     void an_open_set_of_a_declared_type_passes(@TempDir Path dir) throws IOException {
