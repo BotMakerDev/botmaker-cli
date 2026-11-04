@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- A `.bmk` carries `starting-params/`, so a run copy fills its private `params/`. The hash changes only for a bot with
+  that folder. A Studio older than this release refuses such a file.
 - `plugin validate`'s `managed` check passes a method value holding a list or other container the host's grammar
   writes, as it does a generic parameter; the SDK's `launchTargets` is one since 2026-11-04.
 - A release of `botmaker-plugin-host` forces the SDK, which now pins it: a running bot writes its own during-a-run

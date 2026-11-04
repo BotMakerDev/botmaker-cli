@@ -100,7 +100,8 @@ public final class BotFile {
      * commit gives the same bytes.
      *
      * @param sources the commit's files by path, relative with {@code /}; only {@code pom.xml}, {@code icon.png} and
-     *                those under {@code src/main/java/} and {@code src/main/resources/} are taken
+     *                those under {@code src/main/java/}, {@code src/main/resources/} and {@code starting-params/}
+     *                are taken: a run copy fills its private {@code params/} from the last (2026-11-04)
      * @param jars    the bot's resolved classpath; a jar {@code central} serves with the same bytes is listed in
      *                {@code bot.json} only, every other is packed
      * @return the {@code bot.json} written
@@ -286,7 +287,8 @@ public final class BotFile {
     /** A source entry: what {@link #write} takes from the folder. */
     public static boolean isSource(String name) {
         return name.equals("pom.xml") || name.equals("icon.png")
-                || (name.startsWith("src/main/java/") || name.startsWith("src/main/resources/")) && !name.endsWith("/");
+                || (name.startsWith("src/main/java/") || name.startsWith("src/main/resources/")) && !name.endsWith("/")
+                || name.startsWith("starting-params/") && name.endsWith(".java");
     }
 
     private static boolean isLibEntry(String name) {

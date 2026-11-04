@@ -175,6 +175,20 @@ class BotFileTest {
         }
     }
 
+    /** A run copy fills its private {@code params/} from the author's starting copy (2026-11-04). */
+    @Test
+    void aBmkCarriesTheStartingParams(@TempDir Path tmp) throws IOException {
+        Fixture f = fixture(tmp);
+        String relative = "starting-params/bot/RunChoices.java";
+        f.sources().put(relative, bytes("class RunChoices {}"));
+
+        Path into = tmp.resolve("unpacked");
+        BotFile.read(written(tmp, f, "bot.bmk"), into);
+
+        assertArrayEquals(bytes("class RunChoices {}"), Files.readAllBytes(into.resolve(relative)));
+        assertFalse(BotFile.isSource("starting-params/notes.txt"), "only the group files the fit reads");
+    }
+
     /** A plugin's state of the bot is this machine's: even committed, no {@code .bmk} takes it (2026-11-03). */
     @Test
     void aBmkHasNoPluginState() throws IOException {
