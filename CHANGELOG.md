@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- `plugin validate`'s migration check and `bot repair` parse through plugin-host's `SourceParser` (2026-11-04), the
+  one text-to-tree entry.
+
 ### Added
 
 - **`plugin validate` refuses an open set sharing its holder** (2026-11-04): a holder is one open set or marked

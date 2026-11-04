@@ -1,9 +1,7 @@
 package com.botmaker.cli.validate;
 
 import com.botmaker.plugin.api.meta.Migrate;
-import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.dom.AST;
-import org.eclipse.jdt.core.dom.ASTParser;
+import com.botmaker.plugin.host.grammar.SourceParser;
 import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.Annotation;
 import org.eclipse.jdt.core.dom.ArrayType;
@@ -41,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -323,15 +320,7 @@ final class MigrationCheck {
     }
 
     private static CompilationUnit parse(String source) {
-        ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-        parser.setSource(source.toCharArray());
-        // ASTParser's default level is 1.3, where a tree read off today's Java is wrong without a word.
-        Map<String, String> options = JavaCore.getOptions();
-        options.put(JavaCore.COMPILER_COMPLIANCE, JavaCore.latestSupportedJavaVersion());
-        options.put(JavaCore.COMPILER_SOURCE, JavaCore.latestSupportedJavaVersion());
-        parser.setCompilerOptions(options);
-        return (CompilationUnit) parser.createAST(null);
+        return SourceParser.parse(source);
     }
 
     // ---------------------------------------------------------------------------------------------

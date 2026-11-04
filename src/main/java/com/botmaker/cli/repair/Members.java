@@ -1,11 +1,9 @@
 package com.botmaker.cli.repair;
 
-import org.eclipse.jdt.core.JavaCore;
+import com.botmaker.plugin.host.grammar.SourceParser;
 import org.eclipse.jdt.core.compiler.IProblem;
-import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTMatcher;
 import org.eclipse.jdt.core.dom.ASTNode;
-import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.AbstractTypeDeclaration;
 import org.eclipse.jdt.core.dom.AnnotationTypeMemberDeclaration;
 import org.eclipse.jdt.core.dom.CompilationUnit;
@@ -181,15 +179,7 @@ public final class Members {
     }
 
     private static CompilationUnit parse(String source) {
-        ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-        parser.setSource(source.toCharArray());
-        // ASTParser's default level is 1.3, where a tree read off today's Java is wrong without a word.
-        Map<String, String> options = JavaCore.getOptions();
-        options.put(JavaCore.COMPILER_COMPLIANCE, JavaCore.latestSupportedJavaVersion());
-        options.put(JavaCore.COMPILER_SOURCE, JavaCore.latestSupportedJavaVersion());
-        parser.setCompilerOptions(options);
-        return (CompilationUnit) parser.createAST(null);
+        return SourceParser.parse(source);
     }
 
     private static List<IProblem> errors(CompilationUnit cu) {
