@@ -210,7 +210,7 @@ public enum Module {
             // The run log's format (2026-11-03): shared's Diag writes it.
             case SHARED -> List.of(RUNLOG);
             case SESSION -> List.of(SHARED);
-            case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS);
+            case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS, PLUGIN_HOST);
             // The cli's main jar since 2026-10-24: Studio's Publish runs the cli's publish library.
             case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_HOST, CLI);
             case DASHBOARD -> List.of(SHARED, CLI);

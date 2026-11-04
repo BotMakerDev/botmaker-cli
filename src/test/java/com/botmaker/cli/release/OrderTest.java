@@ -151,7 +151,7 @@ class OrderTest {
         // dependency — a plugin depending on another plugin, which PluginLoader's single classloader makes
         // possible and which costs plugin-basics its freedom to break.
         assertEquals(Set.of(Module.SHARED, Module.SESSION, Module.STUDIO_API, Module.PLUGIN_TOOLKIT,
-                Module.PLUGIN_BASICS), upstreamsOf(Module.SDK));
+                Module.PLUGIN_BASICS, Module.PLUGIN_HOST), upstreamsOf(Module.SDK));
         // The toolkit is deliberately NOT here since 2026-09-06: a generated bot's pom stopped declaring it,
         // MavenService.TOOLKIT_FALLBACK_VERSION went with the entry, and with no toolkit version written
         // anywhere in Studio's source a toolkit release changes nothing here.

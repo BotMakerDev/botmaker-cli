@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- A release of `botmaker-plugin-host` forces the SDK, which now pins it: a running bot writes its own during-a-run
+  values through the host's grammar.
 - A test pins that a `.bmk` takes nothing under `.botmaker/`, a plugin's state of the bot included.
 - `Reports.filtered` keeps a report's other lines (`Report.lines`), filtered alike.
 - **`botmaker reports [--repo o/r | --run <folder>] [--group-by <dim>] [--level warn|error] [--since <date>]
