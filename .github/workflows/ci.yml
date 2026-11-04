@@ -9,8 +9,8 @@ name: CI
 # would pass through the same code and prove none of it.
 #
 # EVERY UPSTREAM IS BUILT FROM SOURCE, not resolved from JitPack: this repo's pom pins
-# ${botmaker.studioapi.version}, ${botmaker.pluginhost.version} and ${botmaker.pluginarchetype.version} at their
-# main -SNAPSHOT — the version the umbrella reactor and a local `mvn install` produce — so there is no
+# ${botmaker.studioapi.version}, ${botmaker.java.version}, ${botmaker.pluginhost.version} and
+# ${botmaker.pluginarchetype.version} at their main -SNAPSHOT — the version the umbrella reactor and a local `mvn install` produce — so there is no
 # published artifact under those coordinates to download. botmaker-plugin-host declares the contract
 # `provided`, which is why the contract is installed first and separately rather than coming along as a
 # transitive dependency. The archetype (the example plugin whose `template` zip this jar bundles for
@@ -32,6 +32,12 @@ jobs:
         with:
           repository: BotMakerDev/botmaker-studio-api
           path: .deps/botmaker-studio-api
+
+      - name: Check out botmaker-java
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-java
+          path: .deps/botmaker-java
 
       - name: Check out botmaker-plugin-host
         uses: actions/checkout@v7
@@ -71,6 +77,7 @@ jobs:
         run: |
           source .github/mvn-retry.sh
           mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-java/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-parent/pom.xml install
@@ -101,6 +108,12 @@ jobs:
         with:
           repository: BotMakerDev/botmaker-studio-api
           path: .deps/botmaker-studio-api
+
+      - name: Check out botmaker-java
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-java
+          path: .deps/botmaker-java
 
       - name: Check out botmaker-plugin-host
         uses: actions/checkout@v7
@@ -152,6 +165,7 @@ jobs:
         run: |
           source .github/mvn-retry.sh
           mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-java/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-parent/pom.xml install

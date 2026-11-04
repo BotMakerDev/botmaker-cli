@@ -61,6 +61,7 @@
         <!-- Each upstream's main version; a release commit sets the released ones (doc 43). -->
         <botmaker.studioapi.version>0.14.2-SNAPSHOT</botmaker.studioapi.version>
         <botmaker.pluginhost.version>0.10.2-SNAPSHOT</botmaker.pluginhost.version>
+        <botmaker.java.version>0.1.0-SNAPSHOT</botmaker.java.version>
         <botmaker.pluginarchetype.version>0.7.2-SNAPSHOT</botmaker.pluginarchetype.version>
         <botmaker.runlog.version>0.1.0-SNAPSHOT</botmaker.runlog.version>
     </properties>
@@ -82,6 +83,15 @@
             <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-plugin-host</artifactId>
             <version>${botmaker.pluginhost.version}</version>
+        </dependency>
+
+        <!-- SourceParser, which `repair` and `plugin validate`'s migration check parse a bot's Java with. `optional`,
+             like JDT below, so a consumer of the main artifact downloads neither; the `all` jar carries both. -->
+        <dependency>
+            <groupId>com.github.BotMakerDev</groupId>
+            <artifactId>botmaker-java</artifactId>
+            <version>${botmaker.java.version}</version>
+            <optional>true</optional>
         </dependency>
 
         <!--

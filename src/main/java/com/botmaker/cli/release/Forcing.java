@@ -130,7 +130,7 @@ public record Forcing(Module upstream, Module downstream, String reason) {
                     "the SDK compiles against plugin #2 as an ordinary Maven dependency, and flatten bakes "
                             + "that pin into the SDK's published pom"),
             new Forcing(Module.PLUGIN_HOST, Module.SDK,
-                    "a running bot writes its parameters with plugin-host's grammar, and flatten bakes that pin "
+                    "a running bot builds its grammar with plugin-host's ClasspathGrammar, and flatten bakes that pin "
                             + "into the SDK's published pom"),
 
             new Forcing(Module.SHARED, Module.STUDIO, "Studio's pom pins shared at a released version, "

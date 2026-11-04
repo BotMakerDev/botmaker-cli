@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- `SourceParser` comes from `botmaker-java` (2026-11-04), an `optional` dependency like JDT: the main artifact's
+  consumers download neither, and the `all` jar carries both.
+
 - `plugin validate`'s migration check and `bot repair` parse through plugin-host's `SourceParser` (2026-11-04), the
   one text-to-tree entry.
 
