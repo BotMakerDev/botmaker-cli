@@ -86,7 +86,7 @@
         </dependency>
 
         <!-- SourceParser, which `repair` and `plugin validate`'s migration check parse a bot's Java with. `optional`,
-             like JDT below, so a consumer of the main artifact downloads neither; the `all` jar carries both. -->
+             so a consumer of the main artifact downloads neither it nor the JDT it brings; the `all` jar carries both. -->
         <dependency>
             <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-java</artifactId>
@@ -136,16 +136,10 @@
         </dependency>
 
         <!--
-          com.botmaker.cli.repair reads a damaged file's members by JDT's recovered tree. Optional like picocli: the
-          `all` jar carries it, and the catalog's CI resolving the main artifact does not download it. Studio brings
-          its own, the same version.
+          com.botmaker.cli.repair reads a damaged file's members by JDT's recovered tree. JDT comes through
+          botmaker-java above, the one pom that names its version (2026-11-05), and that dependency being optional keeps
+          it out of the main artifact: the `all` jar carries it, and the catalog's CI does not download it.
         -->
-        <dependency>
-            <groupId>org.eclipse.jdt</groupId>
-            <artifactId>org.eclipse.jdt.core</artifactId>
-            <version>3.47.0</version>
-            <optional>true</optional>
-        </dependency>
 
         <!-- index.json, and the entry `botmaker publish` composes. -->
         <dependency>

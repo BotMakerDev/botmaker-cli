@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- JDT comes through the optional `botmaker-java`, whose pom alone names its version (2026-11-05). The main artifact
+  still brings neither, and the `all` jar still carries both.
 - `mcp-bridge` forwards to BotMaker's core and works with no Studio (2026-11-05). A client's request that finds no core
   starts one with the command the last Studio saved (`core-command.json`), under `core.lock`; with none saved it says to
   start Studio once. `start_studio` waits until Studio is attached to the core, not just until the core answers.
