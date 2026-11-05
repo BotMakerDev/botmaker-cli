@@ -1,6 +1,7 @@
 package com.botmaker.cli.repair;
 
 import com.botmaker.java.grammar.SourceParser;
+import com.botmaker.java.parse.JavaLevel;
 import org.eclipse.jdt.core.compiler.IProblem;
 import org.eclipse.jdt.core.dom.ASTMatcher;
 import org.eclipse.jdt.core.dom.ASTNode;
@@ -179,7 +180,7 @@ public final class Members {
     }
 
     private static CompilationUnit parse(String source) {
-        return SourceParser.parse(source);
+        return SourceParser.parse(JavaLevel.LATEST, source);
     }
 
     private static List<IProblem> errors(CompilationUnit cu) {

@@ -2,6 +2,7 @@ package com.botmaker.cli.validate;
 
 import com.botmaker.plugin.api.meta.Migrate;
 import com.botmaker.java.grammar.SourceParser;
+import com.botmaker.java.parse.JavaLevel;
 import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.Annotation;
 import org.eclipse.jdt.core.dom.ArrayType;
@@ -320,7 +321,7 @@ final class MigrationCheck {
     }
 
     private static CompilationUnit parse(String source) {
-        return SourceParser.parse(source);
+        return SourceParser.parse(JavaLevel.LATEST, source);
     }
 
     // ---------------------------------------------------------------------------------------------
