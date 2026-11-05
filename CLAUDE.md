@@ -33,6 +33,9 @@ from `release.sh`.
   Studio brings its own). A rule added to `ValidateCommand` is a rule the catalog will not enforce: put it in
   `PluginValidator`, as a `Check` (`two-artifacts.md`).
 - **picocli and JDT stay `optional`**, so a consumer of the main artifact resolves neither.
+- **`com.botmaker.cli.mcp` reaches the core only over MCP** (2026-11-05): the cli links neither the core nor Studio.
+  `McpBridge` finds or starts the core (`CoreProcess`, the saved `core-command.json`); `bot run` is a client of it
+  through `CoreTools.Bridged`, and follows a run by `read_trace`'s cursor, never by matching its text.
 - **Every release side effect goes through `Runner`**; a direct write on a write path ignores `--dry-run`. The
   three orders (`Module`, `Order.DECIDE`, `Order.TAG`) are transcribed exactly, and every pin
   (`Module.upstreams()`) is a forcing edge (`release-library.md`).
