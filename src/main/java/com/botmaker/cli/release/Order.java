@@ -64,6 +64,7 @@ public final class Order {
             Module.SHARED,
             Module.SESSION,
             Module.SDK,
+            Module.CORE,
             Module.STUDIO,
             Module.DASHBOARD);
 
@@ -93,6 +94,8 @@ public final class Order {
             // JitPack builds on demand and does not queue, so the SDK must not start building first.
             Module.PLUGIN_BASICS,
             Module.SDK,
+            // Pins the cli, shared and session, all tagged above; Studio resolves it.
+            Module.CORE,
             // Its package job builds against every upstream at the release its pom pins.
             Module.STUDIO,
             // The same shape over the cli, whose tag is far above; nothing pins the dashboard.

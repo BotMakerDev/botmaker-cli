@@ -12,10 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModuleTest {
 
-    /** The seventeen flags `botmaker release --help` lists, in the order it lists them. */
+    /** The eighteen flags `botmaker release --help` lists, in the order it lists them. */
     private static final List<String> SCRIPT_FLAGS = List.of(
             "--studio-api", "--plugin-toolkit", "--plugin-parent", "--java", "--plugin-host", "--plugin-archetype", "--plugin-basics",
-            "--cli", "--runlog", "--shared", "--session", "--sdk", "--studio", "--pilot", "--remote-server", "--remote",
+            "--cli", "--runlog", "--shared", "--session", "--sdk", "--core", "--studio", "--pilot", "--remote-server", "--remote",
             "--dashboard");
 
     @Test

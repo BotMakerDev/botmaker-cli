@@ -147,6 +147,20 @@ public record Forcing(Module upstream, Module downstream, String reason) {
                     "a running bot builds its grammar with plugin-host's ClasspathGrammar, and flatten bakes that pin "
                             + "into the SDK's published pom"),
 
+            // botmaker-core (2026-11-05), the headless process that owns an open bot, pins what a host pins.
+            new Forcing(Module.STUDIO_API, Module.CORE, "the core loads the bot's plugins against the contract it "
+                    + "pins, and flatten bakes that pin into its published pom"),
+            new Forcing(Module.JAVA, Module.CORE, "the core edits the bot's Java through botmaker-java, and flatten "
+                    + "bakes that pin into its published pom"),
+            new Forcing(Module.PLUGIN_HOST, Module.CORE, "the core loads plugins with plugin-host, and flatten bakes "
+                    + "that pin into its published pom"),
+            new Forcing(Module.RUNLOG, Module.CORE, "the core's runs write the run log's format, and JitPack "
+                    + "rebuilds per tag"),
+            new Forcing(Module.CLI, Module.CORE, "the core runs the cli's publish and repair libraries, and "
+                    + "flatten bakes that pin into its published pom"),
+            new Forcing(Module.SHARED, Module.CORE, "the core pins shared, and JitPack rebuilds per tag"),
+            new Forcing(Module.SESSION, Module.CORE, "the core pins session, and JitPack rebuilds per tag"),
+
             new Forcing(Module.SHARED, Module.STUDIO, "Studio's pom pins shared at a released version, "
                     + "which this release moves"),
             new Forcing(Module.SESSION, Module.STUDIO, "Studio's pom pins session at a released version, "
@@ -169,6 +183,12 @@ public record Forcing(Module upstream, Module downstream, String reason) {
             // SDK brings it at compile scope, and a direct entry in the bot's pom outranked that by
             // nearest-wins, pinning a bot to a toolkit its own SDK was never built against. With nothing in
             // Studio's source naming a toolkit version, a toolkit release owes Studio nothing.
+            // ONE PHASE AHEAD OF THE PIN IT DESCRIBES, like PLUGIN_BASICS -> SDK was (2026-11-05): Studio pins the
+            // core from phase 6 of the java-and-core plan, when the open project moves there. Until then it refuses
+            // a core release without a Studio one, the safe direction; --force overrides it.
+            new Forcing(Module.CORE, Module.STUDIO, "Studio is a client of the core and pins it at a released "
+                    + "version, which this release moves"),
+
             new Forcing(Module.SDK, Module.STUDIO,
                     "the release bumps MavenService.SDK_FALLBACK_VERSION, so Studio's own source changes — "
                             + "without a Studio release, freshly created bots keep pinning the previous SDK"),

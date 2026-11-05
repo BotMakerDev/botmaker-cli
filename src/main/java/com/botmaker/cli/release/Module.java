@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The modules {@code release.sh} can cut a tag for — seventeen, and this is now the list that owns that fact.
+ * The modules {@code release.sh} can cut a tag for — eighteen, and this is now the list that owns that fact.
  *
  * <p><b>Keeping the list here is the opposite of the rule {@code botmaker-dashboard} follows, and both are
  * right.</b> The dashboard refuses to keep it because it is a <i>reader</i>: a second copy there would go
@@ -41,6 +41,7 @@ public enum Module {
     SHARED("botmaker-shared"),
     SESSION("botmaker-session"),
     SDK("botmaker-sdk"),
+    CORE("botmaker-core"),
     STUDIO("botmaker-studio"),
     PILOT("botmaker-pilot"),
     REMOTE_SERVER("botmaker-remote-server"),
@@ -162,6 +163,7 @@ public enum Module {
             case SHARED -> "shared";
             case SESSION -> "session";
             case SDK -> "sdk";
+            case CORE -> "core";
             default -> null;
         });
     }
@@ -216,6 +218,9 @@ public enum Module {
             case SHARED -> List.of(RUNLOG);
             case SESSION -> List.of(SHARED);
             case SDK -> List.of(SHARED, SESSION, STUDIO_API, PLUGIN_TOOLKIT, PLUGIN_BASICS, JAVA, PLUGIN_HOST);
+            // The headless process that owns an open bot (2026-11-05): a host like Studio, so it pins what Studio
+            // pins, and the run log it writes runs into.
+            case CORE -> List.of(STUDIO_API, JAVA, PLUGIN_HOST, RUNLOG, CLI, SHARED, SESSION);
             // The cli's main jar since 2026-10-24: Studio's Publish runs the cli's publish library.
             case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, JAVA, PLUGIN_HOST, CLI);
             case DASHBOARD -> List.of(SHARED, CLI);

@@ -103,6 +103,10 @@ public final class ReleaseCommand implements Callable<Integer> {
             description = "The bot runtime, and Studio's plugin #1. " + SPEC_HELP)
     private String sdk;
 
+    @Option(names = "--core", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
+            description = "The headless process that owns an open bot. " + SPEC_HELP)
+    private String core;
+
     @Option(names = "--studio", arity = "0..1", fallbackValue = "patch", paramLabel = SPEC,
             description = "The IDE. " + SPEC_HELP)
     private String studio;
@@ -268,6 +272,7 @@ public final class ReleaseCommand implements Callable<Integer> {
         put(explicit, Module.SHARED, shared);
         put(explicit, Module.SESSION, session);
         put(explicit, Module.SDK, sdk);
+        put(explicit, Module.CORE, core);
         put(explicit, Module.STUDIO, studio);
         put(explicit, Module.PILOT, pilot);
         put(explicit, Module.REMOTE_SERVER, remoteServer);

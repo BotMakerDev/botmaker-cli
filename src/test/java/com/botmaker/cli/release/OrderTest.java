@@ -157,15 +157,27 @@ class OrderTest {
         // MavenService.TOOLKIT_FALLBACK_VERSION went with the entry, and with no toolkit version written
         // anywhere in Studio's source a toolkit release changes nothing here.
         // The cli since 2026-10-24: Studio's Publish runs its publish library.
+        // The core since 2026-11-05, one phase ahead of Studio's pin on it.
         assertEquals(Set.of(Module.SHARED, Module.SESSION, Module.SDK, Module.STUDIO_API,
-                Module.JAVA, Module.PLUGIN_HOST, Module.CLI), upstreamsOf(Module.STUDIO));
+                Module.JAVA, Module.PLUGIN_HOST, Module.CLI, Module.CORE), upstreamsOf(Module.STUDIO));
+        assertEquals(Set.of(Module.STUDIO_API, Module.JAVA, Module.PLUGIN_HOST, Module.RUNLOG, Module.CLI,
+                Module.SHARED, Module.SESSION), upstreamsOf(Module.CORE));
+    }
+
+    @Test
+    void theCoreIsTaggedAfterEverythingItPinsAndBeforeStudio() {
+        for (Module pinned : Module.CORE.upstreams()) {
+            assertTrue(Order.TAG.indexOf(pinned) < Order.TAG.indexOf(Module.CORE), pinned.directory());
+        }
+        assertTrue(Order.TAG.indexOf(Module.CORE) < Order.TAG.indexOf(Module.STUDIO));
+        assertTrue(Module.CORE.onJitpack());
     }
 
     @Test
     void theJavaLibraryIsTaggedBeforeEveryModuleThatPinsIt() {
         // A consumer whose tag builds first dies resolving a version JitPack has not built: a tag lost for good.
         List<Module> consumers = Module.JAVA.dependents();
-        assertEquals(List.of(Module.PLUGIN_HOST, Module.CLI, Module.SDK, Module.STUDIO), consumers);
+        assertEquals(List.of(Module.PLUGIN_HOST, Module.CLI, Module.SDK, Module.CORE, Module.STUDIO), consumers);
         for (Module consumer : consumers) {
             assertTrue(Order.TAG.indexOf(Module.JAVA) < Order.TAG.indexOf(consumer), consumer.directory());
         }

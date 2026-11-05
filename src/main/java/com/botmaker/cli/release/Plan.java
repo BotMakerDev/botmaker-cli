@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 public final class Plan {
 
     /** The label and parenthetical each module gets in the plan block, spaced as the script spaces them. */
-    // Map.ofEntries rather than Map.of: there are seventeen modules and Map.of stops at ten pairs.
+    // Map.ofEntries rather than Map.of: there are eighteen modules and Map.of stops at ten pairs.
     // Package-private for the one test that asserts it is total: a module missing here printed `null:
     // 0.3.0 -> v0.3.0` in the plan block, which is the kind of defect only the next new module finds.
     static final Map<Module, String> LABEL = new EnumMap<>(Map.ofEntries(
@@ -48,6 +48,7 @@ public final class Plan {
             Map.entry(Module.SHARED, "shared "),
             Map.entry(Module.SESSION, "session"),
             Map.entry(Module.SDK, "sdk    "),
+            Map.entry(Module.CORE, "core   "),
             Map.entry(Module.STUDIO, "studio "),
             Map.entry(Module.PILOT, "pilot  "),
             Map.entry(Module.REMOTE_SERVER, "remote-server"),
@@ -65,6 +66,7 @@ public final class Plan {
             Map.entry(Module.PLUGIN_BASICS, "  (plugin #2: values, Settings, the store)"),
             Map.entry(Module.CLI, "  (the botmaker command + the validator)"),
             Map.entry(Module.RUNLOG, "  (the run log's format)"),
+            Map.entry(Module.CORE, "  (the headless process that owns an open bot)"),
             Map.entry(Module.PILOT, "  (tags -> APK GitHub Release)"),
             Map.entry(Module.REMOTE_SERVER, "  (tags -> jar GitHub Release)"),
             Map.entry(Module.REMOTE, "  (tags -> APK GitHub Release)"),

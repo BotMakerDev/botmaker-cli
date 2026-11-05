@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- The release library knows `botmaker-core` (2026-11-05): `botmaker release --core`, decided and tagged after the SDK
+  and before Studio. The contract, `botmaker-java`, plugin-host, the run log, the cli, shared and session force it; it
+  forces Studio.
+
 - `MigrationCheck` and `repair.Members` parse at `JavaLevel.LATEST` (2026-11-05): `botmaker-java`'s parser takes a
   level on every entry, and neither reads a bot's pom.
 
