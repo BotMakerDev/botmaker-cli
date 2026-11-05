@@ -6,7 +6,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The version constants Studio's own source holds, and the release's bump of them — {@code release.sh}'s
+ * The version constants {@link #HOLDER}'s own source holds (Studio's until 2026-11-05; the history below speaks
+ * of Studio), and the release's bump of them — {@code release.sh}'s
  * {@code sed} over {@code MavenService.SDK_FALLBACK_VERSION}.
  *
  * <p><b>A pin Studio <i>writes</i> is not a pin Studio <i>has</i>.</b> {@code SDK_FALLBACK_VERSION} is a
@@ -41,8 +42,14 @@ public final class Fallback {
             Module.SDK, "SDK_FALLBACK_VERSION",
             Module.STUDIO_API, "CONTRACT_FALLBACK_VERSION"));
 
-    /** Studio's file holding them, relative to that module's directory. */
-    static final String SOURCE = "src/main/java/com/botmaker/studio/services/MavenService.java";
+    /**
+     * The module whose source holds them: Studio's until 2026-11-05, the core's since, when {@code MavenService} moved
+     * there with the open project. The bump lands in this module's release commit.
+     */
+    public static final Module HOLDER = Module.CORE;
+
+    /** {@link #HOLDER}'s file holding them, relative to that module's directory. */
+    static final String SOURCE = "src/main/java/com/botmaker/core/services/MavenService.java";
 
     private Fallback() {
     }
@@ -61,12 +68,12 @@ public final class Fallback {
     /**
      * Rewrites every constant naming a module this release is cutting.
      *
-     * <p>Called from the Studio release and only from there, because the file is Studio's. A run that cuts
-     * the SDK without Studio never reaches this — {@link ForcingGate} refuses that run by name rather than
+     * <p>Called from {@link #HOLDER}'s release and only from there, because the file is its. A run that cuts
+     * the SDK without it never reaches this — {@link ForcingGate} refuses that run by name rather than
      * letting it pass silently, which is the failure this pair exists for.
      */
     public static void bump(Runner runner, Path umbrella, Map<Module, Version> releasing) {
-        Path source = umbrella.resolve(Module.STUDIO.directory()).resolve(SOURCE);
+        Path source = umbrella.resolve(HOLDER.directory()).resolve(SOURCE);
         CONSTANTS.forEach((module, constant) -> {
             Version version = releasing.get(module);
             if (version != null) {

@@ -30,7 +30,9 @@ class WaitsTest {
         Set<Module> all = EnumSet.allOf(Module.class);
 
         assertEquals(EnumSet.of(Module.STUDIO_API, Module.PLUGIN_TOOLKIT, Module.PLUGIN_PARENT, Module.JAVA, Module.PLUGIN_HOST,
-                Module.PLUGIN_ARCHETYPE, Module.CLI, Module.RUNLOG, Module.SHARED, Module.SESSION, Module.PLUGIN_BASICS), owed(all));
+                Module.PLUGIN_ARCHETYPE, Module.CLI, Module.RUNLOG, Module.SHARED, Module.SESSION, Module.PLUGIN_BASICS,
+                Module.CORE), owed(all));
+        // The core since 2026-11-05: Studio pins it.
         // The one that goes: nothing tagged after the sdk resolves it from JitPack. The archetype went too until
         // the cli bundled its template (2026-10-19).
         assertFalse(Waits.owed(Module.SDK, all));

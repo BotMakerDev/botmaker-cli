@@ -222,7 +222,8 @@ public enum Module {
             // pins, and the run log it writes runs into.
             case CORE -> List.of(STUDIO_API, JAVA, PLUGIN_HOST, RUNLOG, CLI, SHARED, SESSION);
             // The cli's main jar since 2026-10-24: Studio's Publish runs the cli's publish library.
-            case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, JAVA, PLUGIN_HOST, CLI);
+            // The core since 2026-11-05: the open project and its plugins, called in-process.
+            case STUDIO -> List.of(SHARED, SESSION, STUDIO_API, JAVA, PLUGIN_HOST, CLI, CORE);
             case DASHBOARD -> List.of(SHARED, CLI);
             default -> List.of();
         };

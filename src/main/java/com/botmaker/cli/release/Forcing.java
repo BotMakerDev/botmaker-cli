@@ -189,9 +189,11 @@ public record Forcing(Module upstream, Module downstream, String reason) {
             new Forcing(Module.CORE, Module.STUDIO, "Studio is a client of the core and pins it at a released "
                     + "version, which this release moves"),
 
-            new Forcing(Module.SDK, Module.STUDIO,
-                    "the release bumps MavenService.SDK_FALLBACK_VERSION, so Studio's own source changes — "
-                            + "without a Studio release, freshly created bots keep pinning the previous SDK"),
+            // SDK -> STUDIO until 2026-11-05, when MavenService moved to the core with the open project: the
+            // constant is the core's source now, and the core forces Studio above.
+            new Forcing(Module.SDK, Module.CORE,
+                    "the release bumps MavenService.SDK_FALLBACK_VERSION, so the core's own source changes — "
+                            + "without a core release, freshly created bots keep pinning the previous SDK"),
 
             // The packaged dashboard cuts releases with the rules of the cli it was BUILT with — this very
             // package, called in-process — so a cli release with no dashboard release leaves an installed

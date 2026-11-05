@@ -17,7 +17,8 @@ import java.util.stream.Collectors;
  * on the operator having typed both flags.
  *
  * <p><b>What that cost, on 2026-09-05.</b> {@code ./release.sh --sdk 1.1.6} cut the SDK and nothing else
- * ({@code releases/2026-09-05-0128.md} has one row). The {@code SDK → STUDIO} edge exists precisely
+ * ({@code releases/2026-09-05-0128.md} has one row). The {@code SDK → STUDIO} edge ({@code SDK → CORE} since
+ * 2026-11-05, when the constant moved to the core) exists precisely
  * because that release {@code sed}s {@code MavenService.SDK_FALLBACK_VERSION}, and with no Studio release
  * the {@code sed} never ran: Studio v1.0.37, cut eleven hours later, still pinned {@code 1.1.5} while its
  * own changelog announced {@code 1.1.6}. Every project created by that build pins the one SDK whose plugin

@@ -84,8 +84,8 @@ class OrderTest {
             assertTrue(Order.TAG.indexOf(pinned) < Order.TAG.indexOf(Module.STUDIO),
                     "studio must be tagged after " + pinned);
         }
-        // And after the SDK, whose release rewrites SDK_FALLBACK_VERSION in Studio's source.
-        assertTrue(Order.TAG.indexOf(Module.SDK) < Order.TAG.indexOf(Module.STUDIO));
+        // And the holder of SDK_FALLBACK_VERSION (the core since 2026-11-05) after the SDK, whose release rewrites it.
+        assertTrue(Order.TAG.indexOf(Module.SDK) < Order.TAG.indexOf(Fallback.HOLDER));
     }
 
     @Test
@@ -157,11 +157,12 @@ class OrderTest {
         // MavenService.TOOLKIT_FALLBACK_VERSION went with the entry, and with no toolkit version written
         // anywhere in Studio's source a toolkit release changes nothing here.
         // The cli since 2026-10-24: Studio's Publish runs its publish library.
-        // The core since 2026-11-05, one phase ahead of Studio's pin on it.
-        assertEquals(Set.of(Module.SHARED, Module.SESSION, Module.SDK, Module.STUDIO_API,
+        // The core since 2026-11-05, one phase ahead of Studio's pin on it. The SDK left the same day: its
+        // fallback constant moved to the core with MavenService, so the SDK forces the core instead.
+        assertEquals(Set.of(Module.SHARED, Module.SESSION, Module.STUDIO_API,
                 Module.JAVA, Module.PLUGIN_HOST, Module.CLI, Module.CORE), upstreamsOf(Module.STUDIO));
         assertEquals(Set.of(Module.STUDIO_API, Module.JAVA, Module.PLUGIN_HOST, Module.RUNLOG, Module.CLI,
-                Module.SHARED, Module.SESSION), upstreamsOf(Module.CORE));
+                Module.SHARED, Module.SESSION, Module.SDK), upstreamsOf(Module.CORE));
     }
 
     @Test

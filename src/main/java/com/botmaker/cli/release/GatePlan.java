@@ -78,10 +78,11 @@ public final class GatePlan {
     }
 
     /**
-     * Whether the fallback-constant gate runs: only when this release cuts Studio, because the constants
-     * live in Studio's source and only a Studio release publishes a change to them.
+     * Whether the fallback-constant gate runs: only when this release cuts {@link Fallback#HOLDER} (the core since
+     * 2026-11-05, Studio before), because the constants live in its source and only its release publishes a
+     * change to them.
      */
     public static boolean fallbackVersions(Set<Module> releasing) {
-        return releasing.contains(Module.STUDIO);
+        return releasing.contains(Fallback.HOLDER);
     }
 }

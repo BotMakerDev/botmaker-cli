@@ -394,8 +394,9 @@ public final class Release {
                                 Map<Module, Version> releasing, java.util.function.Consumer<String> at) {
         at.accept("pom versions");
         PomVersions.release(runner, umbrella, module, version, releasing);
-        if (module == Module.STUDIO) {
-            // What a freshly generated bot's pom pins, which is Studio's source and not Studio's dependency.
+        if (module == Fallback.HOLDER) {
+            // What a freshly generated bot's pom pins, which is the core's source (Studio's until 2026-11-05) and
+            // not its dependency.
             at.accept("fallback versions");
             Fallback.bump(runner, umbrella, releasing);
         }

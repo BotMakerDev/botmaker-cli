@@ -17,20 +17,21 @@ class ForcingGateTest {
 
     @Test
     void theReleaseThatShippedOn2026_09_05IsRefused() {
-        // `./release.sh --sdk 1.1.6` alone: the sdk->studio edge fires, nobody named --studio, and
-        // MavenService.SDK_FALLBACK_VERSION never moved. Studio v1.0.37 shipped pinning 1.1.5.
+        // `./release.sh --sdk 1.1.6` alone: the sdk->studio edge fired, nobody named --studio, and
+        // MavenService.SDK_FALLBACK_VERSION never moved. Studio v1.0.37 shipped pinning 1.1.5. The constant is the
+        // core's since 2026-11-05, so the edge is sdk->core now.
         GateVerdict verdict = ForcingGate.check(of(Module.SDK), of(Module.SDK), false);
 
         assertTrue(verdict.stops());
-        assertTrue(verdict.refusal().contains("botmaker-studio"), verdict.refusal());
-        assertTrue(verdict.refusal().contains("Add --studio"), verdict.refusal());
+        assertTrue(verdict.refusal().contains("botmaker-core"), verdict.refusal());
+        assertTrue(verdict.refusal().contains("--core"), verdict.refusal());
         assertTrue(verdict.refusal().contains("SDK_FALLBACK_VERSION"), verdict.refusal());
     }
 
     @Test
     void namingBothFlagsPasses() {
         GateVerdict verdict = ForcingGate.check(
-                of(Module.SDK, Module.STUDIO), of(Module.SDK, Module.STUDIO), false);
+                of(Module.SDK, Module.CORE, Module.STUDIO), of(Module.SDK, Module.CORE, Module.STUDIO), false);
 
         assertFalse(verdict.stops());
         assertEquals(GateVerdict.Status.OK, verdict.status());
@@ -40,7 +41,7 @@ class ForcingGateTest {
     void aRequestedModuleThatWasSkippedIsStillRequested() {
         // The whole reason the gate asks about `requested` rather than `releasing`: --studio was typed and
         // the decide pass skipped it as unchanged. No edge is being ignored — the operator was asked.
-        GateVerdict verdict = ForcingGate.check(of(Module.SDK, Module.STUDIO), of(Module.SDK), false);
+        GateVerdict verdict = ForcingGate.check(of(Module.SDK, Module.CORE), of(Module.SDK), false);
 
         assertFalse(verdict.stops());
     }
@@ -50,7 +51,7 @@ class ForcingGateTest {
         GateVerdict verdict = ForcingGate.check(of(Module.SDK), of(Module.SDK), true);
 
         assertEquals(GateVerdict.Status.FORCED, verdict.status());
-        assertTrue(verdict.line().contains("--studio"), verdict.line());
+        assertTrue(verdict.line().contains("--core"), verdict.line());
     }
 
     @Test

@@ -110,12 +110,12 @@ class SourceEditsTest {
 
     @Test
     void aRunThatDoesNotCutTheSdkTouchesNothingInStudiosSource(@TempDir Path umbrella) throws IOException {
-        Path studio = umbrella.resolve(Module.STUDIO.directory());
+        Path studio = umbrella.resolve(Fallback.HOLDER.directory());
         Files.createDirectories(studio.resolve(Fallback.SOURCE).getParent());
         Path file = Files.writeString(studio.resolve(Fallback.SOURCE), MAVEN_SERVICE);
         List<String> log = new ArrayList<>();
 
-        Fallback.bump(executing(log), umbrella, Map.of(Module.STUDIO, new Version(1, 0, 38)));
+        Fallback.bump(executing(log), umbrella, Map.of(Fallback.HOLDER, new Version(1, 0, 38)));
 
         assertEquals(MAVEN_SERVICE, Files.readString(file));
         assertTrue(log.isEmpty(), log.toString());
@@ -123,12 +123,12 @@ class SourceEditsTest {
 
     @Test
     void theSdkBeingCutMovesTheConstantToIt(@TempDir Path umbrella) throws IOException {
-        Path studio = umbrella.resolve(Module.STUDIO.directory());
+        Path studio = umbrella.resolve(Fallback.HOLDER.directory());
         Files.createDirectories(studio.resolve(Fallback.SOURCE).getParent());
         Path file = Files.writeString(studio.resolve(Fallback.SOURCE), MAVEN_SERVICE);
 
         Fallback.bump(executing(new ArrayList<>()), umbrella,
-                Map.of(Module.STUDIO, new Version(1, 0, 38), Module.SDK, new Version(1, 2, 0)));
+                Map.of(Fallback.HOLDER, new Version(1, 0, 38), Module.SDK, new Version(1, 2, 0)));
 
         assertTrue(Files.readString(file).contains("SDK_FALLBACK_VERSION = \"1.2.0\""));
     }
@@ -136,12 +136,12 @@ class SourceEditsTest {
     @Test
     void theContractBeingCutMovesItsConstantAndLeavesTheSdkOne(@TempDir Path umbrella) throws IOException {
         // A dev Studio writes this tag into a project's pom (HostContract), so it must follow the contract.
-        Path studio = umbrella.resolve(Module.STUDIO.directory());
+        Path studio = umbrella.resolve(Fallback.HOLDER.directory());
         Files.createDirectories(studio.resolve(Fallback.SOURCE).getParent());
         Path file = Files.writeString(studio.resolve(Fallback.SOURCE), MAVEN_SERVICE);
 
         Fallback.bump(executing(new ArrayList<>()), umbrella,
-                Map.of(Module.STUDIO, new Version(1, 0, 38), Module.STUDIO_API, new Version(0, 4, 0)));
+                Map.of(Fallback.HOLDER, new Version(1, 0, 38), Module.STUDIO_API, new Version(0, 4, 0)));
 
         String text = Files.readString(file);
         assertTrue(text.contains("CONTRACT_FALLBACK_VERSION = \"0.4.0\""), text);

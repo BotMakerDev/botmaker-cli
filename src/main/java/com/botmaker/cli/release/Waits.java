@@ -27,8 +27,9 @@ import java.util.Optional;
  * and are owed the wait like any JitPack build.
  *
  * <p>For a full release that answers: owed — studio-api, plugin-toolkit, plugin-parent, java, plugin-host,
- * plugin-archetype (the cli bundles its zip, since 2026-10-19), runlog, cli, shared, session, plugin-basics. Not owed
- * — sdk (nothing tagged after it resolves it; Studio's {@code SDK_FALLBACK_VERSION} is text naming a tag,
+ * plugin-archetype (the cli bundles its zip, since 2026-10-19), runlog, cli, shared, session, plugin-basics, core
+ * (Studio pins it, since 2026-11-05). Not owed
+ * — sdk (nothing tagged after it resolves it; the core's {@code SDK_FALLBACK_VERSION} is text naming a tag,
  * checked by {@link FallbackVersionsGate} as a tag).
  *
  * <p><b>A skipped wait is not a skipped check.</b> The clean-room verify pass still resolves every

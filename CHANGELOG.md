@@ -11,7 +11,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - The release library knows `botmaker-core` (2026-11-05): `botmaker release --core`, decided and tagged after the SDK
   and before Studio. The contract, `botmaker-java`, plugin-host, the run log, the cli, shared and session force it; it
-  forces Studio.
+  forces Studio. Studio pins it since the same day (`Module.STUDIO`'s upstreams).
+
+- The fallback constants follow `MavenService` into the core (2026-11-05): `Fallback.HOLDER` is `CORE`, so a core
+  release bumps `SDK_FALLBACK_VERSION` and `CONTRACT_FALLBACK_VERSION`, `FallbackVersionsGate` runs for `--core`, and
+  `--sdk` forces `--core` where it forced `--studio`. A full release now waits on the core's JitPack build too.
 
 - `MigrationCheck` and `repair.Members` parse at `JavaLevel.LATEST` (2026-11-05): `botmaker-java`'s parser takes a
   level on every entry, and neither reads a bot's pom.

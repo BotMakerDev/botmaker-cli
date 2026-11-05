@@ -45,7 +45,7 @@ import java.util.regex.Pattern;
 public final class FallbackVersionsGate {
 
     /**
-     * Studio's file holding them, relative to that module's directory — {@link Fallback}'s, read rather
+     * {@link Fallback#HOLDER}'s file holding them, relative to that module's directory — {@link Fallback}'s, read rather
      * than copied.
      *
      * <p>The constant list was declared here too until 2026-09-16, beside a {@code release.sh} that
@@ -59,13 +59,15 @@ public final class FallbackVersionsGate {
     }
 
     public static GateVerdict check(Path umbrella, Map<Module, Version> releasing, boolean force) {
-        Path source = umbrella.resolve(Module.STUDIO.directory()).resolve(SOURCE);
+        Module holder = Fallback.HOLDER;
+        String name = holder.shortName();
+        Path source = umbrella.resolve(holder.directory()).resolve(SOURCE);
         String text;
         try {
             text = Files.readString(source);
         } catch (IOException e) {
             // Unreadable is SKIPPED, not REFUSED: a gate must not stop a release over what it cannot read.
-            return GateVerdict.skipped("  studio: " + SOURCE + " unreadable — fallback gate skipped");
+            return GateVerdict.skipped("  " + name + ": " + SOURCE + " unreadable — fallback gate skipped");
         }
 
         List<String> problems = new ArrayList<>();
@@ -90,7 +92,7 @@ public final class FallbackVersionsGate {
             }
             if (Tags.existingRef(umbrella, module, version.get()).isEmpty()) {
                 problems.add("     " + constant + " = \"" + literal.get() + "\" names no tag of "
-                        + module.directory() + ", so every project this Studio creates pins a version\n"
+                        + module.directory() + ", so every project this core creates pins a version\n"
                         + "     that cannot be resolved. Bump it, or release " + module.flag()
                         + " in this run so the sed moves it.");
                 continue;
@@ -102,17 +104,17 @@ public final class FallbackVersionsGate {
             // The verb agrees with the count: a run cutting one of the two modules checks only the other, and
             // a line reading "SDK_FALLBACK_VERSION resolve" is a line that was written for a list.
             return GateVerdict.ok(checked.isEmpty()
-                    ? "  studio: no fallback constant to check this run — ok"
-                    : "  studio: " + String.join(", ", checked)
+                    ? "  " + name + ": no fallback constant to check this run — ok"
+                    : "  " + name + ": " + String.join(", ", checked)
                             + (checked.size() == 1 ? " resolves to a published tag — ok"
                                                    : " resolve to published tags — ok"));
         }
         if (force) {
-            return GateVerdict.forced("  studio: a fallback constant names no published tag — FORCED");
+            return GateVerdict.forced("  " + name + ": a fallback constant names no published tag — FORCED");
         }
-        return GateVerdict.refused("studio: a fallback version constant names nothing published.\n"
+        return GateVerdict.refused(name + ": a fallback version constant names nothing published.\n"
                 + String.join("\n", problems) + "\n"
-                + "     These are pins Studio WRITES into a generated bot's pom, so nothing in a build\n"
+                + "     These are pins the core WRITES into a generated bot's pom, so nothing in a build\n"
                 + "     resolves them and no test can see one go wrong.  --force overrides.");
     }
 

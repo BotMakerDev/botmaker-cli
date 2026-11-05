@@ -45,18 +45,20 @@ class FallbackVersionsGateTest {
     }
 
     @Test
-    void theGateOnlyRunsForAStudioRelease() {
-        // The constants live in Studio's source, so only a Studio release publishes a change to them.
-        assertTrue(GatePlan.fallbackVersions(java.util.Set.of(Module.STUDIO)));
+    void theGateOnlyRunsForACoreRelease() {
+        // The constants live in the core's source (Studio's until 2026-11-05), so only its release publishes a
+        // change to them.
+        assertTrue(GatePlan.fallbackVersions(java.util.Set.of(Module.CORE)));
+        assertTrue(!GatePlan.fallbackVersions(java.util.Set.of(Module.STUDIO)));
         assertTrue(!GatePlan.fallbackVersions(java.util.Set.of(Module.SDK)));
     }
 
     @Test
-    void studiosOwnSourceStillDeclaresWhatTheGateReads() {
-        // The gate finds the constants by name in a real file; a rename in Studio makes it read nothing and
+    void theHoldersOwnSourceStillDeclaresWhatTheGateReads() {
+        // The gate finds the constants by name in a real file; a rename or a move makes it read nothing and
         // pass silently, which is the failure mode it exists to prevent. This is the tripwire for that.
         java.nio.file.Path source = java.nio.file.Path.of("..")
-                .resolve(Module.STUDIO.directory()).resolve(FallbackVersionsGate.SOURCE);
+                .resolve(Fallback.HOLDER.directory()).resolve(FallbackVersionsGate.SOURCE);
         org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.Files.isRegularFile(source),
                 "not run from the umbrella checkout");
         String text = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
