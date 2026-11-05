@@ -22,13 +22,13 @@ import java.util.concurrent.Callable;
  * noun is why the plugin verbs eventually grew one of their own.
  */
 @Command(name = "bot",
-        header = "Create, publish, list and export bot projects.",
+        header = "Create, publish, list, export and run bot projects.",
         description = "Start blank or from a published bot, then publish the result — repository, release and "
                 + "its catalog entry — for anybody else to start from.",
         mixinStandardHelpOptions = true,
         synopsisSubcommandLabel = "<command>",
         subcommands = {BotNewCommand.class, BotPublishCommand.class, BotUnpublishCommand.class,
-                BotListCommand.class, BotExportCommand.class})
+                BotListCommand.class, BotExportCommand.class, BotRunCommand.class})
 final class BotCommand implements Callable<Integer> {
 
     @ParentCommand

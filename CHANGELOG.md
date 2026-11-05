@@ -37,6 +37,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **`botmaker bot run [<folder>] [--entry <title>]`** (2026-11-05): runs a bot from the terminal with no Studio.
+  BotMaker's core opens it (found, or started as `mcp-bridge` starts it) and runs its main or a declared run. The bot's
+  output streams to stdout, and the command's own lines go to stderr. It ends by saying how the run ended and where
+  its `run.jsonl` is. Ctrl+C stops the run. Exit codes: 0 the run ended, 1 the bot did not start, 2 it could not be
+  opened or the core not reached, 130 stopped.
 - **`plugin validate` refuses an open set sharing its holder** (2026-11-04): a holder is one open set or marked
   methods, with parameters beside either, because the host writes a missing holder from its first value.
 
