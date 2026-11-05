@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- `mcp-bridge` checks the hello proof over `<port>:<nonce>`, as the core now signs it (2026-11-05): a proof relayed from
+  another port fails. A bridge and a Studio from before this change do not recognise each other.
 - The release library knows `botmaker-core` (2026-11-05): `botmaker release --core`, decided and tagged after the SDK
   and before Studio. The contract, `botmaker-java`, plugin-host, the run log, the cli, shared and session force it; it
   forces Studio. Studio pins it since the same day (`Module.STUDIO`'s upstreams).

@@ -443,7 +443,7 @@ public final class McpBridge {
                 .build();
         try {
             HttpResponse<String> answer = http.send(hello, HttpResponse.BodyHandlers.ofString());
-            byte[] expected = proof(to.token(), nonce).getBytes(StandardCharsets.UTF_8);
+            byte[] expected = proof(to.token(), to.url().getPort(), nonce).getBytes(StandardCharsets.UTF_8);
             if (answer.statusCode() != 200
                     || !MessageDigest.isEqual(expected, answer.body().strip().getBytes(StandardCharsets.UTF_8))) {
                 throw new IOException("What answers on " + to.url().getPort() + " is not this computer's Studio");
@@ -454,12 +454,15 @@ public final class McpBridge {
         }
     }
 
-    /** HMAC-SHA256 of {@code nonce} under {@code token}, in hex, as Studio's {@code McpEndpoint.proof} makes it. */
-    static String proof(String token, String nonce) {
+    /**
+     * HMAC-SHA256 of {@code <port>:<nonce>} under {@code token}, in hex, as the core's {@code McpEndpoint.proof} makes it
+     * on the port it was asked on: a proof relayed from another port fails.
+     */
+    static String proof(String token, int port, String nonce) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(token.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal(nonce.getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of().formatHex(mac.doFinal((port + ":" + nonce).getBytes(StandardCharsets.UTF_8)));
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("HmacSHA256 is missing from this Java", e);
         }

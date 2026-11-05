@@ -208,7 +208,7 @@ class McpBridgeTest {
             server.createContext("/mcp", this::handle);
             server.createContext(McpBridge.HELLO, exchange -> {
                 String nonce = exchange.getRequestURI().getQuery().substring("nonce=".length());
-                reply(exchange, 200, "text/plain", McpBridge.proof("t", nonce));
+                reply(exchange, 200, "text/plain", McpBridge.proof("t", port, nonce));
             });
             server.start();
         }
