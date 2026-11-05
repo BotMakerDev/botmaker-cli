@@ -13,15 +13,17 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
- * {@code botmaker mcp-bridge} — Studio's MCP tools for a client that starts it as a stdio server, kept across
- * Studio's restarts ({@link McpBridge}). Its stdout is the protocol: nothing else is printed there.
+ * {@code botmaker mcp-bridge} — BotMaker's MCP tools for a client that starts it as a stdio server, kept across
+ * Studio's restarts and served with no Studio at all ({@link McpBridge}). Its stdout is the protocol: nothing else is
+ * printed there.
  */
 @Command(name = "mcp-bridge",
-        header = "Serve Studio's MCP tools over stdio, across Studio's restarts.",
+        header = "Serve BotMaker's MCP tools over stdio, with or without Studio.",
         description = "For an MCP client's config: {\"type\":\"stdio\",\"command\":\"botmaker\",\"args\":"
-                + "[\"mcp-bridge\"]}. Forwards to the Studio running on this computer, reads its endpoint and token "
-                + "from Studio's mcp.json, and tells the client when Studio's tools come back. Its start_studio tool "
-                + "starts Studio the way --umbrella or --studio says.",
+                + "[\"mcp-bridge\"]}. Forwards to BotMaker's core on this computer, starting it as the last Studio "
+                + "did when none runs, reads its endpoint and token from mcp.json, and tells the client when "
+                + "Studio's tools come and go. Its start_studio tool starts Studio the way --umbrella or --studio "
+                + "says.",
         mixinStandardHelpOptions = true)
 final class McpBridgeCommand implements Callable<Integer> {
 
@@ -36,7 +38,7 @@ final class McpBridgeCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws IOException {
-        new McpBridge(McpBridge.fromStudioConfig(), launch(), System.in, System.out, Duration.ofSeconds(2)).run();
+        McpBridge.onThisComputer(launch(), System.in, System.out, Duration.ofSeconds(2)).run();
         return 0;
     }
 

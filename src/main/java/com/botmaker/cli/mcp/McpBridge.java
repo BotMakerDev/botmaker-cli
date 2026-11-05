@@ -49,6 +49,10 @@ import java.util.stream.Stream;
  *
  * The endpoint and its token are read from Studio's own {@code mcp.json} at each connect, so neither sits in the
  * client's config. One client, one Studio; requests from Studio to the client (sampling, roots) are not relayed.
+ *
+ * <p>Since plan phase 11 the endpoint is BotMaker's core, which serves the bot's files and runs with no Studio: a
+ * client's request that finds no core starts one ({@link CoreStart}), and Studio's own tools join and leave as Studio
+ * attaches to it, told as {@code notifications/tools/list_changed}.
  */
 public final class McpBridge {
 
@@ -70,6 +74,17 @@ public final class McpBridge {
         }
     }
 
+    /**
+     * Starts BotMaker's core when none answers (plan phase 11, {@link CoreProcess}); empty once one answers, else the
+     * sentence saying why not.
+     */
+    @FunctionalInterface
+    public interface CoreStart {
+        CoreStart NONE = Optional::empty;
+
+        Optional<String> start();
+    }
+
     /** The bridge's own tool, listed beside Studio's: it answers while Studio is down. */
     static final String START = "start_studio";
     /** Studio's sandbox home ({@code AppPaths.HOME_ENV}). */
@@ -78,18 +93,31 @@ public final class McpBridge {
     static final String UI_ENV = "BOTMAKER_MCP_UI";
     /** How long start_studio waits for Studio's endpoint; a dev Studio compiles first. */
     private static final Duration STARTING = Duration.ofMinutes(3);
+    /** How long start_studio watches a Studio that starts on its bot list, serving nothing, before it answers. */
+    private static final Duration SHOWING = Duration.ofSeconds(20);
 
     /** What the client was told while Studio is down. */
-    static final String DOWN = "BotMaker Studio is not running, or its MCP endpoint is off. start_studio starts "
-            + "it; its tools come back by themselves.";
+    static final String DOWN = "BotMaker's core is not running and could not be started here. start_studio starts "
+            + "Studio, and its core; the tools come back by themselves.";
+    /** How long after a failed start of the core the bridge says why, instead of trying again. */
+    private static final Duration START_AGAIN = Duration.ofSeconds(10);
+    /** {@code CoreServer.INFO}: what a core is, its clients counted. */
+    static final String INFO = "/core";
     private static final String SESSION = "Mcp-Session-Id";
     /** Studio's {@code McpEndpoint.HELLO}. */
     static final String HELLO = "/mcp-hello";
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final String FALLBACK_PROTOCOL = "2025-06-18";
 
-    private final Supplier<Optional<Upstream>> upstream;
+    private volatile Supplier<Optional<Upstream>> upstream;
     private final Optional<Launch> launch;
+    private volatile CoreStart coreStart;
+    /** True for {@link #onThisComputer}: a sandbox home start_studio is given moves the core it talks to there. */
+    private final boolean followsHome;
+    /** Why the last start of the core failed, and when; null after none failed. Under {@link #starting}. */
+    private String startFailed;
+    private long startFailedAt;
+    private final Object starting = new Object();
     private final InputStream in;
     private final OutputStream out;
     private final Duration poll;
@@ -97,6 +125,9 @@ public final class McpBridge {
     private static final Duration QUICK = Duration.ofSeconds(5);
 
     private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(Duration.ofSeconds(2)).build();
+    /** What {@link #answers} looks with, before any bridge exists. */
+    private static final HttpClient PROBE = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(2)).build();
     private final ObjectMapper json = new ObjectMapper();
     private final AtomicLong ids = new AtomicLong();
@@ -125,12 +156,49 @@ public final class McpBridge {
      */
     public McpBridge(Supplier<Optional<Upstream>> upstream, Optional<Launch> launch, InputStream in, OutputStream out,
             Duration poll) {
+        this(upstream, launch, CoreStart.NONE, in, out, poll);
+    }
+
+    /** @param coreStart starts BotMaker's core when a client's request finds none answering */
+    public McpBridge(Supplier<Optional<Upstream>> upstream, Optional<Launch> launch, CoreStart coreStart,
+            InputStream in, OutputStream out, Duration poll) {
+        this(upstream, launch, coreStart, false, in, out, poll);
+    }
+
+    private McpBridge(Supplier<Optional<Upstream>> upstream, Optional<Launch> launch, CoreStart coreStart,
+            boolean followsHome, InputStream in, OutputStream out, Duration poll) {
         this.upstream = upstream;
         this.launch = launch;
+        this.coreStart = coreStart;
+        this.followsHome = followsHome;
         this.in = in;
         this.out = out;
         this.poll = poll;
         this.tools = json.createArrayNode();
+    }
+
+    /**
+     * The bridge {@code botmaker mcp-bridge} runs: the core in {@link #coreDir}, started as the last Studio did when none
+     * answers, and moved to a sandbox's core once start_studio is given its home.
+     */
+    public static McpBridge onThisComputer(Optional<Launch> launch, InputStream in, OutputStream out, Duration poll) {
+        Path dir = coreDir();
+        return new McpBridge(fromStudioConfig(dir), launch, coreProcess(dir), true, in, out, poll);
+    }
+
+    private static CoreStart coreProcess(Path dir) {
+        Supplier<Optional<Upstream>> there = fromStudioConfig(dir);
+        return new CoreProcess(dir, () -> answers(there));
+    }
+
+    /** From now on the core in {@code dir}: the one a Studio started with a sandbox home uses. */
+    private synchronized void follow(Path dir) {
+        upstream = fromStudioConfig(dir);
+        coreStart = coreProcess(dir);
+        connection = null;
+        synchronized (starting) {
+            startFailed = null;
+        }
     }
 
     /** Relays until the client closes stdin. */
@@ -156,24 +224,36 @@ public final class McpBridge {
     }
 
     /**
-     * The endpoint Studio's {@code mcp.json} names, in BotMaker's cache folder (as Studio's {@code CacheDirs} finds
-     * it); empty when Studio never wrote one.
+     * The core's MCP in {@code dir} ({@link #coreDir}): the token {@code mcp.json} holds, on the port {@code core.json}
+     * says the running core took, else the one {@code mcp.json} asks for; empty when no token was ever saved.
      */
-    public static Supplier<Optional<Upstream>> fromStudioConfig() {
+    public static Supplier<Optional<Upstream>> fromStudioConfig(Path dir) {
         ObjectMapper json = new ObjectMapper();
         return () -> {
-            Path file = cacheRoot().resolve("mcp.json");
+            Path file = dir.resolve("mcp.json");
             try {
                 if (!Files.isRegularFile(file)) return Optional.empty();
                 JsonNode config = json.readTree(file.toFile());
                 String token = config.path("token").asText("");
                 if (token.isBlank()) return Optional.empty();
                 int port = config.path("port").asInt(7431);
+                Path core = dir.resolve("core.json");
+                if (Files.isRegularFile(core)) port = json.readTree(core.toFile()).path("port").asInt(port);
                 return Optional.of(new Upstream(URI.create("http://127.0.0.1:" + port + "/mcp"), token));
             } catch (IOException unreadable) {
                 return Optional.empty();
             }
         };
+    }
+
+    /**
+     * Where the user's core keeps its files, as Studio's {@code CoreEdits.coreDir} finds them: {@code core} in the
+     * sandbox {@code $BOTMAKER_HOME} names, else BotMaker's cache folder.
+     */
+    public static Path coreDir() {
+        String home = System.getenv(HOME_ENV);
+        if (home != null && !home.isBlank()) return Path.of(home.strip()).toAbsolutePath().normalize().resolve("core");
+        return cacheRoot();
     }
 
     private static Path cacheRoot() {
@@ -197,7 +277,7 @@ public final class McpBridge {
                 else if (connection != null) send(message);
             } else if (method.equals("initialize")) {
                 clientInit = message.path("params") instanceof ObjectNode p ? p : json.createObjectNode();
-                Connection now = connect();
+                Connection now = connectOrStart();
                 reply(message, now != null ? announced(now.init()) : localInit());
             } else if (method.equals("ping")) {
                 reply(message, json.createObjectNode());
@@ -215,7 +295,7 @@ public final class McpBridge {
 
     private void forward(ObjectNode message) throws IOException {
         for (int attempt = 0; attempt < 2; attempt++) {
-            Connection now = connection != null ? connection : connect();
+            Connection now = connection != null ? connection : connectOrStart();
             if (now == null) {
                 down(message);
                 return;
@@ -243,12 +323,65 @@ public final class McpBridge {
         down(message);
     }
 
-    /** What a request gets while Studio is down. */
+    /** What a request gets while no core answers: why the bridge could not start one, when it tried. */
     private void down(ObjectNode message) throws IOException {
+        String why;
+        synchronized (starting) {
+            why = startFailed != null ? startFailed : DOWN;
+        }
         switch (message.path("method").asText()) {
             case "tools/list" -> reply(message, json.createObjectNode().set("tools", tools.deepCopy().add(startTool())));
-            case "tools/call" -> reply(message, toolText(DOWN, true));
-            default -> error(message, DOWN);
+            case "tools/call" -> reply(message, toolText(why, true));
+            default -> error(message, why);
+        }
+    }
+
+    /**
+     * A session with the core, starting one first when none answers (plan phase 11): a client's request, never the
+     * watcher, starts it, and not again within {@link #START_AGAIN} of a start that failed.
+     */
+    private Connection connectOrStart() {
+        Connection now = connect();
+        if (now != null) return now;
+        synchronized (starting) {
+            now = connect();
+            if (now != null) return now;
+            if (startFailed != null && System.nanoTime() - startFailedAt < START_AGAIN.toNanos()) return null;
+            Optional<String> failed = coreStart.start();
+            startFailed = failed.orElse(null);
+            startFailedAt = System.nanoTime();
+            return failed.isPresent() ? null : connect();
+        }
+    }
+
+    /** Whether a core answers where {@code upstream} says and proves it holds the token: {@link CoreProcess}'s wait. */
+    public static boolean answers(Supplier<Optional<Upstream>> upstream) {
+        Optional<Upstream> where = upstream.get();
+        if (where.isEmpty()) return false;
+        try {
+            provenStudio(PROBE, where.get());
+            return true;
+        } catch (IOException notOurs) {
+            return false;
+        }
+    }
+
+    /**
+     * Whether Studio is on the core: it has a channel open ({@code CoreServer.Info.clients}). A server with no
+     * {@link #INFO}, an older Studio's own endpoint, is Studio itself.
+     */
+    private boolean studioAttached(Connection now) {
+        HttpRequest request = HttpRequest.newBuilder(now.upstream().url().resolve(INFO)).timeout(QUICK)
+                .header("Authorization", "Bearer " + now.upstream().token()).GET().build();
+        try {
+            HttpResponse<String> answer = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (answer.statusCode() != 200) return true;
+            return json.readTree(answer.body()).path("clients").asInt(0) > 0;
+        } catch (IOException unreadable) {
+            return true;
+        } catch (InterruptedException stopped) {
+            Thread.currentThread().interrupt();
+            return true;
         }
     }
 
@@ -257,8 +390,8 @@ public final class McpBridge {
         result.put("protocolVersion", clientInit.path("protocolVersion").asText(FALLBACK_PROTOCOL));
         result.putObject("capabilities").putObject("tools").put("listChanged", true);
         result.putObject("serverInfo").put("name", "botmaker-studio").put("version", "bridge");
-        result.put("instructions", "BotMaker Studio is not running yet. start_studio starts it; its tools appear "
-                + "here once it runs.");
+        result.put("instructions", "BotMaker's core is not running, and no Studio has told this computer how to start "
+                + "one. start_studio starts Studio; its tools appear here once it runs.");
         return result;
     }
 
@@ -297,7 +430,8 @@ public final class McpBridge {
     /** start_studio: Studio started, or found running, and its tools listed again once its endpoint answers. */
     private ObjectNode start(String project, String home, boolean ui) {
         Map<String, String> asked = environment(home, ui);
-        if (connect() != null) {
+        Connection already = connect();
+        if (already != null && studioAttached(already)) {
             // A sandbox asked of a Studio this bridge did not start with it would be the user's real folders.
             if (!asked.isEmpty() && !asked.equals(launchedWith)) {
                 return toolText("Studio runs already, but not with that home and ui: quit_studio, then start_studio "
@@ -310,6 +444,8 @@ public final class McpBridge {
                     + "dev Studio, through javafx:run) or --studio <command>, or set BOTMAKER_UMBRELLA or "
                     + "BOTMAKER_STUDIO.", true);
         }
+        // A sandbox Studio's core keeps its files under its home: talk to that one from now on.
+        if (followsHome && asked.containsKey(HOME_ENV)) follow(Path.of(asked.get(HOME_ENV)).resolve("core"));
         Launch how = launch.get();
         List<String> argv = new ArrayList<>(how.command());
         if (!project.isBlank()) argv.add(how.projectArg().formatted(project.strip()));
@@ -326,9 +462,13 @@ public final class McpBridge {
         } catch (IOException failed) {
             return toolText("Studio did not start: " + failed.getMessage(), true);
         }
-        long until = System.nanoTime() + STARTING.toNanos();
+        // Studio ties to the core once it has something to serve: a project, or the ui tool. On the bot list with
+        // neither it serves nothing, so the wait is short.
+        boolean ties = !project.isBlank() || ui;
+        long until = System.nanoTime() + (ties ? STARTING : SHOWING).toNanos();
         while (System.nanoTime() < until) {
-            if (connect() != null) {
+            Connection now = connect();
+            if (now != null && studioAttached(now)) {
                 toolsChanged();
                 return toolText("Studio runs; its tools are listed again.", false);
             }
@@ -343,7 +483,11 @@ public final class McpBridge {
                 break;
             }
         }
-        return toolText("Studio started, but its endpoint has not answered yet; what it printed is in " + log
+        if (!ties) {
+            return toolText("Studio started on its bot list, which serves no tools until a project opens or its "
+                    + "Assistant tab serves; what it printed is in " + log + ".", false);
+        }
+        return toolText("Studio started, but has not reached BotMaker's core yet; what it printed is in " + log
                 + ". Its tools come back by themselves once it does.", true);
     }
 
@@ -435,7 +579,7 @@ public final class McpBridge {
      * fresh nonce with it. Asked before each request, so a process that took the port while Studio was down is
      * never handed the token.
      */
-    private void provenStudio(Upstream to) throws IOException {
+    private static void provenStudio(HttpClient http, Upstream to) throws IOException {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         String nonce = HexFormat.of().formatHex(bytes);
@@ -470,7 +614,7 @@ public final class McpBridge {
 
     private HttpRequest post(Upstream to, String session, String protocol, JsonNode body, Duration timeout)
             throws IOException {
-        provenStudio(to);
+        provenStudio(http, to);
         HttpRequest.Builder request = HttpRequest.newBuilder(to.url())
                 .header("Authorization", "Bearer " + to.token())
                 .header("Content-Type", "application/json")
@@ -527,7 +671,7 @@ public final class McpBridge {
         if (now.session() != null) request.header(SESSION, now.session());
         while (connection == now) {
             try {
-                provenStudio(now.upstream());
+                provenStudio(http, now.upstream());
                 HttpResponse<Stream<String>> response = http.send(request.build(),
                         HttpResponse.BodyHandlers.ofLines());
                 if (response.statusCode() != 200) {

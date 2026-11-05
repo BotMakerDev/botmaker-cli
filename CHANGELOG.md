@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- `mcp-bridge` forwards to BotMaker's core and works with no Studio (2026-11-05). A client's request that finds no core
+  starts one with the command the last Studio saved (`core-command.json`), under `core.lock`; with none saved it says to
+  start Studio once. `start_studio` waits until Studio is attached to the core, not just until the core answers.
 - `mcp-bridge` checks the hello proof over `<port>:<nonce>`, as the core now signs it (2026-11-05): a proof relayed from
   another port fails. A bridge and a Studio from before this change do not recognise each other.
 - The release library knows `botmaker-core` (2026-11-05): `botmaker release --core`, decided and tagged after the SDK
