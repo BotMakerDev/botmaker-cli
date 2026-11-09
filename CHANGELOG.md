@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- botmaker-java is a plain dependency (2026-11-09, the user's call), so the main artifact now brings it and JDT. A
+  `.bmk`'s main class is read from a parse (`BotEntry`): a comment or a string naming `main` no longer counts, and a
+  `main` in a member class gives its top-level class. Only picocli stays optional.
 - JDT comes through the optional `botmaker-java`, whose pom alone names its version (2026-11-05). The main artifact
   still brings neither, and the `all` jar still carries both.
 - `mcp-bridge` forwards to BotMaker's core and works with no Studio (2026-11-05). A client's request that finds no core

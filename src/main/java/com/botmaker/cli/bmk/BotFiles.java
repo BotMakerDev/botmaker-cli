@@ -1,6 +1,7 @@
 package com.botmaker.cli.bmk;
 
 import com.botmaker.cli.project.Poms;
+import com.botmaker.java.edit.helpers.BotEntry;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -38,8 +39,6 @@ public final class BotFiles {
     /** One record of {@code git ls-tree -r -z}: {@code <mode> <type> <id>\t<path>}. */
     private static final Pattern TREE = Pattern.compile("(\\d{6}) (\\w+) ([0-9a-f]+)\t(.+)", Pattern.DOTALL);
 
-    private static final Pattern PACKAGE =Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
-
     private BotFiles() {}
 
     /** The {@code .bmk}'s sha256, lowercase hex: what the catalog pins as {@code bmkSha256}. */
@@ -55,17 +54,18 @@ public final class BotFiles {
     }
 
     /**
-     * The class holding {@code main}: the first source under {@code src/main/java/} (by path) that declares
-     * {@code static void main(}, named by its package. Textual, as Studio finds its entry class: nothing is compiled.
+     * The class holding {@code main}: in the first source under {@code src/main/java/} (by path) that declares it,
+     * read from its tree by {@link BotEntry}, as Studio finds its entry class; a file too broken to name its type is
+     * named by its file. Nothing is compiled.
      */
     public static Optional<String> mainClass(Map<String, byte[]> sources) {
         for (String name : sources.keySet().stream()
                 .filter(f -> f.startsWith("src/main/java/") && f.endsWith(".java")).sorted().toList()) {
-            String source = new String(sources.get(name), StandardCharsets.UTF_8);
-            if (!source.contains("static void main(") && !source.contains("static void main (")) continue;
+            Optional<BotEntry> entry = BotEntry.of(new String(sources.get(name), StandardCharsets.UTF_8));
+            if (entry.isEmpty()) continue;
+            if (entry.get().named()) return Optional.of(entry.get().qualifiedName());
             String simple = name.substring(name.lastIndexOf('/') + 1).replaceFirst("\\.java$", "");
-            Matcher pkg = PACKAGE.matcher(source);
-            return Optional.of(pkg.find() ? pkg.group(1) + "." + simple : simple);
+            return Optional.of(new BotEntry(entry.get().packageName(), simple).qualifiedName());
         }
         return Optional.empty();
     }

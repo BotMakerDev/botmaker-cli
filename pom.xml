@@ -85,13 +85,14 @@
             <version>${botmaker.pluginhost.version}</version>
         </dependency>
 
-        <!-- SourceParser, which `repair` and `plugin validate`'s migration check parse a bot's Java with. `optional`,
-             so a consumer of the main artifact downloads neither it nor the JDT it brings; the `all` jar carries both. -->
+        <!-- SourceParser, which `repair` and `plugin validate`'s migration check parse a bot's Java with, and BotEntry,
+             which reads a .bmk's main class from a tree. A plain dependency since 2026-11-09 (the user's call): the
+             catalog's EntryGate rebuilds every .bmk from the main artifact, so it needs the reader the author's
+             Publish used, and downloads botmaker-java and JDT for it. -->
         <dependency>
             <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-java</artifactId>
             <version>${botmaker.java.version}</version>
-            <optional>true</optional>
         </dependency>
 
         <!--
@@ -137,8 +138,7 @@
 
         <!--
           com.botmaker.cli.repair reads a damaged file's members by JDT's recovered tree. JDT comes through
-          botmaker-java above, the one pom that names its version (2026-11-05), and that dependency being optional keeps
-          it out of the main artifact: the `all` jar carries it, and the catalog's CI does not download it.
+          botmaker-java above, the one pom that names its version (2026-11-05).
         -->
 
         <!-- index.json, and the entry `botmaker publish` composes. -->

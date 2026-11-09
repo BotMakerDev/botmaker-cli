@@ -32,8 +32,9 @@ from `release.sh`.
   `com.botmaker.cli.repair` print nothing, spawn no UI and know no command line.** A publish does every side effect through its `PublishHost` (the cli's runs every program through a `StepRunner`;
   Studio brings its own). A rule added to `ValidateCommand` is a rule the catalog will not enforce: put it in
   `PluginValidator`, as a `Check` (`two-artifacts.md`).
-- **picocli and `botmaker-java` stay `optional`**, so a consumer of the main artifact resolves neither, nor JDT, which
-  comes through `botmaker-java` at the one version its pom names.
+- **picocli stays `optional`**, so a consumer of the main artifact does not resolve it. `botmaker-java` is a plain
+  dependency since 2026-11-09 (the user's call): `BotFiles.mainClass` reads a `.bmk`'s entry by its `BotEntry`, and the
+  catalog's rebuild must read it alike. JDT comes through `botmaker-java` at the one version its pom names.
 - **`com.botmaker.cli.mcp` reaches the core only over MCP** (2026-11-05): the cli links neither the core nor Studio.
   `McpBridge` finds or starts the core (`CoreProcess`, the saved `core-command.json`); `bot run` is a client of it
   through `CoreTools.Bridged`, and follows a run by `read_trace`'s cursor, never by matching its text.
