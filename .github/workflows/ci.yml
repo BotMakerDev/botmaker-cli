@@ -64,6 +64,12 @@ jobs:
           repository: BotMakerDev/botmaker-plugin-archetype
           path: .deps/botmaker-plugin-archetype
 
+      - name: Check out botmaker-runlog
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-runlog
+          path: .deps/botmaker-runlog
+
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -82,6 +88,7 @@ jobs:
           mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-parent/pom.xml install
           mvn_retry mvn -B -f .deps/botmaker-plugin-archetype/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-runlog/pom.xml install -DskipTests
 
       - name: Build and test
         run: mvn -B verify
@@ -140,6 +147,12 @@ jobs:
           repository: BotMakerDev/botmaker-plugin-archetype
           path: .deps/botmaker-plugin-archetype
 
+      - name: Check out botmaker-runlog
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-runlog
+          path: .deps/botmaker-runlog
+
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -170,6 +183,7 @@ jobs:
           mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-parent/pom.xml install
           mvn_retry mvn -B -f .deps/botmaker-plugin-archetype/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-runlog/pom.xml install -DskipTests
           # The tag reaches the manifest here and nowhere else, so without this `botmaker --version`
           # answers "(dev)" on a released package.
           mvn_retry mvn -B package -DskipTests "-Dbotmaker.cli.version=${GITHUB_REF_NAME#v}"

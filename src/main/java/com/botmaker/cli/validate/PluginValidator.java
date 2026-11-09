@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
+import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -689,6 +690,8 @@ public final class PluginValidator {
                 Wither<?> wither = withers.get(i);
                 if (wither.flag()) continue;
                 Type part = wither.method().getGenericParameterTypes()[0];
+                // A varargs link, .serves(Goal...), is written as its elements, as a factory's varargs tail is.
+                if (wither.method().isVarArgs()) part = elementOf(part);
                 String leaf = unwritable(part, known, literals, new HashSet<>());
                 if (leaf != null) {
                     unwritables.add("part " + (fixed + i) + " (" + part.getTypeName() + ", ."
@@ -1156,7 +1159,8 @@ public final class PluginValidator {
             problems.add(at + "'s first value is a " + first.getClass().getName() + ", not a " + raw.getName());
             return problems;
         }
-        if (shape != null) {
+        // A first value equal to one of the shape's constants is written by name (Plan.NONE), never rebuilt.
+        if (shape != null && !isConstant(shape, first)) {
             Object back;
             boolean same;
             try {
@@ -1174,6 +1178,18 @@ public final class PluginValidator {
             }
         }
         return problems;
+    }
+
+    /** Whether {@code value} equals one of {@code shape}'s constants, which the host writes by its name. */
+    private static boolean isConstant(ComponentType<?> shape, Object value) {
+        for (Field field : nonNull(shape.constants())) {
+            try {
+                if (Modifier.isStatic(field.getModifiers()) && value.equals(field.get(null))) return true;
+            } catch (IllegalAccessException e) {
+                // not public: the host ignores it, so the value is rebuilt
+            }
+        }
+        return false;
     }
 
     @SuppressWarnings("unchecked")

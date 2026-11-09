@@ -7,6 +7,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- `plugin validate` reads a varargs link (`.serves(Goal...)`) as its elements, as it reads a factory's varargs tail,
+  and writes a managed value's first value by name when it equals one of its type's constants (`Plan.NONE`) instead
+  of rebuilding it; both refused the SDK.
+- CI checks out and installs `botmaker-runlog`, which the pom resolves at its `-SNAPSHOT`.
+
 ### Changed
 
 - botmaker-java is a plain dependency (2026-11-09, the user's call), so the main artifact now brings it and JDT. A
