@@ -935,8 +935,8 @@ public final class PluginValidator {
     }
 
     /**
-     * Whether {@code cls} is a functional interface, whose only Java is a method reference — the SDK's
-     * {@code ActivityBody}, written {@code Collect::body}. The host writes such a part through its source-leaf
+     * Whether {@code cls} is a functional interface, whose only Java is a method reference — a
+     * {@code Chore}, written {@code Crops::water}. The host writes such a part through its source-leaf
      * path, from the text the declaration's {@code components} hands over (`two-strings.md`), so no plugin
      * declares it and none need to.
      */
