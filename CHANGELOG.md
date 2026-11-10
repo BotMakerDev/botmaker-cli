@@ -5,6 +5,20 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- `mcp-bridge --umbrella <dir>` (or `$BOTMAKER_UMBRELLA`) starts BotMaker's core with no Studio ever started on
+  this computer: with no saved `core-command.json`, it resolves the checkout's built Studio classpath offline
+  (`maven-dependency-plugin:3.6.1:build-classpath`, into `core-classpath.txt`) and saves the command a Studio would.
+  It is Studio's classpath, not the core's, so the core says Studio's version and a Studio started later takes it.
+
+### Fixed
+
+- Maven on Windows: `mvnw.cmd`, then `%MAVEN_HOME%\bin\mvn.cmd`, then `mvn.cmd` on the PATH. It named the POSIX
+  `mvn` script, which Windows cannot run, so `start_studio`, `plugin run` and every Maven step failed there.
+
 ## [0.12.0] — 2026-11-10
 
 ### Fixed

@@ -2,6 +2,7 @@ package com.botmaker.cli;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -100,7 +101,7 @@ public final class Mvn {
     static final Set<String> UNTRUSTED_ENV = Set.of("PATH", "JAVA_HOME", "MAVEN_HOME", "LANG", "TMPDIR");
 
     /** The process and every process it started: a forked compiler outlives a killed mvn otherwise. */
-    private static void kill(Process process) {
+    public static void kill(Process process) {
         process.descendants().forEach(ProcessHandle::destroyForcibly);
         process.destroyForcibly();
     }
@@ -135,31 +136,59 @@ public final class Mvn {
     }
 
     /**
-     * {@code ./mvnw} in the project, else {@code $MAVEN_HOME/bin/mvn}, else {@code mvn} on the PATH.
+     * {@code ./mvnw} in the project, else {@code $MAVEN_HOME/bin/mvn}, else {@code mvn} on the PATH; on Windows each is
+     * the {@code .cmd} ({@code mvnw.cmd}, {@code mvn.cmd}), the PATH searched here.
      *
      * <p>No probe for whether the last one exists: {@code ProcessBuilder} reports a missing executable
      * clearly enough, and a probe that ran {@code mvn --version} would cost a JVM start on every single
      * invocation to answer a question the next line answers for free.
      */
-    static String executable(Path dir) {
-        String wrapper = System.getProperty("os.name", "").toLowerCase().startsWith("windows")
-                ? "mvnw.cmd" : "mvnw";
-        Path local = dir.resolve(wrapper);
+    public static String executable(Path dir) {
+        return executable(dir, System.getProperty("os.name", "").toLowerCase().startsWith("windows"),
+                System.getenv("MAVEN_HOME"), System.getenv("PATH"));
+    }
+
+    /**
+     * As {@link #executable(Path)} for the given platform and environment. On Windows every name is the {@code .cmd}:
+     * {@code ProcessBuilder} adds no extension there, so a bare {@code mvn} names the POSIX script Maven also ships,
+     * which Windows cannot run, and a PATH holding only {@code mvn.cmd} is not searched for it.
+     */
+    static String executable(Path dir, boolean windows, String mavenHome, String path) {
+        Path local = dir.resolve(windows ? "mvnw.cmd" : "mvnw");
         if (Files.isRegularFile(local)) {
             return local.toAbsolutePath().toString();
         }
-        return systemExecutable();
+        return systemExecutable(windows, mavenHome, path);
     }
 
-    /** {@code $MAVEN_HOME/bin/mvn}, else {@code mvn} on the PATH. */
+    /** The system Maven, never a wrapper: {@code $MAVEN_HOME}'s, else the PATH's. */
     private static String systemExecutable() {
-        String home = System.getenv("MAVEN_HOME");
-        if (home != null && !home.isBlank()) {
-            Path fromHome = Path.of(home, "bin", "mvn");
+        return systemExecutable(System.getProperty("os.name", "").toLowerCase().startsWith("windows"),
+                System.getenv("MAVEN_HOME"), System.getenv("PATH"));
+    }
+
+    private static String systemExecutable(boolean windows, String mavenHome, String path) {
+        String name = windows ? "mvn.cmd" : "mvn";
+        if (mavenHome != null && !mavenHome.isBlank()) {
+            Path fromHome = Path.of(mavenHome, "bin", name);
             if (Files.isRegularFile(fromHome)) {
                 return fromHome.toString();
             }
         }
-        return "mvn";
+        if (windows && path != null) {
+            for (String entry : path.split(";")) {
+                if (entry.isBlank()) continue;
+                try {
+                    Path folder = Path.of(entry.strip().replace("\"", ""));
+                    // A relative entry means the working directory, which a caller's directory() then changes.
+                    if (!folder.isAbsolute()) continue;
+                    Path onPath = folder.resolve(name);
+                    if (Files.isRegularFile(onPath)) return onPath.toString();
+                } catch (InvalidPathException malformed) {
+                    // A PATH entry Windows itself would skip.
+                }
+            }
+        }
+        return name;
     }
 }

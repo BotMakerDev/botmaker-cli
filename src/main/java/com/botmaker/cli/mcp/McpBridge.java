@@ -183,18 +183,20 @@ public final class McpBridge {
      */
     public static McpBridge onThisComputer(Optional<Launch> launch, InputStream in, OutputStream out, Duration poll) {
         Path dir = coreDir();
-        return new McpBridge(fromStudioConfig(dir), launch, coreProcess(dir), true, in, out, poll);
+        return new McpBridge(fromStudioConfig(dir), launch, coreProcess(dir, launch), true, in, out, poll);
     }
 
-    private static CoreStart coreProcess(Path dir) {
+    /** The core in {@code dir}, its command made from the checkout start_studio runs, when no Studio saved one. */
+    private static CoreStart coreProcess(Path dir, Optional<Launch> launch) {
         Supplier<Optional<Upstream>> there = fromStudioConfig(dir);
-        return new CoreProcess(dir, () -> answers(there));
+        // A Launch with a dir is a checkout's dev Studio (--umbrella); a packaged one's has none.
+        return new CoreProcess(dir, () -> answers(there), launch.map(Launch::dir));
     }
 
     /** From now on the core in {@code dir}: the one a Studio started with a sandbox home uses. */
     private synchronized void follow(Path dir) {
         upstream = fromStudioConfig(dir);
-        coreStart = coreProcess(dir);
+        coreStart = coreProcess(dir, launch);
         connection = null;
         synchronized (starting) {
             startFailed = null;

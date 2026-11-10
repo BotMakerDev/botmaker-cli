@@ -28,7 +28,8 @@ import java.util.concurrent.Callable;
 final class McpBridgeCommand implements Callable<Integer> {
 
     @Option(names = "--umbrella", paramLabel = "<dir>",
-            description = "A BotMaker umbrella checkout: start_studio runs its dev Studio with javafx:run. Or "
+            description = "A BotMaker umbrella checkout: start_studio runs its dev Studio with javafx:run, and the "
+                    + "core starts from its built Studio when no Studio has started one on this computer. Or "
                     + "$BOTMAKER_UMBRELLA.")
     private String umbrella;
 
