@@ -316,6 +316,20 @@ class PluginValidatorTest {
                 holders.detail()::toString);
     }
 
+    /**
+     * A holder that links JavaFX cannot be built on the cli's classpath, and the contract wraps that
+     * LinkageError in its own exception ("… could not be loaded"): the cause chain still says JavaFX, so the
+     * surface is not asked rather than blamed (the SDK v1.10.0's editors, overlay and run overlay,
+     * 2026-11-10). This test's classpath has JavaFX, so the helper is what is tested.
+     */
+    @Test
+    void a_wrapped_javafx_linkage_error_is_told_by_its_cause() {
+        assertTrue(PluginValidator.linksJavaFx(new IllegalStateException("p.Holder could not be loaded",
+                new NoClassDefFoundError("javafx/scene/Node"))));
+        assertFalse(PluginValidator.linksJavaFx(new IllegalStateException("p.Holder could not be loaded",
+                new NoClassDefFoundError("com/example/Missing"))));
+    }
+
     @Test
     void a_plugin_without_a_changelog_or_an_icon_is_warned_and_passes(@TempDir Path dir) throws IOException {
         List<CheckResult> results = PluginValidator.validate(subject(dir, GOOD_POM));

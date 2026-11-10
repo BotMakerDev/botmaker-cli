@@ -277,8 +277,14 @@ public final class PluginValidator {
                         problems.add(safeId(plugin) + " ." + surface.getKey() + ": " + e);
                     }
                 } catch (RuntimeException e) {
-                    problems.add(safeId(plugin) + " ." + surface.getKey() + ": " + e.getMessage()
-                            + (e.getCause() == null ? "" : " (" + e.getCause() + ")"));
+                    // The contract builds a holder itself and wraps a LinkageError in its own exception
+                    // ("… could not be loaded"), so the JavaFX case is told by the cause chain here too.
+                    if (!javafx() && linksJavaFx(e)) {
+                        unlinked.add(surface.getKey());
+                    } else {
+                        problems.add(safeId(plugin) + " ." + surface.getKey() + ": " + e.getMessage()
+                                + (e.getCause() == null ? "" : " (" + e.getCause() + ")"));
+                    }
                 }
             }
         }
@@ -292,7 +298,7 @@ public final class PluginValidator {
      * ({@code javafx/scene/Node}), and a class whose initialiser failed on it is "Could not initialize class …"
      * afterwards, with the first failure as its cause.
      */
-    private static boolean linksJavaFx(Throwable failure) {
+    static boolean linksJavaFx(Throwable failure) {
         for (Throwable each = failure; each != null; each = each.getCause()) {
             if (String.valueOf(each.getMessage()).contains("javafx/")) return true;
             if (each.getCause() == each) break;

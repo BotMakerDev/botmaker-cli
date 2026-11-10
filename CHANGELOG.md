@@ -5,6 +5,15 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- `plugin validate` on a published jar no longer fails `holders` for a holder that links JavaFX: the contract
+  wraps the `NoClassDefFoundError` in its own "could not be loaded", which the check now reads by its cause and
+  lists as not asked, as it did a bare one. It had refused the SDK v1.10.0's publish (editors, overlay, run
+  overlay).
+
 ## [0.11.0] — 2026-11-10
 
 ### Fixed
