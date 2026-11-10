@@ -5,7 +5,7 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
-## [Unreleased]
+## [0.12.0] — 2026-11-10
 
 ### Fixed
 
@@ -13,6 +13,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   wraps the `NoClassDefFoundError` in its own "could not be loaded", which the check now reads by its cause and
   lists as not asked, as it did a bare one. It had refused the SDK v1.10.0's publish (editors, overlay, run
   overlay).
+
+### Changed
+
+- Built against botmaker-studio-api 0.17.0 (was 0.15.0).
+- Built against botmaker-plugin-host 0.12.0 (was 0.11.0).
+- Built against botmaker-plugin-archetype 0.9.0 (was 0.8.0).
+- Built against botmaker-java 0.2.0 (was 0.1.0).
 
 ## [0.11.0] — 2026-11-10
 
