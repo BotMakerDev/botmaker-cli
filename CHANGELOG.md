@@ -14,6 +14,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   Assistant window denies them; refused outside a bot's folder (no `pom.xml`, or a plugin's). Ctrl+C is the tool's.
   Arguments after the tool's name go to it (`botmaker ai codex -- exec "…"`).
 
+- `botmaker mcp install <tool> [--dev [--umbrella <dir>]] [--print]`: BotMaker's MCP server, named
+  `botmaker-studio` as `botmaker ai` names it, in the tool's user settings, so every session of a tool you start
+  yourself has the tools. Claude Code through its own `claude mcp add --scope user`; Codex's `~/.codex/config.toml`
+  (`$CODEX_HOME`), opencode's `~/.config/opencode/opencode.json` and Gemini CLI's `~/.gemini/settings.json` get only
+  the server's entry, an earlier one replaced, the rest kept, and a file it cannot be sure of (comments, a
+  multi-line string, the server named another way) left alone with the entry printed. `--dev` registers an umbrella
+  checkout's newest built `-all` jar with `--umbrella` (and this shell's `MAVEN_HOME`). It adds no guard.
+
 - `BotGuard` guards every client in a bot's folder, not only Claude Code: `opencode.json` (`permission.edit` deny,
   `bash` ask), `.codex/config.toml` (`sandbox_mode = "read-only"`, which Codex reads once the folder is trusted) and
   `AGENTS.md` (how to work on the bot: through the MCP tools only, written when missing and never rewritten). Each
