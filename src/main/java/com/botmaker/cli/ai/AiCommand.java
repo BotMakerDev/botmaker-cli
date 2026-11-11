@@ -15,6 +15,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
@@ -29,7 +30,7 @@ import java.util.stream.Stream;
         header = "Start an AI tool on a bot, changing it only through BotMaker's MCP tools.",
         description = "In the bot's folder, starts Claude Code, Codex, Gemini CLI or opencode with BotMaker's MCP "
                 + "tools (this cli's mcp-bridge: no Studio needed) and its own file edits denied. Exit 2: not a bot "
-                + "folder or no such tool; 1: the tool is not installed; otherwise the tool's own exit code.",
+                + "folder, no such tool, or an argument cmd.exe would change (a Windows .cmd tool); 1: the tool is not installed; otherwise the tool's own exit code.",
         mixinStandardHelpOptions = true)
 public final class AiCommand implements Callable<Integer> {
 
@@ -69,6 +70,11 @@ public final class AiCommand implements Callable<Integer> {
         if (exe.isEmpty()) {
             System.err.println(picked.displayName() + " is not installed: " + picked.installHint());
             return ExitCode.SOFTWARE;
+        }
+        Optional<String> cut = cutByBatchFile(exe.get(), toolArgs);
+        if (cut.isPresent()) {
+            System.err.println(cut.get());
+            return ExitCode.USAGE;
         }
         for (BotGuard.Guard guard : BotGuard.ensure(bot)) {
             // Only what concerns this session: another tool's own setting is the user's business.
@@ -111,6 +117,21 @@ public final class AiCommand implements Callable<Integer> {
             return Optional.of(folder + " is a plugin's folder; botmaker ai works on a bot.");
         }
         return Optional.empty();
+    }
+
+    /**
+     * Why {@code args} cannot reach the tool at {@code exe}, or empty when they can. An npm install puts a {@code .cmd}
+     * on Windows, which runs through {@code cmd.exe}: its {@code %*} ends at an argument's first line break, so the
+     * tool would go ahead on the first line of a prompt; it expands {@code %NAME%}; and a double quote inside an
+     * argument ends Java's quoting of it, after which {@code &} or {@code |} starts a command of its own.
+     */
+    static Optional<String> cutByBatchFile(Path exe, List<String> args) {
+        String name = exe.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (!name.endsWith(".cmd") && !name.endsWith(".bat")) return Optional.empty();
+        return args.stream().filter(a -> a.chars().anyMatch(c -> c == '\n' || c == '\r' || c == '"' || c == '%'))
+                .findFirst()
+                .map(a -> exe.getFileName() + " runs through cmd.exe, which would change this argument: "
+                        + a.lines().findFirst().orElse("") + "\nWrite it on one line, with no \" or %.");
     }
 
     /**

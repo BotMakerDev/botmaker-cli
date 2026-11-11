@@ -12,7 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `botmaker ai <tool> [-C <folder>] [--allow-shell] [-- <tool args>]`: Claude Code, Codex, Gemini CLI or opencode
   started in a bot's folder with no Studio, pointed at this cli's own `mcp-bridge` and denied its file edits as the
   Assistant window denies them; refused outside a bot's folder (no `pom.xml`, or a plugin's). Ctrl+C is the tool's.
-  Arguments after the tool's name go to it (`botmaker ai codex -- exec "…"`).
+  Arguments after the tool's name go to it (`botmaker ai codex -- exec "…"`). On Windows, when the tool is a `.cmd` (an
+  npm install), an argument with a line break, a `"` or a `%` is refused: `cmd.exe` would cut it at the line break
+  (the tool going ahead on the prompt's first line), expand `%NAME%`, or run what follows a `"` and `&` itself.
 
 - `botmaker mcp install <tool> [--dev [--umbrella <dir>]] [--print]`: BotMaker's MCP server, named
   `botmaker-studio` as `botmaker ai` names it, in the tool's user settings, so every session of a tool you start

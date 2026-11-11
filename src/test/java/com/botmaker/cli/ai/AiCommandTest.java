@@ -40,6 +40,20 @@ class AiCommandTest {
     }
 
     @Test
+    void aBatchFileIsNotGivenALineBreakItWouldCut() {
+        List<String> twoLines = List.of("exec", "list my projects\nthen open one");
+        assertTrue(AiCommand.cutByBatchFile(Path.of("C:\\npm\\codex.cmd"), twoLines).isPresent());
+        assertTrue(AiCommand.cutByBatchFile(Path.of("C:\\npm\\CODEX.BAT"), List.of("a\r\nb")).isPresent());
+        assertTrue(AiCommand.cutByBatchFile(Path.of("C:\\npm\\codex.cmd"), List.of("say \"a & b\"")).isPresent(),
+                "a quote ends Java's quoting, and & starts a command");
+        assertTrue(AiCommand.cutByBatchFile(Path.of("C:\\npm\\codex.cmd"), List.of("show %PATH%")).isPresent());
+        assertEquals(Optional.empty(), AiCommand.cutByBatchFile(Path.of("C:\\npm\\codex.cmd"),
+                List.of("exec", "one line, with 'quotes' & more")));
+        assertEquals(Optional.empty(), AiCommand.cutByBatchFile(Path.of("/usr/bin/codex"), twoLines),
+                "only cmd.exe cuts it");
+    }
+
+    @Test
     void outsideABotNothingStarts() {
         int code = new CommandLine(new AiCommand()).execute("codex", "-C", dir.toString(), "--", "exec", "-x");
         assertEquals(CommandLine.ExitCode.USAGE, code);
