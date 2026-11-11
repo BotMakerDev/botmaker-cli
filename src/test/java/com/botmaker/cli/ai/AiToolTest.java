@@ -116,14 +116,16 @@ class AiToolTest {
     @Test
     void opencodeDeniesEditsInTheConfigItIsGiven() throws IOException {
         AiTool.Launch launch = launch(AiTool.OPENCODE, false);
+        JsonNode inline = JSON.readTree(launch.env().get("OPENCODE_CONFIG_CONTENT"));
+        assertEquals("deny", inline.path("permission").path("edit").asText(), "inline: above the bot's own opencode.json");
+        assertEquals("deny", inline.path("permission").path("bash").asText());
+        assertFalse(launch.env().get("OPENCODE_CONFIG_CONTENT").contains(TOKEN), "the environment carries no token");
         JsonNode config = privateJson(Path.of(launch.env().get("OPENCODE_CONFIG")));
-        assertEquals("deny", config.path("permission").path("edit").asText());
-        assertEquals("deny", config.path("permission").path("bash").asText());
         JsonNode server = config.path("mcp").path(AiTool.SERVER);
         assertEquals("remote", server.path("type").asText());
         assertEquals(URL, server.path("url").asText());
 
-        JsonNode asking = privateJson(Path.of(launch(AiTool.OPENCODE, true).env().get("OPENCODE_CONFIG")));
+        JsonNode asking = JSON.readTree(launch(AiTool.OPENCODE, true).env().get("OPENCODE_CONFIG_CONTENT"));
         assertEquals("ask", asking.path("permission").path("bash").asText());
     }
 
@@ -181,7 +183,8 @@ class AiToolTest {
     void opencodeStartsTheBridgeAsALocalServer() throws IOException {
         AiTool.Launch launch = launch(AiTool.OPENCODE, stdio(), false);
         JsonNode config = privateJson(Path.of(launch.env().get("OPENCODE_CONFIG")));
-        assertEquals("deny", config.path("permission").path("edit").asText());
+        assertEquals("deny", JSON.readTree(launch.env().get("OPENCODE_CONFIG_CONTENT")).path("permission").path("edit")
+                .asText());
         JsonNode server = config.path("mcp").path(AiTool.SERVER);
         assertEquals("local", server.path("type").asText());
         assertEquals(BRIDGE, strings(server.path("command")));

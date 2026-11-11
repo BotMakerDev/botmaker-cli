@@ -14,6 +14,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   Assistant window denies them; refused outside a bot's folder (no `pom.xml`, or a plugin's). Ctrl+C is the tool's.
   Arguments after the tool's name go to it (`botmaker ai codex -- exec "…"`).
 
+- `BotGuard` guards every client in a bot's folder, not only Claude Code: `opencode.json` (`permission.edit` deny,
+  `bash` ask), `.codex/config.toml` (`sandbox_mode = "read-only"`, which Codex reads once the folder is trusted) and
+  `AGENTS.md` (how to work on the bot: through the MCP tools only, written when missing and never rewritten). Each
+  file only gains what it lacks; a setting the user gave another value, a link, or a file that is not strict JSON is
+  left alone and reported (`Guard.warning`; `botmaker ai` prints only its own tool's). No file names the MCP server,
+  whose command is the machine's. The three new files are kept out of the bot's versions by `.git/info/exclude`, so
+  Publish does not find the tree dirty. `ensure` returns each client's `Guard` and prints nothing.
+
+- `botmaker ai opencode` and Studio's opencode session pass their permissions as `OPENCODE_CONFIG_CONTENT`, which
+  outranks the bot's own `opencode.json`: its `bash: ask` no longer undoes a denied shell.
+
 - `com.botmaker.cli.ai`: `AiTool` (the AI command-line tools BotMaker starts: Claude Code, Codex, Gemini CLI,
   opencode, each denied direct file edits in its own vocabulary) and `BotGuard` (a bot folder's
   `.claude/settings.json` rules) moved here from `botmaker-core`, ready for a cli command that starts a guarded

@@ -70,7 +70,10 @@ public final class AiCommand implements Callable<Integer> {
             System.err.println(picked.displayName() + " is not installed: " + picked.installHint());
             return ExitCode.SOFTWARE;
         }
-        BotGuard.ensure(bot);
+        for (BotGuard.Guard guard : BotGuard.ensure(bot)) {
+            // Only what concerns this session: another tool's own setting is the user's business.
+            if (guard.tool() == picked || guard.tool() == AiTool.UNKNOWN) guard.warning(bot).ifPresent(System.err::println);
+        }
         Path dir = privateDir();
         Process[] started = new Process[1];
         Thread cleanup = new Thread(() -> {

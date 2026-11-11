@@ -221,9 +221,13 @@ public enum AiTool {
                 Map<String, Object> config = new LinkedHashMap<>();
                 config.put("$schema", "https://opencode.ai/config.json");
                 config.put("mcp", Map.of(SERVER, server));
-                config.put("permission", Map.of("edit", "deny", "bash", allowShell ? "ask" : "deny"));
                 Path file = writePrivate(dir.resolve("opencode.json"), config);
-                yield new Launch(List.of(exe), Map.of("OPENCODE_CONFIG", file.toString()));
+                // Inline config outranks the bot's own opencode.json, which the file above does not: its "bash": "ask"
+                // (BotGuard) would otherwise undo a denied shell. It holds no secret, so the environment may carry it.
+                String permission = JSON.writeValueAsString(Map.of("permission",
+                        Map.of("edit", "deny", "bash", allowShell ? "ask" : "deny")));
+                yield new Launch(List.of(exe), Map.of("OPENCODE_CONFIG", file.toString(),
+                        "OPENCODE_CONFIG_CONTENT", permission));
             }
             case UNKNOWN -> throw new IllegalStateException("no tool to launch");
         };
