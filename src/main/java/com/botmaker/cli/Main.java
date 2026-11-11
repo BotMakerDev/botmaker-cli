@@ -1,5 +1,6 @@
 package com.botmaker.cli;
 
+import com.botmaker.cli.ai.AiCommand;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IVersionProvider;
@@ -51,7 +52,8 @@ import java.util.concurrent.Callable;
         versionProvider = Main.ManifestVersion.class,
         synopsisSubcommandLabel = "<command>",
         subcommands = {PluginCommand.class, BotCommand.class, ReleaseCommand.class, DoctorCommand.class,
-                ReportsCommand.class, CompletionCommand.class, McpBridgeCommand.class, MovedCommand.class})
+                ReportsCommand.class, CompletionCommand.class, McpBridgeCommand.class, AiCommand.class,
+                MovedCommand.class})
 public final class Main implements Callable<Integer> {
 
     /**

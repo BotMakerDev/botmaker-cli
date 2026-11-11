@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * The AI command-line tools BotMaker starts, and how each is told about the MCP server.
@@ -44,7 +45,7 @@ public enum AiTool {
     static final String TOKEN_ENV = "BOTMAKER_MCP_TOKEN";
 
     /** Claude Code's file-writing tools. Its Bash can write files too, so it is denied unless allowed. */
-    public static final List<String> CLAUDE_EDIT_TOOLS = List.of("Edit", "MultiEdit", "Write", "NotebookEdit");
+    public static final List<String> CLAUDE_EDIT_TOOLS = List.of("Edit", "Write", "NotebookEdit");
 
     private static final String CLAUDE_RULE = "Change the user's bot only through the " + SERVER
             + " MCP tools (read_tree, list_palette, edit_code, list_errors); direct file edits are disabled in this "
@@ -136,6 +137,14 @@ public enum AiTool {
     public static AiTool fromId(String id) {
         for (AiTool tool : values()) {
             if (tool.id.equals(id)) return tool;
+        }
+        return UNKNOWN;
+    }
+
+    /** The offered tool a person names by its id or its executable ({@code claude}), or {@link #UNKNOWN}. */
+    public static AiTool named(String name) {
+        for (AiTool tool : offered()) {
+            if (tool.id.equals(name) || tool.executable.equals(name)) return tool;
         }
         return UNKNOWN;
     }
@@ -325,12 +334,18 @@ public enum AiTool {
     }
 
     /**
-     * {@code value} as a TOML value for Codex's {@code -c key=value}: a JSON string or array of strings is also a
-     * TOML basic string or inline array, escapes included (a Windows path's backslashes).
+     * {@code value}, a string or a list of them, as a TOML value for Codex's {@code -c key=value}. A literal string
+     * ({@code 'C:\bin'}) where it can be one: it needs no escape, and a double quote would not survive Windows'
+     * command line, which Java does not escape. Otherwise a basic string, whose JSON form is also TOML.
      */
     static String toml(Object value) {
+        if (value instanceof List<?> list) {
+            return list.stream().map(AiTool::toml).collect(Collectors.joining(",", "[", "]"));
+        }
+        String text = value.toString();
+        if (text.indexOf('\'') < 0 && text.chars().noneMatch(c -> c < 0x20 || c == 0x7f)) return "'" + text + "'";
         try {
-            return JSON.writeValueAsString(value);
+            return JSON.writeValueAsString(text);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException(e);
         }

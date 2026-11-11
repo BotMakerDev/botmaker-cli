@@ -84,7 +84,7 @@ class AiToolTest {
         List<String> command = launch(AiTool.CLAUDE_CODE, false).command();
         int deny = command.indexOf("--disallowedTools");
         List<String> denied = command.subList(deny + 1, command.indexOf("--append-system-prompt"));
-        assertTrue(denied.containsAll(List.of("Edit", "MultiEdit", "Write", "NotebookEdit", "Bash")), denied.toString());
+        assertTrue(denied.containsAll(List.of("Edit", "Write", "NotebookEdit", "Bash")), denied.toString());
         assertTrue(command.contains("mcp__" + AiTool.SERVER), "the MCP tools are allowed without a prompt each");
         assertTrue(command.get(command.indexOf("--append-system-prompt") + 1)
                 .startsWith("You are running inside BotMaker Studio."), "Studio's sessions are told Studio is there");
@@ -108,8 +108,8 @@ class AiToolTest {
         AiTool.Launch launch = launch(AiTool.CODEX, true);
         List<String> command = launch.command();
         assertEquals("read-only", command.get(command.indexOf("--sandbox") + 1), "shell or not, it writes nothing");
-        assertTrue(command.contains("mcp_servers." + AiTool.SERVER + ".url=\"" + URL + "\""), command.toString());
-        assertTrue(command.contains("mcp_servers." + AiTool.SERVER + ".bearer_token_env_var=\"" + AiTool.TOKEN_ENV + "\""));
+        assertTrue(command.contains("mcp_servers." + AiTool.SERVER + ".url='" + URL + "'"), command.toString());
+        assertTrue(command.contains("mcp_servers." + AiTool.SERVER + ".bearer_token_env_var='" + AiTool.TOKEN_ENV + "'"));
         assertEquals(TOKEN, launch.env().get(AiTool.TOKEN_ENV));
     }
 
@@ -155,10 +155,26 @@ class AiToolTest {
         List<String> command = launch.command();
         assertEquals("read-only", command.get(command.indexOf("--sandbox") + 1));
         String key = "mcp_servers." + AiTool.SERVER;
-        assertTrue(command.contains(key + ".command=\"C:\\\\Java\\\\bin\\\\java.exe\""),
-                "a TOML basic string escapes each backslash: " + command);
-        assertTrue(command.contains(key + ".args=[\"-jar\",\"C:\\\\bm\\\\cli.jar\",\"mcp-bridge\"]"), command.toString());
+        assertTrue(command.contains(key + ".command='C:\\Java\\bin\\java.exe'"),
+                "a TOML literal string, no double quote for Windows' command line to lose: " + command);
+        assertTrue(command.contains(key + ".args=['-jar','C:\\bm\\cli.jar','mcp-bridge']"), command.toString());
+        assertTrue(command.stream().noneMatch(a -> a.contains("\"")), command.toString());
         assertTrue(launch.env().isEmpty());
+    }
+
+    @Test
+    void aTomlStringWithAQuoteIsABasicString() {
+        assertEquals("\"it's\"", AiTool.toml("it's"));
+        assertEquals("['a',\"b\\nc\"]", AiTool.toml(List.of("a", "b\nc")));
+    }
+
+    @Test
+    void aToolIsNamedByItsIdOrItsExecutable() {
+        assertEquals(AiTool.CLAUDE_CODE, AiTool.named("claude"));
+        assertEquals(AiTool.CLAUDE_CODE, AiTool.named("claude-code"));
+        assertEquals(AiTool.CODEX, AiTool.named("codex"));
+        assertEquals(AiTool.UNKNOWN, AiTool.named("cursor"));
+        assertEquals(AiTool.UNKNOWN, AiTool.named("unknown"), "the placeholder is not a tool");
     }
 
     @Test

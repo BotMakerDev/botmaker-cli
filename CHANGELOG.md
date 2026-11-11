@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `botmaker ai <tool> [-C <folder>] [--allow-shell] [-- <tool args>]`: Claude Code, Codex, Gemini CLI or opencode
+  started in a bot's folder with no Studio, pointed at this cli's own `mcp-bridge` and denied its file edits as the
+  Assistant window denies them; refused outside a bot's folder (no `pom.xml`, or a plugin's). Ctrl+C is the tool's.
+  Arguments after the tool's name go to it (`botmaker ai codex -- exec "…"`).
+
 - `com.botmaker.cli.ai`: `AiTool` (the AI command-line tools BotMaker starts: Claude Code, Codex, Gemini CLI,
   opencode, each denied direct file edits in its own vocabulary) and `BotGuard` (a bot folder's
   `.claude/settings.json` rules) moved here from `botmaker-core`, ready for a cli command that starts a guarded
@@ -19,6 +24,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   this computer: with no saved `core-command.json`, it resolves the checkout's built Studio classpath offline
   (`maven-dependency-plugin:3.6.1:build-classpath`, into `core-classpath.txt`) and saves the command a Studio would.
   It is Studio's classpath, not the core's, so the core says Studio's version and a Studio started later takes it.
+
+### Changed
+
+- `BotGuard` writes one path rule, `Edit(./src/**)`, which Claude Code applies to every file-editing tool, and removes
+  the `MultiEdit`/`Write`/`NotebookEdit(./src/**)` rules it wrote before: Claude Code warned about them on every
+  start. `AiTool.CLAUDE_EDIT_TOOLS` no longer names `MultiEdit`, which is no tool now.
 
 ### Fixed
 

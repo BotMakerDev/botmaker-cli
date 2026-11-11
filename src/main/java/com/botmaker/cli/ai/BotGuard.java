@@ -18,7 +18,8 @@ import java.util.List;
  * that rewrite a file in place. The bot changes through the MCP tools, where every edit compiles before it
  * lands; the sessions BotMaker starts itself are denied the same tools on their command line ({@link AiTool}).
  *
- * <p>Written as a project opens, only adding a rule that is missing and never removing one: the user's own rules
+ * <p>Written as a project opens, only adding a rule that is missing and removing none but the {@link #OBSOLETE} ones
+ * an earlier guard wrote: the user's own rules
  * and settings stay as they are, and a file that is not JSON is left alone. The shell rules are a guard against slips, not a
  * sandbox — a command can always be spelled another way.
  */
@@ -38,12 +39,18 @@ public final class BotGuard {
     public static final List<String> SHELL = List.of("Bash(sed -i *)", "Bash(sed --in-place *)", "Bash(perl -i *)",
             "Bash(perl -pi *)");
 
-    /** Every rule the guard keeps in {@code permissions.deny}. */
+    /** Every rule the guard keeps in {@code permissions.deny}: an {@code Edit(path)} rule covers every file-editing tool. */
     static final List<String> DENY = denied();
 
+    /**
+     * Rules an earlier guard wrote, which Claude Code now warns about on every start ({@code MultiEdit} is no tool,
+     * and a path rule names {@code Edit} only); removed when found, whoever wrote them, since {@code Edit(./src/**)}
+     * denies all they meant to.
+     */
+    static final List<String> OBSOLETE = List.of("MultiEdit(./src/**)", "Write(./src/**)", "NotebookEdit(./src/**)");
+
     private static List<String> denied() {
-        List<String> rules = new ArrayList<>();
-        for (String tool : AiTool.CLAUDE_EDIT_TOOLS) rules.add(tool + "(./src/**)");
+        List<String> rules = new ArrayList<>(List.of("Edit(./src/**)"));
         rules.addAll(SHELL);
         return List.copyOf(rules);
     }
@@ -94,15 +101,21 @@ public final class BotGuard {
         JsonNode deny = perms.path("deny");
         if (!deny.isMissingNode() && !deny.isArray()) return Result.LEFT_ALONE;
         ArrayNode rules = deny.isArray() ? (ArrayNode) deny : perms.putArray("deny");
+        boolean changed = false;
+        for (int i = rules.size() - 1; i >= 0; i--) {
+            if (OBSOLETE.contains(rules.get(i).asText())) {
+                rules.remove(i);
+                changed = true;
+            }
+        }
         List<String> present = new ArrayList<>();
         rules.forEach(r -> present.add(r.asText()));
-        boolean added = false;
         for (String rule : DENY) {
             if (present.contains(rule)) continue;
             rules.add(rule);
-            added = true;
+            changed = true;
         }
-        if (!added) return Result.ALREADY;
+        if (!changed) return Result.ALREADY;
         try {
             Files.createDirectories(file.getParent());
             JSON.writeValue(file.toFile(), root);

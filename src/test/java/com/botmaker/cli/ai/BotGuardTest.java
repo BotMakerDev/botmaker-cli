@@ -52,8 +52,21 @@ class BotGuardTest {
         assertEquals("Bash(git *)", root.path("permissions").path("allow").get(0).asText());
         List<String> rules = deny();
         assertEquals("WebFetch", rules.get(0));
-        assertEquals(1, rules.stream().filter("Write(./src/**)"::equals).count(), "a rule present is not doubled");
         assertTrue(rules.containsAll(BotGuard.DENY));
+    }
+
+    @Test
+    void aRuleAlreadyThereIsNotDoubledAndTheOldGuardsRulesGo() throws IOException {
+        Files.createDirectories(bot.resolve(".claude"));
+        Files.writeString(bot.resolve(BotGuard.FILE), """
+                {"permissions": {"deny": ["Edit(./src/**)", "MultiEdit(./src/**)", "Write(./src/**)", "Read(./x)"]}}
+                """);
+        assertEquals(BotGuard.Result.WRITTEN, BotGuard.ensure(bot));
+        List<String> rules = deny();
+        assertEquals(1, rules.stream().filter("Edit(./src/**)"::equals).count(), "a rule present is not doubled");
+        assertTrue(rules.stream().noneMatch(BotGuard.OBSOLETE::contains), rules.toString());
+        assertTrue(rules.contains("Read(./x)"), "the user's own rule stays");
+        assertEquals(BotGuard.Result.ALREADY, BotGuard.ensure(bot));
     }
 
     @Test
