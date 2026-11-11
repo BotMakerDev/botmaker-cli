@@ -9,6 +9,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `com.botmaker.cli.ai`: `AiTool` (the AI command-line tools BotMaker starts: Claude Code, Codex, Gemini CLI,
+  opencode, each denied direct file edits in its own vocabulary) and `BotGuard` (a bot folder's
+  `.claude/settings.json` rules) moved here from `botmaker-core`, ready for a cli command that starts a guarded
+  session with no Studio (next). `AiTool.Connection` is sealed: `Http` (Studio's endpoint and token, as before) or
+  `Stdio` (a command speaking MCP on its streams, `botmaker mcp-bridge`), written in each tool's own config format.
+
 - `mcp-bridge --umbrella <dir>` (or `$BOTMAKER_UMBRELLA`) starts BotMaker's core with no Studio ever started on
   this computer: with no saved `core-command.json`, it resolves the checkout's built Studio classpath offline
   (`maven-dependency-plugin:3.6.1:build-classpath`, into `core-classpath.txt`) and saves the command a Studio would.
