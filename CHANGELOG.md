@@ -5,6 +5,14 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- The catalog's check fills a bot's `params/` package from its committed `starting-params/` before it compiles the
+  tag (`StartingParams`), as Studio does on open. `params/` is never in a tag, so a bot with a `@Param` group of its
+  own (SwordXStaff's `Progress`) failed with `cannot find symbol`, although it compiled on its author's machine.
+
 ## [0.12.0] — 2026-11-10
 
 ### Fixed
