@@ -56,6 +56,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - Maven on Windows: `mvnw.cmd`, then `%MAVEN_HOME%\bin\mvn.cmd`, then `mvn.cmd` on the PATH. It named the POSIX
   `mvn` script, which Windows cannot run, so `start_studio`, `plugin run` and every Maven step failed there.
+- The catalog's check fills a bot's `params/` package from its committed `starting-params/` before it compiles the
+  tag (`StartingParams`), as Studio does on open. `params/` is never in a tag, so a bot with a `@Param` group of its
+  own (SwordXStaff's `Progress`) failed with `cannot find symbol`, although it compiled on its author's machine.
 
 ## [0.12.0] — 2026-11-10
 

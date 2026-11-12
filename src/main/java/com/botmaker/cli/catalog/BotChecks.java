@@ -224,6 +224,7 @@ public final class BotChecks {
         if (Finding.refused(pom)) return pom;
         List<Finding> icon = checkIcon(clone, path);
         if (Finding.refused(icon)) return icon;
+        StartingParams.fill(clone);
         List<String> build = new ArrayList<>(List.of("compile", "-Dmaven.test.skip"));
         build.addAll(List.of(goals));
         Mvn.Result compiled = mvn.runUntrusted(clone, Duration.ofMinutes(20), build.toArray(String[]::new));
