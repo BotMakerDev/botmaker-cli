@@ -3,6 +3,8 @@ package com.botmaker.cli;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.GitHubFacts;
 import com.botmaker.cli.publish.CatalogPr;
+import com.botmaker.cli.publish.Jitpack;
+import com.botmaker.cli.publish.Level;
 import com.botmaker.cli.publish.Listener;
 import com.botmaker.cli.publish.NextVersion;
 import com.botmaker.cli.publish.Publish;
@@ -10,8 +12,6 @@ import com.botmaker.cli.publish.PublishHost;
 import com.botmaker.cli.publish.PublishRequest;
 import com.botmaker.cli.publish.Refusal;
 import com.botmaker.cli.publish.StepRunner;
-import com.botmaker.cli.release.Jitpack;
-import com.botmaker.cli.release.Level;
 import com.botmaker.cli.validate.CheckResult;
 import picocli.CommandLine;
 

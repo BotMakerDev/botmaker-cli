@@ -10,7 +10,8 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 /**
- * The four verbs that moved under {@link PluginCommand} on 2026-09-05, kept only to say where they went.
+ * The four verbs that moved under {@link PluginCommand} on 2026-09-05, and {@code release}, which went to sluice
+ * on 2026-11-13, kept only to say where they went.
  *
  * <p><b>It does not delegate, and that is the point.</b> An alias is a second spelling to carry forever and
  * a second thing every example has to choose between; this runs nothing and exits 2 — the command line was
@@ -25,15 +26,19 @@ import java.util.concurrent.Callable;
  * arguments — picocli reports the command's primary name, not the alias, and the message has to name the
  * verb the person actually wrote.
  */
-@Command(name = "new", aliases = {"validate", "run", "publish"}, hidden = true)
+@Command(name = "new", aliases = {"validate", "run", "publish", "release"}, hidden = true)
 final class MovedCommand implements Callable<Integer> {
 
-    /** Old verb to its replacement. Every one of them is now a {@code plugin} sub-verb. */
+    /**
+     * Old verb to its replacement: the four plugin verbs are {@code plugin} sub-verbs, and {@code release} is
+     * sluice's (2026-11-13), the umbrella's {@code ./release.sh}.
+     */
     private static final Map<String, String> MOVED = Map.of(
             "new", "botmaker plugin new",
             "validate", "botmaker plugin validate",
             "run", "botmaker plugin run",
-            "publish", "botmaker plugin publish");
+            "publish", "botmaker plugin publish",
+            "release", "sluice");
 
     @Spec
     private CommandSpec spec;
@@ -49,8 +54,9 @@ final class MovedCommand implements Callable<Integer> {
     public Integer call() {
         String typed = typedVerb();
         Console console = parent.console();
-        console.error("`botmaker " + typed + "` moved: use `" + MOVED.get(typed) + "`. "
-                + "The four plugin verbs are under `botmaker plugin`; a bot's are under `botmaker bot`.");
+        console.error("`botmaker " + typed + "` moved: use `" + MOVED.get(typed) + "`. " + (typed.equals("release")
+                ? "BotMaker is released by sluice, from the umbrella's ./release.sh."
+                : "The four plugin verbs are under `botmaker plugin`; a bot's are under `botmaker bot`."));
         return picocli.CommandLine.ExitCode.USAGE;
     }
 

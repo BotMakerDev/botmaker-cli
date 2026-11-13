@@ -9,8 +9,6 @@ import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.FakeFacts;
 import com.botmaker.cli.catalog.PluginEntry;
 import com.botmaker.cli.catalog.Publishers;
-import com.botmaker.cli.release.Jitpack;
-import com.botmaker.cli.release.Level;
 import com.botmaker.cli.validate.CheckResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -370,66 +368,6 @@ class PublishTest {
                 List.of()));
         Publish.Outcome outcome = publish(EntryPath.Kind.PLUGIN, Optional.of("v0.1.0"), false);
         assertInstanceOf(Publish.Outcome.Opened.class, outcome, outcome.toString());
-    }
-
-    private Optional<Publish.Outcome> listRelease(String tag, Jitpack.Sleeper sleeper) {
-        return new Publish(facts, catalog, Checks.LEFT_TO_THE_CATALOG, jitpack, sleeper)
-                .listRelease(dir, REPO, tag, "botmaker release", FakeRunner.QUIET, runner.host(dir));
-    }
-
-    private void catalogLists(String repo) {
-        index = Optional.of(new Catalog(Catalog.SCHEMA_VERSION, "", List.of(new Catalog.Plugin(repo, null,
-                "com.github." + repo.replace('/', ':'), "Thing", "", List.of(), 0, List.of())), List.of()));
-    }
-
-    @Test
-    void a_release_lists_no_plugin_the_catalog_does_not_list() throws Exception {
-        FakeRunner.repository(dir, ORIGIN);
-        catalogLists("otherdev/other");
-        assertEquals(Optional.empty(), listRelease("v0.1.0", duration -> true));
-        assertEquals(List.of(), runner.changes);
-        index = Optional.empty();
-        assertInstanceOf(Publish.Outcome.Refused.class, listRelease("v0.1.0", duration -> true).orElseThrow(),
-                "an unread catalog.json is said, not taken for \"not listed\"");
-    }
-
-    /** The release library's step: its CI's GitHub Release awaited, the tag appended, nothing tagged here. */
-    @Test
-    void a_release_appends_its_tag_once_the_github_release_is_out() throws Exception {
-        FakeRunner.repository(dir, ORIGIN);
-        FakeRunner.git(dir, "tag", "v0.2.0");
-        FakeRunner.commit(dir, "back-to-snapshot");
-        catalogLists(REPO);
-        facts.release(REPO, "v0.1.0", "somedev");
-        listed.put(PLUGIN, new PluginEntry(REPO, List.of(FakeFacts.pluginRelease("v0.1.0"))));
-        int[] slept = {0};
-        Optional<Publish.Outcome> outcome = listRelease("v0.2.0", duration -> {
-            if (++slept[0] == 2) facts.release(REPO, "v0.2.0", "somedev");
-            return true;
-        });
-
-        Publish.Outcome.Opened opened = assertInstanceOf(Publish.Outcome.Opened.class, outcome.orElseThrow(),
-                outcome.toString());
-        assertEquals(List.of("v0.1.0", "v0.2.0"),
-                opened.entry().releases().stream().map(ApprovedRelease::tag).toList());
-        assertTrue(slept[0] >= 2, "waited for the release");
-        assertTrue(runner.commands().stream().noneMatch(c -> c.startsWith("git tag") || c.startsWith("gh release")
-                || c.equals("git push origin HEAD")), runner.commands().toString());
-    }
-
-    @Test
-    void a_release_whose_github_release_never_comes_is_refused_naming_the_command() throws Exception {
-        FakeRunner.repository(dir, ORIGIN);
-        catalogLists(REPO);
-        Publish.Outcome.Refused refused = assertInstanceOf(Publish.Outcome.Refused.class,
-                listRelease("v0.2.0", duration -> true).orElseThrow());
-        assertTrue(refused.reason().contains("botmaker plugin publish --tag v0.2.0"), refused.reason());
-        assertTrue(refused.reason().contains("was not out after 20 minutes"), refused.reason());
-        assertEquals(List.of(), runner.changes);
-
-        Publish.Outcome.Refused stopped = assertInstanceOf(Publish.Outcome.Refused.class,
-                listRelease("v0.2.0", duration -> false).orElseThrow());
-        assertTrue(stopped.reason().startsWith("stopped while waiting"), "a Stop is no timeout: " + stopped.reason());
     }
 
     @Test

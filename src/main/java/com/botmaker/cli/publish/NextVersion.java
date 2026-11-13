@@ -4,8 +4,6 @@ import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryFacts;
 import com.botmaker.cli.catalog.EntryGate;
-import com.botmaker.cli.release.Level;
-import com.botmaker.cli.release.Version;
 
 import java.util.Comparator;
 import java.util.List;

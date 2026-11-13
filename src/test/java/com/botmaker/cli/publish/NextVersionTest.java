@@ -3,7 +3,6 @@ package com.botmaker.cli.publish;
 import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.FakeFacts;
 import com.botmaker.cli.catalog.PluginEntry;
-import com.botmaker.cli.release.Level;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

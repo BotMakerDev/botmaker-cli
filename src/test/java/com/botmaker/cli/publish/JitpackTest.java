@@ -1,7 +1,8 @@
-package com.botmaker.cli.release;
+package com.botmaker.cli.publish;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class JitpackTest {
 
-    private static final Version V = new Version(0, 4, 1);
+    private static final String GROUP = "com.github.BotMakerDev";
+    private static final String TAG = "v0.4.1";
 
     private static Jitpack.Probe probe(Optional<String> failure, boolean built) {
         return new Jitpack.Probe() {
@@ -39,7 +41,7 @@ class JitpackTest {
         List<String> said = new ArrayList<>();
         AtomicInteger slept = new AtomicInteger();
 
-        Jitpack.Waited waited = Jitpack.waitFor(new Runner(false, said::add), Module.STUDIO_API, V,
+        Jitpack.Waited waited = Jitpack.waitFor(GROUP, "botmaker-studio-api", TAG, said::add, () -> false,
                 duration -> slept.incrementAndGet() >= 0,
                 probe(Optional.of("No build artifacts found. See the log: com/github/x/build.log"), false));
 
@@ -54,7 +56,7 @@ class JitpackTest {
     void aBuildThatNeverAppearsTimesOutAfterSixtyTries() {
         AtomicInteger slept = new AtomicInteger();
 
-        Jitpack.Waited waited = Jitpack.waitFor(new Runner(false, line -> { }), Module.STUDIO_API, V,
+        Jitpack.Waited waited = Jitpack.waitFor(GROUP, "botmaker-studio-api", TAG, line -> { }, () -> false,
                 duration -> slept.incrementAndGet() > 0, probe(Optional.empty(), false));
 
         assertEquals(Jitpack.Build.TIMEOUT, waited.build());
@@ -66,7 +68,7 @@ class JitpackTest {
         AtomicBoolean stop = new AtomicBoolean(true);
         AtomicInteger slept = new AtomicInteger();
 
-        Jitpack.Waited waited = Jitpack.waitFor(new Runner(false, line -> { }, stop::get), Module.STUDIO_API, V,
+        Jitpack.Waited waited = Jitpack.waitFor(GROUP, "botmaker-studio-api", TAG, line -> { }, stop::get,
                 duration -> slept.incrementAndGet() > 0, probe(Optional.empty(), false));
 
         assertEquals(Jitpack.Build.STOPPED, waited.build());
@@ -77,7 +79,7 @@ class JitpackTest {
     void theRealSleeperGivesUpOnAStopInsteadOfSleepingTheGapOut() {
         long started = System.nanoTime();
 
-        boolean slept = Jitpack.Sleeper.real(() -> true).sleep(java.time.Duration.ofSeconds(10));
+        boolean slept = Jitpack.Sleeper.real(() -> true).sleep(Duration.ofSeconds(10));
 
         assertEquals(false, slept);
         assertTrue(System.nanoTime() - started < 2_000_000_000L);

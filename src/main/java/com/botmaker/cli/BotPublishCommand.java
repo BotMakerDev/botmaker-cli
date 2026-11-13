@@ -1,9 +1,9 @@
 package com.botmaker.cli;
 
 import com.botmaker.cli.catalog.EntryPath;
+import com.botmaker.cli.publish.Level;
 import com.botmaker.cli.publish.Publish;
 import com.botmaker.cli.publish.PublishRequest;
-import com.botmaker.cli.release.Level;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;

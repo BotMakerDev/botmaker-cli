@@ -1,8 +1,6 @@
 package com.botmaker.cli;
 
 import com.botmaker.cli.project.Poms;
-import com.botmaker.cli.release.Module;
-import com.botmaker.cli.release.PomVersions;
 import com.botmaker.cli.validate.PluginValidator;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -36,6 +34,9 @@ final class PluginUpgradeCommand implements Callable<Integer> {
     static final String PARENT_REPO = "BotMakerDev/" + PluginValidator.PARENT_ARTIFACT;
 
     private static final Pattern TAG = Pattern.compile("[\\w.+-]+");
+    /** The parent's {@code <version>}, right after its {@code <artifactId>}: groups 1 and 2 are what surrounds it. */
+    private static final Pattern PARENT_VERSION = Pattern.compile("(<artifactId>\\s*" + PluginValidator.PARENT_ARTIFACT
+            + "\\s*</artifactId>\\s*<version>)\\s*[^<\\s]*\\s*(</version>)");
 
     @ParentCommand
     private PluginCommand parent;
@@ -74,7 +75,7 @@ final class PluginUpgradeCommand implements Callable<Integer> {
             return 1;
         }
         String text = Files.readString(pom);
-        Matcher version = PomVersions.parentVersion(Module.PLUGIN_PARENT).matcher(text);
+        Matcher version = PARENT_VERSION.matcher(text);
         if (!version.find()) {
             console.error("could not move " + PluginValidator.PARENT_ARTIFACT + " from " + from + ": its <version> "
                     + "must come right after its <artifactId> in the <parent>, as `botmaker plugin new` writes it");

@@ -7,18 +7,18 @@ Read the umbrella `../CLAUDE.md` first, then `../botmaker-plugin-host/CLAUDE.md`
 phase 7 of the plugin-ecosystem plan.
 
 The design, its history and the reasons behind it are in `docs/architecture/`, one file per section (moved
-there unchanged on 2026-10-05); `docs/release-port-divergences.md` records where the release port differs
-from `release.sh`.
+there unchanged on 2026-10-05). `docs/architecture/release-library.md` and `docs/release-port-divergences.md` are
+history: the release library (`com.botmaker.cli.release`, `botmaker release`) was removed on 2026-11-13, when sluice
+became BotMaker's release engine; `botmaker release` now only says so (`MovedCommand`).
 
 ## Read before touching
 
 | Touching | Read (`docs/architecture/`) |
 |---|---|
 | the two artifacts, `com.botmaker.cli.validate`, picocli, the shade setup | `two-artifacts.md` |
-| `com.botmaker.cli.release`: `Plan`, `Forcing`, `Order`, gates, `Runner`, `Actions`, `ReleaseCommand` | `release-library.md` |
 | `packaging/nfpm.yaml`, the dnf/apt repositories | `packaging.md` |
 | the `plugin`/`bot` verbs, `MovedCommand`, `doctor`, `BlankProject` | `nouns.md` |
-| `com.botmaker.cli.publish` (`Publish`, `NextVersion`, `CatalogPr`), the publish commands | `publish-entry.md` |
+| `com.botmaker.cli.publish` (`Publish`, `NextVersion`, `CatalogPr`, `Version`, `Level`, `Jitpack`), the publish commands | `publish-entry.md` |
 | `com.botmaker.cli.catalog` (the check, the merge policy, the index) | `catalog-gate.md` |
 | `Subjects`, `Console.reportAside` | `registry-gate.md` (the registry's gate, removed 2026-10-23; history) |
 | the `EDITORS` check, why no JavaFX | `no-javafx.md` |
@@ -28,7 +28,7 @@ from `release.sh`.
 
 ## Rules
 
-- **`com.botmaker.cli.validate`, `com.botmaker.cli.release`, `com.botmaker.cli.publish` and
+- **`com.botmaker.cli.validate`, `com.botmaker.cli.publish` and
   `com.botmaker.cli.repair` print nothing, spawn no UI and know no command line.** A publish does every side effect through its `PublishHost` (the cli's runs every program through a `StepRunner`;
   Studio brings its own). A rule added to `ValidateCommand` is a rule the catalog will not enforce: put it in
   `PluginValidator`, as a `Check` (`two-artifacts.md`).
@@ -38,12 +38,6 @@ from `release.sh`.
 - **`com.botmaker.cli.mcp` reaches the core only over MCP** (2026-11-05): the cli links neither the core nor Studio.
   `McpBridge` finds or starts the core (`CoreProcess`, the saved `core-command.json`); `bot run` is a client of it
   through `CoreTools.Bridged`, and follows a run by `read_trace`'s cursor, never by matching its text.
-- **Every release side effect goes through `Runner`**; a direct write on a write path ignores `--dry-run`. The
-  three orders (`Module`, `Order.DECIDE`, `Order.TAG`) are transcribed exactly, and every pin
-  (`Module.upstreams()`) is a forcing edge (`release-library.md`).
-- **`ChangelogGate` invokes the module's own `tools/changelog-section.sh`**; never port it.
-- **A gate's `SKIPPED` never stops a release, and `--force` overrides a gate that failed, never one that could
-  not run.**
 - **No dependency on `botmaker-studio` or the toolkit**: copy file shapes, never depend on an application
   (`nouns.md`, `stub-contexts.md`).
 - **Maven is shelled to, never embedded** (`maven.md`).
@@ -64,4 +58,4 @@ against `System.getProperty("java.class.path")`. A mocked `StudioPlugin` would p
 prove none of it, because it would never have been loaded. Keep it that way; every failure these checks
 exist to catch is a failure of a real classloader over real bytecode.
 
-Published through JitPack. Releases are cut from the umbrella with `../release.sh --cli <version>`.
+Published through JitPack. Releases are cut from the umbrella with `../release.sh --cli <level|version>` (sluice).

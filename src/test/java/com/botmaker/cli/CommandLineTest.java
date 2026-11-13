@@ -1,6 +1,6 @@
 package com.botmaker.cli;
 
-import com.botmaker.cli.release.Level;
+import com.botmaker.cli.publish.Level;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 import picocli.CommandLine.ParseResult;
@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -244,40 +243,6 @@ class CommandLineTest {
                 "--help/x", "-a/b", "a/-b", "a/.", "a/.."}) {
             assertThrows(IOException.class, () -> BotNewCommand.slug(bad), bad);
         }
-    }
-
-    /**
-     * The third noun's flags are {@code release.sh}'s, one for one — and each takes an optional value, so
-     * {@code --cli} and {@code --cli patch} are the same request, as {@code take_optional} makes them.
-     */
-    @Test
-    void release_mirrors_the_scripts_module_flags() {
-        ParseResult bare = parse("release", "--cli", "--shared").subcommand();
-        assertEquals("patch", applied(bare, "--cli"));
-        assertEquals("patch", applied(bare, "--shared"));
-
-        ParseResult explicit = parse("release", "--sdk", "1.2.0", "--all", "minor").subcommand();
-        assertEquals("1.2.0", explicit.matchedOptionValue("--sdk", ""));
-        assertEquals("minor", explicit.matchedOptionValue("--all", ""));
-
-        // Every module the script has a flag for, and nothing it does not: --gallery is not a release.
-        for (String flag : new String[]{"--studio-api", "--plugin-toolkit", "--java", "--plugin-host",
-                "--plugin-archetype", "--cli", "--shared", "--session", "--sdk", "--studio", "--pilot"}) {
-            assertTrue(parse("release", flag).subcommand().hasMatchedOption(flag), flag);
-        }
-    }
-
-    /**
-     * {@code --why} exists because the cutover diff has to be empty.
-     *
-     * <p>The reasons a module was forced into a release are the one place the port improves on the script,
-     * and printing them by default would make every {@code --dry-run} comparison fail on an addition
-     * nobody objects to.
-     */
-    @Test
-    void release_keeps_its_one_addition_opt_in() {
-        assertFalse(parse("release", "--all").subcommand().hasMatchedOption("--why"));
-        assertTrue(parse("release", "--all", "--why").subcommand().hasMatchedOption("--why"));
     }
 
     /** The option `botmaker plugin run` passes to Studio as a named JavaFX parameter. */

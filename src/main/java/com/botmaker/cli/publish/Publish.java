@@ -11,8 +11,6 @@ import com.botmaker.cli.catalog.Finding;
 import com.botmaker.cli.catalog.PluginEntry;
 import com.botmaker.cli.bmk.BotFiles;
 import com.botmaker.cli.project.Poms;
-import com.botmaker.cli.release.Jitpack;
-import com.botmaker.cli.release.Level;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -104,48 +102,6 @@ public final class Publish {
             return new Outcome.Refused(e.getMessage());
         } catch (UncheckedIOException e) {
             return new Outcome.Refused("could not reach GitHub: " + e.getCause().getMessage());
-        }
-    }
-
-    /**
-     * The release library's step ({@link ReleaseListing}): {@code tag}, which the release just pushed, listed in the
-     * entry {@code catalog.json} holds for {@code repo} — {@link #run} with {@code --tag}, once the tag's GitHub
-     * Release is out (its own CI makes it, minutes after the tag). The folder is past the tag, so the listing is
-     * {@link NextVersion.Listing#EXISTING EXISTING}: nothing tagged, the jar checked from JitPack.
-     *
-     * @return empty when the catalog lists no plugin of {@code repo}: a release lists no plugin by itself
-     */
-    public Optional<Outcome> listRelease(Path dir, String repo, String tag, String command, Listener listener,
-                                         PublishHost host) {
-        Optional<Catalog> index = catalog.catalog();
-        if (index.isEmpty()) {
-            return Optional.of(new Outcome.Refused("the catalog's " + Catalog.FILE + " did not read, so whether it"
-                    + " lists " + repo + " cannot be told."));
-        }
-        if (index.get().plugins().stream().noneMatch(p -> p.repo().equalsIgnoreCase(repo))) return Optional.empty();
-        Optional<String> unreleased = awaitRelease(repo, tag, listener);
-        if (unreleased.isPresent()) {
-            return Optional.of(new Outcome.Refused(unreleased.get() + " Once it is out, run `botmaker plugin publish"
-                    + " --tag " + tag + "` in " + dir + "."));
-        }
-        return Optional.of(run(new PublishRequest(dir, EntryPath.Kind.PLUGIN, Level.DEFAULT, Optional.of(tag),
-                Optional.of(repo), false, command), listener, host));
-    }
-
-    private static final Duration RELEASE_WAIT = Duration.ofMinutes(20);
-    private static final Duration RELEASE_EVERY = Duration.ofSeconds(30);
-
-    /** Waits a while for {@code tag}'s GitHub Release to be published: empty once it is, else why it is not. */
-    private Optional<String> awaitRelease(String repo, String tag, Listener listener) {
-        String release = "the GitHub Release of " + repo + " " + tag;
-        for (Duration waited = Duration.ZERO; ; waited = waited.plus(RELEASE_EVERY)) {
-            if (facts.release(repo, tag).filter(r -> !r.draft()).isPresent()) return Optional.empty();
-            if (waited.isZero()) listener.step("Waiting for " + release + ".");
-            if (waited.compareTo(RELEASE_WAIT) >= 0) {
-                return Optional.of(release + " was not out after " + RELEASE_WAIT.toMinutes() + " minutes (the tag's"
-                        + " CI makes it).");
-            }
-            if (!sleeper.sleep(RELEASE_EVERY)) return Optional.of("stopped while waiting for " + release + ".");
         }
     }
 

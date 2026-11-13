@@ -1,7 +1,6 @@
 package com.botmaker.cli;
 
 import com.botmaker.cli.project.Poms;
-import com.botmaker.cli.release.PomVersions;
 import com.botmaker.cli.validate.PluginClasses;
 import com.botmaker.plugin.host.PluginPoms;
 import picocli.CommandLine.Command;
@@ -48,6 +47,8 @@ final class PluginDeclareCommand implements Callable<Integer> {
     private boolean noBuild;
 
     /** The pom's first {@code <properties>} opening a line, with its indentation and line break. */
+    /** Pinned, so a run does not pick up whatever the plugin's latest happens to do. */
+    private static final String VERSIONS_PLUGIN = "org.codehaus.mojo:versions-maven-plugin:2.18.0";
     private static final Pattern PROPERTIES = Pattern.compile("(?m)^([ \\t]*)<properties>[ \\t]*(\\R)");
     /** The line {@code <properties>} is inserted before when the pom has none. */
     private static final Pattern BEFORE = Pattern.compile("(?m)^([ \\t]*)<(repositories|dependencyManagement|dependencies|build)>");
@@ -76,7 +77,7 @@ final class PluginDeclareCommand implements Callable<Integer> {
             return 0;
         }
         if (current != null) {
-            Mvn.Result set = parent.main().mvn().run(dir, "-q", PomVersions.PLUGIN + ":set-property",
+            Mvn.Result set = parent.main().mvn().run(dir, "-q", VERSIONS_PLUGIN + ":set-property",
                     "-Dproperty=" + PluginPoms.PROPERTY, "-DnewVersion=" + plugin, "-DgenerateBackupPoms=false");
             if (!set.ok() || !plugin.equals(Poms.properties(pom).get(PluginPoms.PROPERTY))) {
                 console.error("could not set " + PluginPoms.PROPERTY + " in pom.xml:\n" + set.tail(10));

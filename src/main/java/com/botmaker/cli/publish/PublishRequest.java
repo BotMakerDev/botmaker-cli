@@ -1,7 +1,6 @@
 package com.botmaker.cli.publish;
 
 import com.botmaker.cli.catalog.EntryPath;
-import com.botmaker.cli.release.Level;
 
 import java.nio.file.Path;
 import java.util.Optional;

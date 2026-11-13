@@ -1,4 +1,4 @@
-package com.botmaker.cli.release;
+package com.botmaker.cli.publish;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,22 +16,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Nudging JitPack and waiting for a tag to build — {@code release.sh}'s {@code wait_for_jitpack}.
+ * Nudging JitPack and waiting for a tag to build: what {@code plugin publish} and Studio's Publish wait on after
+ * tagging an author's plugin or bot, before its listing is opened.
  *
- * <p><b>The waits were removed in 2026-08 and put back on 2026-09-05, and the reversal is the part to
- * carry.</b> Pinning each upstream exactly (once in a {@code .deps.env}, now in the tag's pom —
- * {@link PomVersions}) removed the <i>requirement</i> that an
- * upstream be published and newest before a downstream is tagged — JitPack resolves and builds a pinned
- * dependency tag on demand. Every clause of that is true and it still loses a race: <b>builds on demand is
- * not queues and retries</b>. {@code botmaker-cli} v0.0.9 was tagged seconds after
- * {@code botmaker-plugin-host} v0.0.5, JitPack began the CLI build while the plugin-host build was still
- * running, and it died with {@code Could not find artifact …botmaker-plugin-host:jar:v0.0.5}. A build
- * result is <b>cached per tag</b>, so that is permanent and only a new tag repairs it.
- *
- * <p>The worst property of the bug is that it fails on <i>timing</i>: another module in the same chain
- * resolved cleanly, so it reads as a JitPack outage rather than as something here. Waiting costs a few
- * minutes per link once per release; losing the race costs a whole chain and burns a tag that cannot be
- * reused.
+ * <p>A build result is <b>cached per tag</b>: a build that failed, or that began before something it resolves was
+ * there, is failed for good, and only a new tag repairs it. The release tool that once owned this wait (2026-09-05)
+ * is sluice now; this is the publish's own copy.
  */
 public final class Jitpack {
 
@@ -41,29 +31,17 @@ public final class Jitpack {
     private Jitpack() {
     }
 
-    /** The pom a consumer would download — its presence is what "built" means for a waiting downstream. */
-    public static String pomUrl(Module module, Version version) {
-        return pomUrl(GROUP, module.directory(), version.tag());
-    }
-
-    /** {@link #pomUrl(Module, Version)} for any coordinate JitPack serves, a plugin author's included. */
+    /** The pom a consumer would download — its presence is what "built" means. */
     public static String pomUrl(String groupId, String artifactId, String tag) {
         return SITE + groupId.replace('.', '/') + "/" + artifactId + "/" + tag + "/" + artifactId + "-" + tag + ".pom";
     }
 
     /** The endpoint that asks JitPack to start a build rather than waiting for somebody to request it. */
-    public static String buildUrl(Module module, Version version) {
-        return buildUrl(GROUP, module.directory(), version.tag());
-    }
-
-    /** {@link #buildUrl(Module, Version)} for any coordinate. */
     public static String buildUrl(String groupId, String artifactId, String tag) {
         return SITE + "api/builds/" + groupId + "/" + artifactId + "/" + tag;
     }
 
-    private static final String GROUP = "com.github." + CleanRoom.COORDINATE_OWNER;
-
-    /** How a wait ended. Only {@link #BUILT} lets the chain tag the next module. */
+    /** How a wait ended. Only {@link #BUILT} lets the publish go on to the listing. */
     public enum Build {
         /** The pom is downloadable. */
         BUILT,
@@ -127,27 +105,10 @@ public final class Jitpack {
      * modules on top of it.
      *
      * @param sleeper how to wait between tries — a parameter so a test is not a ten-minute test
-     * @return how it ended. <b>The script dies on a timeout</b>; this reports, because the tag is already
-     *         pushed and the caller still has work (the log, the pointer commit) worth doing.
-     */
-    public static Waited waitFor(Runner runner, Module module, Version version, Sleeper sleeper) {
-        return waitFor(runner, module, version, sleeper, Probe.real());
-    }
-
-    static Waited waitFor(Runner runner, Module module, Version version, Sleeper sleeper, Probe probe) {
-        if (runner.dryRun()) {
-            runner.say("    (dry-run) would poll " + pomUrl(module, version) + " until built");
-            return new Waited(Build.BUILT, "");
-        }
-        return waitFor(GROUP, module.directory(), version.tag(), runner::say, () -> runner.stopping(), sleeper, probe);
-    }
-
-    /**
-     * The same poll for any coordinate: what {@code plugin publish} waits on after tagging an author's plugin
-     * (2026-10-24), so the release library and the author's publish share one reading of JitPack.
-     *
      * @param say      each progress line
      * @param stopping whether the caller asked to stop
+     * @param sleeper  how to wait between tries — a parameter so a test is not a ten-minute test
+     * @return how it ended; a timeout is reported, never thrown, since the tag is already pushed
      */
     public static Waited waitFor(String groupId, String artifactId, String tag, Consumer<String> say,
                                  BooleanSupplier stopping, Sleeper sleeper, Probe probe) {
@@ -157,8 +118,6 @@ public final class Jitpack {
             // The build API first: asking it is also the nudge that starts a build nobody requested yet.
             Optional<String> failure = probe.failure(buildUrl(groupId, artifactId, tag));
             if (failure.isPresent()) {
-                // No "error: " prefix: that line closes a module's segment for the dashboard's board, which
-                // would then never see this one. The chain's own error line follows.
                 say.accept("JitPack failed to build " + what + ": " + failure.get());
                 return new Waited(Build.FAILED, failure.get());
             }
@@ -205,7 +164,7 @@ public final class Jitpack {
      */
     static String withCause(String message, Optional<String> log) {
         return log.filter(text -> RATE_LIMIT.matcher(text).find()).isPresent()
-                // One line: the dashboard's board reads the wait's output line by line.
+                // One line: a listener reads the wait's output line by line.
                 ? message + " — the log shows Maven Central's " + RATE_LIMITED + ": a rate limit on JitPack's "
                         + "builders, not this module. A new patch of it repairs the tag."
                 : message;
@@ -246,7 +205,7 @@ public final class Jitpack {
     }
 
     private static final Duration SLICE = Duration.ofMillis(500);
-    /** JitPack's front page: what {@link PinsResolveGate} asks to tell "not served" from "not reachable". */
+    /** JitPack's front page. */
     static final String SITE = "https://jitpack.io/";
     private static final String RATE_LIMITED = "429 Too Many Requests";
     /**

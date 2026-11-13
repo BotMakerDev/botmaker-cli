@@ -52,6 +52,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   the `MultiEdit`/`Write`/`NotebookEdit(./src/**)` rules it wrote before: Claude Code warned about them on every
   start. `AiTool.CLAUDE_EDIT_TOOLS` no longer names `MultiEdit`, which is no tool now.
 
+- `Version`, `Level` and `Jitpack` move from `com.botmaker.cli.release` to `com.botmaker.cli.publish`; `Jitpack.waitFor`
+  takes a coordinate and tag (`groupId`, `artifactId`, `tag`) instead of a release module.
+
+### Removed
+
+- `botmaker release` and the release library, `com.botmaker.cli.release` (plan, forcing, gates, `Runner`, resume):
+  sluice releases BotMaker now, from the umbrella's `./release.sh` or sluice-desktop. `botmaker release` prints where
+  it went and exits. With it go `Publish.listRelease`/`awaitRelease` (sluice's after-tag step runs `plugin publish
+  --tag`) and `ReleaseListing`.
+
 ### Fixed
 
 - Maven on Windows: `mvnw.cmd`, then `%MAVEN_HOME%\bin\mvn.cmd`, then `mvn.cmd` on the PATH. It named the POSIX

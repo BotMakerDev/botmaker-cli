@@ -52,7 +52,7 @@ import java.util.concurrent.Callable;
         mixinStandardHelpOptions = true,
         versionProvider = Main.ManifestVersion.class,
         synopsisSubcommandLabel = "<command>",
-        subcommands = {PluginCommand.class, BotCommand.class, ReleaseCommand.class, DoctorCommand.class,
+        subcommands = {PluginCommand.class, BotCommand.class, DoctorCommand.class,
                 ReportsCommand.class, CompletionCommand.class, McpBridgeCommand.class, AiCommand.class,
                 McpCommand.class, MovedCommand.class})
 public final class Main implements Callable<Integer> {
