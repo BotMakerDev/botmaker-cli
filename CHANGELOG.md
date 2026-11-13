@@ -5,7 +5,7 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
-## [Unreleased]
+## [0.12.1] — 2026-11-13
 
 ### Added
 
@@ -54,6 +54,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - `Version`, `Level` and `Jitpack` move from `com.botmaker.cli.release` to `com.botmaker.cli.publish`; `Jitpack.waitFor`
   takes a coordinate and tag (`groupId`, `artifactId`, `tag`) instead of a release module.
+- Built against botmaker-studio-api 0.17.1 (was 0.17.0).
+- Built against botmaker-plugin-host 0.12.1 (was 0.12.0).
+- Built against botmaker-plugin-archetype 0.9.1 (was 0.9.0).
+- Built against botmaker-java 0.2.1 (was 0.2.0).
 
 ### Removed
 
