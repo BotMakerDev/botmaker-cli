@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.catalog.FacadeEntry;
 import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.MemberId;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
+import com.botmaker.plugin.api.run.PluginPool;
 import com.botmaker.plugin.api.source.ManagedClasses;
 import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedOpenSet;
@@ -265,6 +266,7 @@ public final class PluginValidator {
             surfaces.put("runOverlay", plugin::runOverlayParts);
             surfaces.put("overlay", plugin::overlayPart);
             surfaces.put("assistant", plugin::assistantTools);
+            surfaces.put("pools", plugin::pools);
             surfaces.put("catalog", plugin::catalog);
             for (Map.Entry<String, Supplier<?>> surface : surfaces.entrySet()) {
                 try {
@@ -1046,6 +1048,7 @@ public final class PluginValidator {
                 problems.addAll(found);
             }
             problems.addAll(mixedHolders(id, values));
+            problems.addAll(poolProblems(id, plugin, values));
         }
         if (!problems.isEmpty()) return CheckResult.fail(Check.MANAGED, problems);
         return CheckResult.pass(Check.MANAGED, sound == 0 ? "declares no managed values"
@@ -1070,6 +1073,40 @@ public final class PluginValidator {
                         .toList() + "; an open set is a holder of its own, so give each one its own constant");
             }
         });
+        return problems;
+    }
+
+    /**
+     * A pool fills a parameter its own plugin declares among its values, and one of a bot: the host deals a run a
+     * value only for a parameter it bound to a method of the bot's group (2026-11-15). The candidates are this PC's
+     * data, so none is asked here. A {@code pools()} that throws is the holders check's to say.
+     */
+    private static List<String> poolProblems(String plugin, StudioPlugin declaring, List<ManagedValue<?>> values) {
+        List<PluginPool<?>> pools;
+        try {
+            pools = declaring.pools();
+        } catch (RuntimeException | LinkageError e) {
+            return List.of();
+        }
+        Map<String, ManagedValue<?>> declared = new HashMap<>();
+        for (ManagedValue<?> value : values) {
+            if (value != null) declared.putIfAbsent(value.id(), value);
+        }
+        List<String> problems = new ArrayList<>();
+        for (PluginPool<?> pool : nonNull(pools)) {
+            ManagedParam<?> parameter = pool.parameter();
+            String at = plugin + ": the pool for \"" + parameter.id() + "\"";
+            ManagedValue<?> value = declared.get(parameter.id());
+            if (value == null) {
+                problems.add(at + " fills a parameter the plugin's values() do not declare, so no bot has it");
+            } else if (!(value instanceof ManagedParam<?>) || value.type() != parameter.type()) {
+                problems.add(at + " is not the parameter values() declares under that id: a "
+                        + parameter.type().getName() + " parameter, declared as " + value + " of "
+                        + value.type().getName() + "; build the pool from the declared constant");
+            } else if (parameter.onHost()) {
+                problems.add(at + " fills a value of this PC; a pool fills a parameter of the bot");
+            }
+        }
         return problems;
     }
 

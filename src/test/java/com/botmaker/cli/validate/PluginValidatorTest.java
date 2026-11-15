@@ -900,6 +900,40 @@ class PluginValidatorTest {
         assertEquals(Status.PASS, managed.status(), managed::toString);
     }
 
+    /** {@code ManagedValue.param(GreetingValue.Id.<constant>)}, a String parameter starting as {@code first()}. */
+    private static String param(String constant) {
+        return "com.botmaker.plugin.api.source.ManagedValue.param(GreetingValue.Id." + constant + ")"
+                + ".in(GreetingValue.Holder.VALUES).startsAs(GoodPlugin::first).shown(\"\", null).because(\"why\")";
+    }
+
+    /** The good plugin declaring {@code values}, and a pool for the parameter {@code pooled}. */
+    private static String pooling(String pooled, String... values) {
+        return managing(values)
+                .replace(".values(Values.class)", ".values(Values.class).pools(Pools.class)")
+                .replace(TYPES, "public static String first() { return \"a\"; }"
+                        + " public static final class Pools implements com.botmaker.plugin.api.PoolHolder {"
+                        + " @Override public List<com.botmaker.plugin.api.run.PluginPool<?>> pools() {"
+                        + " return List.of(com.botmaker.plugin.api.run.PluginPool.fills(" + pooled + ")"
+                        + ".from(services -> List.of(\"a\", \"b\"))); } } " + TYPES);
+    }
+
+    @Test
+    void a_pool_for_a_declared_parameter_passes(@TempDir Path dir) throws IOException {
+        PluginSubject subject = subject(dir, GOOD_POM, pooling(param("CLOCK"), param("CLOCK")), GOOD_API);
+        List<CheckResult> results = PluginValidator.validate(subject);
+        assertEquals(Status.PASS, result(results, Check.MANAGED).status(), result(results, Check.MANAGED)::toString);
+        assertEquals(Status.PASS, result(results, Check.HOLDERS).status(), result(results, Check.HOLDERS)::toString);
+    }
+
+    /** The host deals a value only for a parameter it bound in the bot, which it does for declared ones. */
+    @Test
+    void a_pool_for_a_parameter_the_plugin_does_not_declare_fails(@TempDir Path dir) throws IOException {
+        PluginSubject subject = subject(dir, GOOD_POM, pooling(param("CLOCK")), GOOD_API);
+        CheckResult managed = result(PluginValidator.validate(subject), Check.MANAGED);
+        assertEquals(Status.FAIL, managed.status());
+        assertTrue(managed.detail().getFirst().contains("do not declare"), managed.detail()::toString);
+    }
+
     @Test
     void one_id_is_one_value(@TempDir Path dir) throws IOException {
         String value = method("GREETING") + ".in(GreetingValue.Holder.VALUES)"
