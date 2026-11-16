@@ -7,6 +7,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- `botmaker update` replaces the jar it runs from with the latest release's `botmaker-cli-all.jar`, checked against
+  the release's `checksums_sha256.txt` first; a jar that does not match is deleted and the old one kept. On Windows,
+  which locks a running jar, the checked jar waits beside it as `<jar>.new` and takes its place when the command
+  ends, or at the next start. A package manager's copy, JBang's and the Claude plugin's pinned copy are left to them,
+  and the command says who updates each. `com.botmaker.cli.update.ReleaseChecksums` is the one checksum check, which
+  Studio's updater uses too.
+
 ### Changed
 
 - Every file states its license and copyright by REUSE (`REUSE.toml`, `LICENSES/`), every Java source starts with

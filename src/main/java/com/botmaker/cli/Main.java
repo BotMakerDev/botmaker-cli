@@ -12,6 +12,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -57,7 +58,7 @@ import java.util.concurrent.Callable;
         synopsisSubcommandLabel = "<command>",
         subcommands = {PluginCommand.class, BotCommand.class, DoctorCommand.class,
                 ReportsCommand.class, CompletionCommand.class, McpBridgeCommand.class, AiCommand.class,
-                McpCommand.class, MovedCommand.class})
+                McpCommand.class, UpdateCommand.class, MovedCommand.class})
 public final class Main implements Callable<Integer> {
 
     /**
@@ -76,6 +77,7 @@ public final class Main implements Callable<Integer> {
     private Subjects subjects;
 
     public static void main(String[] args) {
+        UpdateCommand.finishPending();
         System.exit(run(args));
     }
 
@@ -152,10 +154,15 @@ public final class Main implements Callable<Integer> {
     static final class ManifestVersion implements IVersionProvider {
         @Override
         public String[] getVersion() {
-            String implementation = Main.class.getPackage().getImplementationVersion();
-            boolean released = implementation != null && !implementation.isBlank()
-                    && !implementation.equals("dev") && !implementation.endsWith("-SNAPSHOT");
-            return new String[]{"botmaker " + (released ? implementation : "(dev)")};
+            return new String[]{"botmaker " + releasedVersion().orElse("(dev)")};
         }
+    }
+
+    /** The released version out of the manifest ({@code 0.13.1}), or empty for a development build. */
+    static Optional<String> releasedVersion() {
+        String implementation = Main.class.getPackage().getImplementationVersion();
+        boolean released = implementation != null && !implementation.isBlank()
+                && !implementation.equals("dev") && !implementation.endsWith("-SNAPSHOT");
+        return released ? Optional.of(implementation) : Optional.empty();
     }
 }
