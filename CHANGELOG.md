@@ -5,7 +5,7 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
-## [Unreleased]
+## [0.13.0] — 2026-11-16
 
 ### Added
 
@@ -15,6 +15,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   run.
 - `plugin validate` asks a plugin's `pools()` with its other surfaces, and refuses a pool that fills a parameter the
   plugin's values do not declare, or a value of this PC (2026-11-15). It asks for no candidate: those are a PC's data.
+
+### Changed
+
+- Built against botmaker-studio-api 0.18.0 (was 0.17.1).
+- Built against botmaker-plugin-host 0.13.0 (was 0.12.1).
+- Built against botmaker-plugin-archetype 0.10.0 (was 0.9.1).
+- Built against botmaker-java 0.3.0 (was 0.2.1).
 
 ## [0.12.1] — 2026-11-13
 
