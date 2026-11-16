@@ -56,8 +56,13 @@ release:
     # repositories is the one thing JReleaser has no way to express.
     skipTag: true
     overwrite: false
+    # sluice writes the release page as it tags, so it exists when this job runs: it is updated with the
+    # assets only, its notes left as sluice wrote them. Refusing to update cost v0.12.0 and v0.13.0 their jar
+    # (2026-11-16). With no page yet, JReleaser creates one.
     update:
-      enabled: false
+      enabled: true
+      sections:
+        - ASSETS
     changelog:
       external: target/jreleaser-changelog.md
 
