@@ -15,7 +15,7 @@ pkgrel=1
 pkgdesc='The botmaker command: create, validate, run and publish BotMaker plugins and bots'
 arch=('any')
 url='https://github.com/BotMakerDev/botmaker-cli'
-license=('CC0-1.0')
+license=('PolyForm-Noncommercial-1.0.0')
 # 25: the jar is compiled for Java 25 (nfpm.yaml says why). Headless, like the rpm's and deb's; the full JRE
 # provides it too. build() runs the jar, so it is a make dependency as well.
 depends=('java-runtime-headless>=25')

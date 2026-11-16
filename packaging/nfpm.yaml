@@ -51,7 +51,7 @@ description: |
   publishes it to the gallery as a starting template.
 vendor: BotMaker
 homepage: https://github.com/BotMakerDev/botmaker-cli
-license: CC0-1.0
+license: PolyForm-Noncommercial-1.0.0
 
 contents:
   - src: target/botmaker-cli-all.jar
