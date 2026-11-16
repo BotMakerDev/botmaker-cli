@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `botmaker bot run --runs N` starts N runs of the bot, each dealt its own row of the bot's pools: what can run is
+  shown first and the start asked (`-y` starts without asking). `--dry-run` only shows the count, `--all-or-none`
+  starts none unless all can (exit 3), and `--pin [run:]pool=value` fixes a pick. Needs a core with `run_bot`'s dry
+  run.
 - `plugin validate` asks a plugin's `pools()` with its other surfaces, and refuses a pool that fills a parameter the
   plugin's values do not declare, or a value of this PC (2026-11-15). It asks for no candidate: those are a PC's data.
 

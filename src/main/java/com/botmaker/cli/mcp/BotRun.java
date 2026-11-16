@@ -59,9 +59,9 @@ public final class BotRun {
     private static final Pattern HEAD = Pattern.compile(
             "next=(-?\\d+) starts=(\\d+) ends=(\\d+) busy=(true|false) skipped=(\\d+)");
     /** {@code HomeTools.openProject}'s answer: Studio opens the project in its window, and its tools follow. */
-    private static final String OPENING = "Opening ";
+    static final String OPENING = "Opening ";
     /** How long a run is asked for again while Studio still opens the project. */
-    private static final Duration OPEN_WAIT = Duration.ofSeconds(30);
+    static final Duration OPEN_WAIT = Duration.ofSeconds(30);
     /** How long the run loop waits for the run's end after a stop; the shutdown hook waits a little longer. */
     private static final Duration STOP_WAIT = Duration.ofSeconds(15);
     private static final Duration HOOK_WAIT = STOP_WAIT.plusSeconds(5);

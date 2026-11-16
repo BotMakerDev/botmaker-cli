@@ -37,7 +37,9 @@ became BotMaker's release engine; `botmaker release` now only says so (`MovedCom
   catalog's rebuild must read it alike. JDT comes through `botmaker-java` at the one version its pom names.
 - **`com.botmaker.cli.mcp` reaches the core only over MCP** (2026-11-05): the cli links neither the core nor Studio.
   `McpBridge` finds or starts the core (`CoreProcess`, the saved `core-command.json`); `bot run` is a client of it
-  through `CoreTools.Bridged`, and follows a run by `read_trace`'s cursor, never by matching its text.
+  through `CoreTools.Bridged`, and follows a run by `read_trace`'s cursor, never by matching its text. `bot run
+  --runs` (`SeveralStart`) reads only the first words of `run_bot {runs}`, `K of N can run` / `K of N started`, which
+  the core's `CLAUDE.md` names as read here.
 - **No dependency on `botmaker-studio` or the toolkit**: copy file shapes, never depend on an application
   (`nouns.md`, `stub-contexts.md`).
 - **Maven is shelled to, never embedded** (`maven.md`).
