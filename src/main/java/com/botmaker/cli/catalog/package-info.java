@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 LiQiyeDev
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
 /**
  * {@code botmaker-catalog}: the one list of bots and plugins Studio reads (2026-10-23, replacing the plugin
  * registry and the topic-found bots).

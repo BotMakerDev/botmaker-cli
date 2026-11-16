@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 LiQiyeDev
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
 /**
  * Publishing a plugin or a bot from its folder and listing it in the catalog ({@link com.botmaker.cli.publish.Publish}),
  * and the catalog pull request a publish or an unpublish opens ({@link com.botmaker.cli.publish.CatalogPr}).

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 LiQiyeDev
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
 /**
  * The {@code .bmk} bot file (spec {@code docs/superpowers/specs/2026-10-24-run-mode-bmk-design.md} § 2): one
  * reproducible zip of a bot at a commit, written and read by {@link com.botmaker.cli.bmk.BotFile} for every host —
