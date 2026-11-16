@@ -5,6 +5,13 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Fixed
+
+- The release carries `botmaker-cli-all.jar` again. v0.12.0 and v0.13.0 published none: the tag's job found the
+  release page sluice had written and refused to add to it. It now attaches the jar and leaves the notes.
+
 ## [0.13.0] — 2026-11-16
 
 ### Added
