@@ -54,7 +54,49 @@ final class CompletionCommand implements Callable<Integer> {
         // The parent's own CommandLine, so every subcommand registered on it is in the script — including
         // any added after this file was written, which is the property a checked-in script cannot have.
         CommandLine root = new CommandLine(new Main());
-        parent.console().out(AutoComplete.bash(root.getCommandName(), root));
+        parent.console().out(AutoComplete.bash(root.getCommandName(), root) + TOOL);
         return 0;
     }
+
+    /**
+     * {@code botmaker tool}'s completion, which no annotation can state: a plugin's operations and their options are
+     * the plugin's. It replaces picocli's function for the command, defined above it, and asks
+     * {@code botmaker tool --complete}, which answers from the last listing kept and never starts BotMaker's core;
+     * {@code --project} and {@code --new} still complete folders.
+     */
+    static final String TOOL = """
+
+            # botmaker tool: a plugin's operations, from the last listing `botmaker tool` kept.
+            function _picocli_botmaker_tool() {
+              local curr_word=${COMP_WORDS[COMP_CWORD]}
+              local prev_word=${COMP_WORDS[COMP_CWORD-1]}
+              case ${prev_word} in
+                --project|--new)
+                  type compopt &>/dev/null && compopt -o filenames
+                  local IFS=$'\\n'
+                  COMPREPLY=( $( compgen -f -- "${curr_word}" ) )
+                  return 0
+                  ;;
+              esac
+              # The words from the line itself: COMP_WORDS splits a groupId:artifactId and an --option=value apart.
+              local -a line
+              read -ra line <<< "${COMP_LINE:0:COMP_POINT}"
+              local typed=${line[${#line[@]}-1]}
+              [[ ${COMP_LINE:COMP_POINT-1:1} == " " ]] && typed=""
+              local before=$(( ${#line[@]} - 1 ))
+              [[ -z $typed ]] && before=${#line[@]}
+              local at=1
+              while [[ $at -lt $before && ${line[at]} != tool ]]; do at=$((at + 1)); done
+              local offered
+              offered=$("${line[0]}" tool --complete "${line[@]:at+1:before-at-1}" 2>/dev/null)
+              local IFS=$'\\n'
+              COMPREPLY=( $(compgen -W "${offered}" -- "${typed}") )
+              # Bash puts back only the part after the last ':' of the word being typed.
+              if [[ $typed == *:* && $COMP_WORDBREAKS == *:* ]]; then
+                local colon=${typed%"${typed##*:}"}
+                local i=${#COMPREPLY[@]}
+                while [[ $((--i)) -ge 0 ]]; do COMPREPLY[i]=${COMPREPLY[i]#"$colon"}; done
+              fi
+            }
+            """;
 }

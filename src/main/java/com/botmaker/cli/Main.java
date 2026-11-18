@@ -58,7 +58,7 @@ import java.util.concurrent.Callable;
         synopsisSubcommandLabel = "<command>",
         subcommands = {PluginCommand.class, BotCommand.class, DoctorCommand.class,
                 ReportsCommand.class, CompletionCommand.class, McpBridgeCommand.class, AiCommand.class,
-                McpCommand.class, UpdateCommand.class, MovedCommand.class})
+                McpCommand.class, UpdateCommand.class, ToolCommand.class, MovedCommand.class})
 public final class Main implements Callable<Integer> {
 
     /**
@@ -83,9 +83,11 @@ public final class Main implements Callable<Integer> {
 
     static int run(String[] argv) {
         Main main = new Main();
-        return new CommandLine(main)
-                .setExecutionExceptionHandler(main.exceptions())
-                .execute(argv);
+        CommandLine line = new CommandLine(main).setExecutionExceptionHandler(main.exceptions());
+        // An operation's options are its plugin's, unknown here: ToolCommand hands them on as words. Every word after
+        // the plugin's name is the operation's, so a field named project, new, quiet or debug reaches it whole.
+        line.getSubcommands().get("tool").setUnmatchedOptionsArePositionalParams(true).setStopAtPositional(true);
+        return line.execute(argv);
     }
 
     /** No verb: the usage text, and exit 2 — a bare invocation is a command line that said nothing. */

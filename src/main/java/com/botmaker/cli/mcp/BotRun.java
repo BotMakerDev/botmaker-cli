@@ -95,8 +95,16 @@ public final class BotRun {
 
     /** Opens {@code folder} in the core and runs its main, or the declared run {@code entry} titles. */
     public End run(Path folder, Optional<String> entry) {
+        return run(folder, entry, Optional.empty());
+    }
+
+    /**
+     * {@link #run(Path, Optional)} with {@code args}, the JSON object of the parameters {@code entry} takes
+     * ({@code botmaker tool}); none when empty.
+     */
+    public End run(Path folder, Optional<String> entry, Optional<String> args) {
         try {
-            return runOnce(folder.toAbsolutePath().normalize(), entry);
+            return runOnce(folder.toAbsolutePath().normalize(), entry, args);
         } catch (IOException e) {
             err.println("BotMaker's core did not answer: " + e.getMessage());
             return stopAsked != null ? End.STOPPED : End.REFUSED;
@@ -129,7 +137,8 @@ public final class BotRun {
         }
     }
 
-    private End runOnce(Path folder, Optional<String> entry) throws IOException, InterruptedException {
+    private End runOnce(Path folder, Optional<String> entry, Optional<String> args)
+            throws IOException, InterruptedException {
         CoreTools.Answer opened = tools.call("open_project", Map.of("path", folder.toString()));
         if (opened.error()) {
             err.println(opened.text());
@@ -141,6 +150,7 @@ public final class BotRun {
 
         Map<String, Object> run = new LinkedHashMap<>();
         entry.ifPresent(title -> run.put("entry", title));
+        args.ifPresent(json -> run.put("args", json));
         if (stopAsked != null) return End.STOPPED;
         CoreTools.Answer started = tools.call("run_bot", run);
         // Studio opens a project in its window: its run tool comes once it is open. A refusal while something runs

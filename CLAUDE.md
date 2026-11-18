@@ -39,7 +39,9 @@ became BotMaker's release engine; `botmaker release` now only says so (`MovedCom
   `McpBridge` finds or starts the core (`CoreProcess`, the saved `core-command.json`); `bot run` is a client of it
   through `CoreTools.Bridged`, and follows a run by `read_trace`'s cursor, never by matching its text. `bot run
   --runs` (`SeveralStart`) reads only the first words of `run_bot {runs}`, `K of N can run` / `K of N started`, which
-  the core's `CLAUDE.md` names as read here.
+  the core's `CLAUDE.md` names as read here. `botmaker tool` (`ToolRun`) reads the core's `operations` JSON
+  (`mcp.Operations`), calls a plugin's tool by the MCP name it lists and starts a run through `BotRun`; it knows no
+  plugin, and builds each operation's options from its schema (`OperationOptions`).
 - **No dependency on `botmaker-studio` or the toolkit**: copy file shapes, never depend on an application
   (`nouns.md`, `stub-contexts.md`).
 - **Maven is shelled to, never embedded** (`maven.md`).
