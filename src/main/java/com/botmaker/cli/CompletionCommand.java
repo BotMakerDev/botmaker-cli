@@ -89,8 +89,14 @@ final class CompletionCommand implements Callable<Integer> {
               while [[ $at -lt $before && ${line[at]} != tool ]]; do at=$((at + 1)); done
               local offered
               offered=$("${line[0]}" tool --complete "${line[@]:at+1:before-at-1}" 2>/dev/null)
-              local IFS=$'\\n'
-              COMPREPLY=( $(compgen -W "${offered}" -- "${typed}") )
+              # Compared as text, never through compgen -W, which expands $(…) in a word a plugin's schema wrote.
+              local -a words
+              mapfile -t words <<< "${offered}"
+              COMPREPLY=()
+              local word
+              for word in "${words[@]}"; do
+                [[ -n $word && $word == "$typed"* ]] && COMPREPLY+=("$word")
+              done
               # Bash puts back only the part after the last ':' of the word being typed.
               if [[ $typed == *:* && $COMP_WORDBREAKS == *:* ]]; then
                 local colon=${typed%"${typed##*:}"}
