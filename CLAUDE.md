@@ -41,7 +41,9 @@ became BotMaker's release engine; `botmaker release` now only says so (`MovedCom
   --runs` (`SeveralStart`) reads only the first words of `run_bot {runs}`, `K of N can run` / `K of N started`, which
   the core's `CLAUDE.md` names as read here. `botmaker tool` (`ToolRun`) reads the core's `operations` JSON
   (`mcp.Operations`), calls a plugin's tool by the MCP name it lists and starts a run through `BotRun`; it knows no
-  plugin, and builds each operation's options from its schema (`OperationOptions`).
+  plugin, and takes no operation's arguments (2026-11-19, the user's call): the bot is the configuration, so a run
+  starts with what it reads from the bot and a tool whose schema requires a value is refused, left to Studio and the
+  assistant. No option is built from a schema and no completion of its own.
 - **No dependency on `botmaker-studio` or the toolkit**: copy file shapes, never depend on an application
   (`nouns.md`, `stub-contexts.md`).
 - **Maven is shelled to, never embedded** (`maven.md`).

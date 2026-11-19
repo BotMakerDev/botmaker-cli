@@ -9,17 +9,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
-- `botmaker tool [<plugin> [<operation> [--<field> <value>…]]] [--project <dir> | --new <dir>]` runs any plugin's
-  operations from the shell: its assistant tools and its declared runs, as BotMaker's core lists them (its new
-  `operations` tool). With no plugin it lists the plugins with operations; with a plugin, its operations and their
-  options; with an operation, it runs it. A tool prints its reply (exit 1 when it refuses); a run is followed as
-  `bot run` follows one, with the same exit codes and Ctrl+C. Each operation's options come from its schema: nested
-  fields as `--a.b`, lists repeated or split at commas, maps as `key=value`, enum choices offered, and `--help` per
-  operation. A plugin is named by its artifactId without `botmaker-` (`sdk`) or by `groupId:artifactId`; a short name
-  two plugins share is refused, listing both. The bot is `--project`, this folder when it holds one, or `--new <dir>`,
-  a blank bot made there with the plugin at the version the core bound. With no bot, tools still work and a run is
-  refused: a run needs a bot. `botmaker completion` completes plugins, operations, options and choices from the last
-  listing `botmaker tool` kept, never starting the core.
+- `botmaker tool [<plugin> [<operation>]] [--project <dir>]` runs any plugin's operations from the shell: its
+  assistant tools and its declared runs, as BotMaker's core lists them (its new `operations` tool). With no plugin it
+  lists the plugins with operations; with a plugin, its operations; with an operation, it runs it. A tool prints its
+  reply (exit 1 when it refuses); a run is followed as `bot run` follows one, with the same exit codes and Ctrl+C. It
+  takes no operation's arguments: the bot is the configuration, so a run starts with what it reads from the bot (its
+  launch target, its parameters), and a tool that needs values is refused, naming them, and left to Studio and the
+  assistant; the list says which. A plugin is named by its artifactId without `botmaker-` (`sdk`) or by
+  `groupId:artifactId`; a short name two plugins share is refused, listing both. The bot is `--project`, or this
+  folder when it holds one. With no bot, tools still work and a run is refused: a run needs a bot.
 - `botmaker update` replaces the jar it runs from with the latest release's `botmaker-cli-all.jar`, checked against
   the release's `checksums_sha256.txt` first; a jar that does not match is deleted and the old one kept. On Windows,
   which locks a running jar, the checked jar waits beside it as `<jar>.new` and takes its place when the command

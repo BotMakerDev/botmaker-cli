@@ -5,7 +5,6 @@ package com.botmaker.cli.mcp;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -23,31 +22,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** {@code botmaker tool} against a fake core: names, options from a schema, a tool's reply, a run, {@code --new}. */
+/** {@code botmaker tool} against a fake core: names, a tool's reply, a tool that needs values, a run in its bot. */
 class ToolRunTest {
 
-    /** As the core's {@code operations} writes it: the SDK with a tool and a run, and two plugins named web. */
+    /** As the core's {@code operations} writes it: the SDK with two tools and a run, and two plugins named web. */
     private static final String LISTING = """
             {"project": %s, "plugins": [
               {"groupId": "com.github.BotMakerDev", "artifactId": "botmaker-sdk", "name": "BotMaker SDK",
                "version": "1.4.0", "operations": [
                  {"kind": "tool", "name": "crop_picture", "call": "botmaker_sdk_crop_picture",
                   "description": "Cut a picture.", "schema": {"type": "object", "properties": {
-                    "name": {"type": "string", "description": "its name"},
-                    "area": {"type": "object", "properties": {
-                      "x": {"type": "integer"}, "y": {"type": "integer"}}, "required": ["x", "y"]},
-                    "look": {"type": "string", "enum": ["exact", "coarse"]},
-                    "tags": {"type": "array", "items": {"type": "string"}},
-                    "notes": {"type": "object", "additionalProperties": {"type": "string"}},
-                    "steps": {"type": "array", "items": {"type": "object", "properties": {}}},
-                    "dim": {"type": "boolean"}},
-                   "required": ["name", "area"]}},
+                    "name": {"type": "string"}, "look": {"type": "string"}}, "required": ["name", "area"]}},
+                 {"kind": "tool", "name": "describe", "call": "botmaker_sdk_describe",
+                  "description": "Say what is on the game.", "schema": {"type": "object", "properties": {
+                    "scale": {"type": "number"}}}},
                  {"kind": "run", "name": "Keep exploring", "description": "", "schema": {"type": "object",
-                  "properties": {"minutes": {"type": "integer"}, "maxScreens": {"type": "integer"}},
-                  "required": []}}]},
+                  "properties": {"minutes": {"type": "integer"}}, "required": []}}]},
               {"groupId": "a.one", "artifactId": "web", "name": "Web", "version": "1.0.0", "operations": []},
               {"groupId": "b.two", "artifactId": "botmaker-web", "name": "Other web", "version": "2.0.0",
-               "operations": []}]}
+               "operations": [{"kind": "later", "name": "watch", "schema": {"type": "object"}}]}]}
             """;
 
     private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -67,72 +60,40 @@ class ToolRunTest {
         assertTrue(assertThrows(IllegalArgumentException.class, () -> listed.plugin("nope")).getMessage()
                 .contains("These have: sdk, web, web"));
         assertEquals("Keep exploring", listed.plugin("sdk").operation("keep-exploring").name());
-        assertEquals("crop_picture", listed.plugin("sdk").operation("crop-picture").name());
-    }
+        assertEquals(Operations.Kind.UNKNOWN, listed.plugin("b.two:botmaker-web").operation("watch").kind());
 
-    @Test
-    void aSchemaBecomesOptionsAndTheOptionsBecomeItsArgumentsAgain() throws IOException {
-        Operations.Operation crop = Operations.read(LISTING.formatted("null")).plugin("sdk").operation("crop-picture");
-        OperationOptions options = new OperationOptions("botmaker tool sdk crop-picture", crop);
-
-        Map<String, Object> arguments = options.arguments(List.of("--name", "ore", "--area.x", "3", "--area.y", "4",
-                "--look", "coarse", "--tags", "a,b", "--tags", "c", "--notes", "k=v", "--steps", "{\"go\": 1}",
-                "--dim"));
-
-        assertEquals(Map.of("name", "ore", "area", Map.of("x", 3L, "y", 4L), "look", "coarse",
-                "tags", List.of("a", "b", "c"), "notes", Map.of("k", "v"), "steps", List.of(Map.of("go", 1)),
-                "dim", true), arguments);
-        assertEquals(List.of("exact", "coarse"), options.choices("--look"));
-        assertTrue(options.usage().contains("--area.x=<integer>"), options.usage());
-        assertThrows(CommandLine.MissingParameterException.class, () -> options.arguments(List.of("--name", "ore")),
-                "a required nested field is required");
-        assertThrows(IllegalArgumentException.class, () -> options.arguments(List.of("--name", "o", "--area.x", "1",
-                "--area.y", "2", "--steps", "not json")));
-    }
-
-    @Test
-    void typedItemsStayTypedAndNamesTheShellCannotTellApartAreRefused(@TempDir Path here) throws IOException {
-        Operations listed = Operations.read("""
+        Operations twins = Operations.read("""
                 {"project": null, "plugins": [{"groupId": "g", "artifactId": "x", "name": "X", "version": "1",
-                  "operations": [
-                    {"kind": "tool", "name": "crop_picture", "call": "x_crop_picture", "schema": {"type": "object",
-                     "properties": {"ids": {"type": "array", "items": {"type": "integer"}},
-                       "modes": {"type": "array", "items": {"enum": ["a", "b"]}},
-                       "weights": {"type": "object", "additionalProperties": {"type": "number"}}}}},
-                    {"kind": "run", "name": "Crop picture", "schema": {"type": "object"}},
-                    {"kind": "later", "name": "watch", "schema": {"type": "object"}}]}]}
+                  "operations": [{"kind": "tool", "name": "crop_picture", "call": "x_crop_picture",
+                                  "schema": {"type": "object"}},
+                                 {"kind": "run", "name": "Crop picture", "schema": {"type": "object"}}]}]}
                 """);
-        Operations.Plugin plugin = listed.plugin("x");
-        Operations.Operation crop = plugin.operations().getFirst();
-        OperationOptions options = new OperationOptions("botmaker tool x crop-picture", crop);
-
-        assertEquals(Map.of("ids", List.of(1L, 2L), "weights", Map.of("k", 3.0)),
-                options.arguments(List.of("--ids", "1,2", "--weights", "k=3")));
-        assertTrue(options.usage().contains("--modes=<choice>"), options.usage());
-        assertTrue(assertThrows(IllegalArgumentException.class, () -> plugin.operation("crop-picture")).getMessage()
-                .contains("cannot tell them apart"));
-        assertEquals(Operations.Kind.UNKNOWN, plugin.operation("watch").kind());
-
-        FakeCore core = new FakeCore(LISTING.formatted("null"));
-        assertEquals(0, tool(core, ask(here, "sdk", "--help")));
-        assertTrue(text(out).contains("keep-exploring  (run)"), text(out));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> twins.plugin("x").operation("crop-picture"))
+                .getMessage().contains("cannot tell them apart"));
     }
 
     @Test
-    void aToolPrintsItsReplyAndARefusalEndsOne(@TempDir Path here) {
+    void aPluginsListSaysWhichOperationsNeedValues(@TempDir Path here) {
+        assertEquals(0, tool(new FakeCore(LISTING.formatted("null")), ask(here, "sdk")));
+
+        assertTrue(text(out).contains("crop-picture  (tool)  needs name, area: Studio or the assistant"), text(out));
+        assertTrue(text(out).contains("keep-exploring  (run)\n"), text(out));
+    }
+
+    @Test
+    void aToolIsCalledWithNoValuesAndOneThatNeedsSomeIsRefused(@TempDir Path here) {
         FakeCore core = new FakeCore(LISTING.formatted("null"));
-        core.reply = new CoreTools.Answer("Cut ore.", false);
+        core.reply = new CoreTools.Answer("A title screen.", false);
 
-        int code = tool(core, ask(here, "sdk", "crop-picture", "--name", "ore", "--area.x", "1", "--area.y", "2"));
+        assertEquals(0, tool(core, ask(here, "sdk", "describe")));
+        assertEquals("A title screen.\n", text(out));
+        assertEquals(Map.of(), core.argumentsOf("botmaker_sdk_describe"));
 
-        assertEquals(0, code);
-        assertEquals("Cut ore.\n", text(out));
-        assertEquals(Map.of("name", "ore", "area", Map.of("x", 1L, "y", 2L)), core.argumentsOf("botmaker_sdk_crop_picture"));
-
-        core.reply = new CoreTools.Answer("No such area.", true);
-        assertEquals(1, tool(core, ask(here, "sdk", "crop-picture", "--name", "o", "--area.x", "1", "--area.y", "2")));
-        assertEquals(2, tool(core, ask(here, "sdk", "crop-picture")), "a missing option is a command line's fault");
-        assertTrue(text(err).contains("Missing required options"), text(err));
+        core.reply = new CoreTools.Answer("No game.", true);
+        assertEquals(1, tool(core, ask(here, "sdk", "describe")), "the tool's refusal");
+        assertEquals(2, tool(core, ask(here, "sdk", "crop-picture")));
+        assertTrue(text(err).contains("crop_picture needs name, area"), text(err));
+        assertTrue(core.called().stream().noneMatch("botmaker_sdk_crop_picture"::equals), "never called");
     }
 
     @Test
@@ -145,74 +106,37 @@ class ToolRunTest {
         Files.writeString(project.resolve("pom.xml"), "<project/>");
         FakeCore core = new FakeCore(LISTING.formatted("\"" + project.toString().replace("\\", "\\\\") + "\""));
 
-        int code = tool(core, ask(project, "sdk", "keep-exploring", "--minutes", "2"));
+        int code = tool(core, ask(project, "sdk", "keep-exploring"));
 
         assertEquals(130, code, "the run's own exit code");
         assertEquals(Map.of("path", project.toString()), core.argumentsOf("open_project"),
                 "a folder that holds a bot is the bot");
-        assertEquals(List.of(project + " Keep exploring {\"minutes\":2}"), runs);
-    }
-
-    @Test
-    void newMakesTheBotWithThePluginBeforeItOpensIt(@TempDir Path parent) {
-        Path fresh = parent.resolve("site");
-        FakeCore core = new FakeCore(LISTING.formatted("null")) {
-            @Override
-            public Answer call(String tool, Map<String, Object> arguments) {
-                if (tool.equals("open_project")) listing = LISTING.formatted("\"" + fresh.toString()
-                        .replace("\\", "\\\\") + "\"");
-                return super.call(tool, arguments);
-            }
-        };
-        List<String> made = new ArrayList<>();
-        ToolRun run = new ToolRun(core, stream(out), stream(err), (b, e, a) -> 0, (dir, plugin) -> {
-            made.add(dir + " " + plugin.coordinate() + " " + plugin.version() + " after " + core.called());
-            ToolRun.makeBlank(dir, plugin);
-        }, Duration.ofMillis(1), Duration.ofSeconds(1), Optional.empty());
-
-        int code = run.run(new ToolRun.Ask(Optional.of("sdk"), Optional.of("keep-exploring"), List.of(),
-                Optional.empty(), Optional.of(fresh), parent));
-
-        assertEquals(0, code, text(err));
-        assertEquals(List.of(fresh + " com.github.BotMakerDev:botmaker-sdk 1.4.0 after [operations]"), made);
-        assertTrue(core.called().indexOf("open_project") > 0, "opened after it was made");
-        assertTrue(ToolRun.isBot(fresh));
-    }
-
-    @Test
-    void theShellCompletesFromTheLastListing() throws IOException {
-        Optional<Operations> cached = Optional.of(Operations.read(LISTING.formatted("null")));
-
-        assertEquals(List.of("sdk", "web", "web", "--project", "--new"), ToolRun.complete(List.of(), cached));
-        assertEquals(List.of("crop-picture", "keep-exploring"), ToolRun.complete(List.of("sdk"), cached));
-        assertEquals(List.of("--minutes", "--maxScreens", "--help"),
-                ToolRun.complete(List.of("sdk", "keep-exploring"), cached));
-        assertEquals(List.of("exact", "coarse"), ToolRun.complete(List.of("sdk", "crop-picture", "--look"), cached));
-        assertEquals(List.of(), ToolRun.complete(List.of(), Optional.empty()), "no listing yet, nothing offered");
+        assertEquals(List.of(project + " Keep exploring"), runs);
     }
 
     private int tool(FakeCore core, ToolRun.Ask ask) {
-        ToolRun run = new ToolRun(core, stream(out), stream(err), (bot, entry, args) -> {
-            runs.add(bot + " " + entry + " " + args.orElse(""));
+        ToolRun run = new ToolRun(core, stream(out), stream(err), (bot, entry) -> {
+            runs.add(bot + " " + entry);
             return 130;
-        }, (dir, plugin) -> {
-            throw new IOException("not asked");
-        }, Duration.ofMillis(1), Duration.ofMillis(50), Optional.empty());
+        }, Duration.ofMillis(1), Duration.ofMillis(50));
         return run.run(ask);
     }
 
-    private static ToolRun.Ask ask(Path here, String... words) {
-        List<String> all = List.of(words);
-        return new ToolRun.Ask(Optional.of(all.get(0)), Optional.of(all.get(1)), all.subList(2, all.size()),
-                Optional.empty(), Optional.empty(), here);
+    private static ToolRun.Ask ask(Path here, String plugin) {
+        return new ToolRun.Ask(Optional.of(plugin), Optional.empty(), Optional.empty(), here);
+    }
+
+    private static ToolRun.Ask ask(Path here, String plugin, String operation) {
+        return new ToolRun.Ask(Optional.of(plugin), Optional.of(operation), Optional.empty(), here);
     }
 
     private static PrintStream stream(ByteArrayOutputStream bytes) {
         return new PrintStream(bytes, true, StandardCharsets.UTF_8);
     }
 
+    /** What was printed, its line ends {@code \n} on every platform. */
     private static String text(ByteArrayOutputStream bytes) {
-        return bytes.toString(StandardCharsets.UTF_8);
+        return bytes.toString(StandardCharsets.UTF_8).replace(System.lineSeparator(), "\n");
     }
 
     /** A core that lists {@link #listing}, opens anything, and answers every other tool {@link #reply}. */
@@ -220,7 +144,7 @@ class ToolRunTest {
         record Call(String tool, Map<String, Object> arguments) {}
 
         final List<Call> calls = new ArrayList<>();
-        String listing;
+        final String listing;
         Answer reply = new Answer("", false);
 
         FakeCore(String listing) {
