@@ -71,8 +71,9 @@ disagree, `--help` is right.
 same way, and each spells its noun. The plugin verbs once sat at the top level (`botmaker new`, `validate`,
 `run`, `publish`); typing one of those tells you where it went and runs nothing.
 
-Three more verbs belong to the tool rather than to either noun: `doctor`, `completion`, and `release` — the
-maintainer's cross-module release, run from the umbrella checkout.
+Two more verbs belong to the tool rather than to either noun: `doctor` and `completion`. The cross-module
+release left for [sluice](https://github.com/BotMakerDev/sluice) on 2026-11-13; `botmaker release` says so and
+runs nothing.
 
 ## `botmaker plugin` — about a plugin
 
@@ -246,25 +247,13 @@ One script for both shells, because picocli emits bash and zsh runs it through `
 committed completion file: a hand-written one is a third statement of what the options are — beside the
 parser and the usage text — and the one that fails silently, by quietly not offering a verb somebody added.
 
-## `botmaker release` — the cross-module release
-
-```bash
-botmaker release --umbrella ~/IdeaProjects/botmaker --studio-api 0.6.0          # preview: decides, runs the gates
-botmaker release --umbrella ~/IdeaProjects/botmaker --studio-api 0.6.0 --execute
-```
-
-The maintainer's tool, and the one implementation behind the umbrella's `release.sh` and the dashboard's
-Release tab. It previews unless `--execute` is passed. Each module flag takes `x.y.z` or
-`patch|minor|major`; `--why` also says why each forced module is in the release. The umbrella's `README.md` describes forcing and the
-gates.
-
 ## Using it as a library
 
 The main artifact is a **library**, and the executable jar is the `all` classifier. It holds two packages
 other repositories call: `com.botmaker.cli.validate` — the author's `botmaker plugin validate` and the
 catalog's check run the same code, so a submission never fails for a reason its author could not have seen —
-`com.botmaker.cli.catalog`, the catalog's check, merge policy and index, and `com.botmaker.cli.release`, which
-the dashboard runs in-process.
+and `com.botmaker.cli.catalog`, the catalog's check, merge policy and index. `com.botmaker.cli.publish`, the one
+publish implementation, is what Studio's Publish runs in-process.
 
 ```xml
 <dependency>
@@ -295,4 +284,4 @@ renamed only the *main* artifact and left the pair spelled two different ways. T
 once, on the way out (`jreleaser.yml`), so the download URL above stays stable.
 
 Published through JitPack, which serves each git tag under `com.github.BotMakerDev`. Releases are cut from the
-umbrella only, with `--cli <version>` plus the downstream it forces (dashboard); `/release-check` names it.
+umbrella only, by sluice, with `--cli <version>` plus the dependents it owes; `/release-check` names them.
