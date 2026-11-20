@@ -34,7 +34,7 @@ final class MovedCommand implements Callable<Integer> {
 
     /**
      * Old verb to its replacement: the four plugin verbs are {@code plugin} sub-verbs, and {@code release} is
-     * sluice's (2026-11-13), the umbrella's {@code ./release.sh}.
+     * sluice's (2026-11-13), run at the umbrella's root.
      */
     private static final Map<String, String> MOVED = Map.of(
             "new", "botmaker plugin new",
@@ -58,7 +58,7 @@ final class MovedCommand implements Callable<Integer> {
         String typed = typedVerb();
         Console console = parent.console();
         console.error("`botmaker " + typed + "` moved: use `" + MOVED.get(typed) + "`. " + (typed.equals("release")
-                ? "BotMaker is released by sluice, from the umbrella's ./release.sh."
+                ? "BotMaker is released by sluice, run at the umbrella's root."
                 : "The four plugin verbs are under `botmaker plugin`; a bot's are under `botmaker bot`."));
         return picocli.CommandLine.ExitCode.USAGE;
     }

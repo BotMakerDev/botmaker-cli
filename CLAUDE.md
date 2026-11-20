@@ -64,4 +64,4 @@ against `System.getProperty("java.class.path")`. A mocked `StudioPlugin` would p
 prove none of it, because it would never have been loaded. Keep it that way; every failure these checks
 exist to catch is a failure of a real classloader over real bytecode.
 
-Published through JitPack. Releases are cut from the umbrella with `../release.sh --cli <level|version>` (sluice).
+Published through JitPack. Releases are cut from the umbrella with `sluice --cli <level|version>`.
