@@ -41,6 +41,8 @@ public final class CoreFeed implements AutoCloseable {
     public static final String NONE = "No BotMaker core runs on this computer: botmaker core start.";
     static final String EVENTS = "/dashboard/events";
     static final String KEY = "/dashboard-key";
+    /** The core's {@code DashboardAccess.PATH}: the one path a dashboard link may name. */
+    static final String DASHBOARD = "/dashboard";
     private static final Duration CONNECT = Duration.ofSeconds(3);
     /** How long a core that took the connection has to answer. */
     private static final Duration ANSWER = Duration.ofSeconds(5);
@@ -100,6 +102,7 @@ public final class CoreFeed implements AutoCloseable {
      * @throws IOException when the core refuses the feed, or takes the connection and says nothing
      */
     public static Optional<CoreFeed> open(At at) throws IOException {
+        if (!answers(at)) return Optional.empty();
         HttpRequest request = HttpRequest.newBuilder(at.resolve(EVENTS)).header("Authorization", "Bearer " + at.token())
                 .GET().build();
         // The stream has no end, so no request timeout: only its headers are waited for, ANSWER at most.
@@ -131,6 +134,7 @@ public final class CoreFeed implements AutoCloseable {
      * @throws IOException when the core gives none; a {@link ConnectException} when nothing answers
      */
     public static URI dashboardLink(At at) throws IOException {
+        if (!answers(at)) throw new ConnectException(NONE);
         HttpRequest request = HttpRequest.newBuilder(at.resolve(KEY)).header("Authorization", "Bearer " + at.token())
                 .timeout(ANSWER).POST(HttpRequest.BodyPublishers.noBody()).build();
         try {
@@ -143,11 +147,31 @@ public final class CoreFeed implements AutoCloseable {
             if (answer.statusCode() != 200) throw new IOException("The core gave no dashboard link: HTTP "
                     + answer.statusCode());
             URI link = URI.create(JSON.readTree(answer.body()).path("url").asText());
-            if (!link.isAbsolute()) throw new IOException("The core gave no dashboard link: " + answer.body());
+            // The link goes to the system's opener: only the core's own page, never another scheme, host or path.
+            if (!"http".equals(link.getScheme()) || !at.root().getHost().equals(link.getHost())
+                    || at.root().getPort() != link.getPort() || !DASHBOARD.equals(link.getPath())) {
+                throw new IOException("The core gave a link that is not its dashboard: " + link.getScheme() + "://"
+                        + link.getHost() + ":" + link.getPort() + link.getPath());
+            }
             return link;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted", interrupted);
+        }
+    }
+
+    /**
+     * Whether a core answers at {@code at} and proves it holds the token (the bridge's {@code /mcp-hello} proof),
+     * asked before the token is sent: a process that took the port while the core was down is never handed it.
+     *
+     * @throws IOException when what answers is not the core
+     */
+    public static boolean answers(At at) throws IOException {
+        try {
+            McpBridge.proven(new McpBridge.Upstream(at.resolve("/mcp"), at.token()));
+            return true;
+        } catch (ConnectException nobody) {
+            return false;
         }
     }
 

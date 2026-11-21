@@ -372,6 +372,16 @@ public final class McpBridge {
     }
 
     /**
+     * Refuses unless what answers where {@code to} says proves it holds the token, before anything is sent with it:
+     * {@code botmaker core}'s feed and dashboard link ask it first.
+     *
+     * @throws java.net.ConnectException when nothing answers there
+     */
+    public static void proven(Upstream to) throws IOException {
+        provenStudio(PROBE, to);
+    }
+
+    /**
      * Whether Studio is on the core: it has a channel open ({@code CoreServer.Info.clients}). A server with no
      * {@link #INFO}, an older Studio's own endpoint, is Studio itself.
      */
@@ -607,7 +617,7 @@ public final class McpBridge {
      * HMAC-SHA256 of {@code <port>:<nonce>} under {@code token}, in hex, as the core's {@code McpEndpoint.proof} makes it
      * on the port it was asked on: a proof relayed from another port fails.
      */
-    static String proof(String token, int port, String nonce) {
+    public static String proof(String token, int port, String nonce) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(token.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));

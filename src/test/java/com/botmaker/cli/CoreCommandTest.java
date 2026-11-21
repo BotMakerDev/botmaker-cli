@@ -5,6 +5,7 @@ package com.botmaker.cli;
 
 import com.botmaker.cli.core.CoreCards;
 import com.botmaker.cli.core.CoreFeed;
+import com.botmaker.cli.core.CoreHello;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -123,6 +124,7 @@ class CoreCommandTest {
                 body.write(frames.getBytes(StandardCharsets.UTF_8));
             }
         });
+        CoreHello.serve(server, "t");
         server.start();
         URI root = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/");
         return CoreFeed.open(new CoreFeed.At(root, "t")).orElseThrow();
