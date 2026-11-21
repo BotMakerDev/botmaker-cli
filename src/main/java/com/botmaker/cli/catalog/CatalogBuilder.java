@@ -59,11 +59,13 @@ public final class CatalogBuilder {
                 .collect(Collectors.toMap(Catalog.Bot::repo, Function.identity(), (a, b) -> a))).orElse(Map.of());
 
         List<Catalog.Plugin> plugins = new ArrayList<>();
-        for (PluginEntry entry : read(root, EntryPath.PLUGINS, PluginEntry::read,
-                p -> p.repo().toLowerCase(Locale.ROOT))) {
+        List<PluginEntry> pluginEntries = read(root, EntryPath.PLUGINS, PluginEntry::read,
+                p -> p.repo().toLowerCase(Locale.ROOT));
+        Set<String> pluginRepos = pluginEntries.stream().map(Entry::repo).collect(Collectors.toSet());
+        for (PluginEntry entry : pluginEntries) {
             Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
             if (repo.isEmpty()) continue;
-            Catalog.Plugin before = previousRow(previousPlugins, entry);
+            Catalog.Plugin before = previousRow(previousPlugins, entry, pluginRepos);
             List<Catalog.Plugin.Release> releases = new ArrayList<>();
             String name = null;
             for (ApprovedRelease release : entry.releases().reversed()) {
@@ -98,10 +100,12 @@ public final class CatalogBuilder {
         plugins.replaceAll(plugin -> withListedPins(plugin, listed));
 
         List<Catalog.Bot> bots = new ArrayList<>();
-        for (BotEntry entry : read(root, EntryPath.BOTS, BotEntry::read, b -> b.repo().toLowerCase(Locale.ROOT))) {
+        List<BotEntry> botEntries = read(root, EntryPath.BOTS, BotEntry::read, b -> b.repo().toLowerCase(Locale.ROOT));
+        Set<String> botRepos = botEntries.stream().map(Entry::repo).collect(Collectors.toSet());
+        for (BotEntry entry : botEntries) {
             Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
             if (repo.isEmpty()) continue;
-            Catalog.Bot before = previousRow(previousBots, entry);
+            Catalog.Bot before = previousRow(previousBots, entry, botRepos);
             List<Catalog.Bot.Release> releases = new ArrayList<>();
             for (ApprovedRelease release : entry.releases().reversed()) {
                 Optional<EntryFacts.Release> published = published(facts, entry.repo(), release.tag());
@@ -170,13 +174,14 @@ public final class CatalogBuilder {
 
     /**
      * The previous catalog's row for {@code entry}: at its repo, else at the newest slug it had {@code formerly}, so a
-     * move made tonight still keeps the facts its releases were read with (2026-11-21); null when none.
+     * move made tonight still keeps the facts its releases were read with (2026-11-21); null when none. A former
+     * slug another entry lists now is that entry's row, never this one's.
      */
-    private static <R> R previousRow(Map<String, R> byRepo, Entry entry) {
+    private static <R> R previousRow(Map<String, R> byRepo, Entry entry, Set<String> listed) {
         R row = byRepo.get(entry.repo());
         for (String slug : entry.formerly().reversed()) {
             if (row != null) break;
-            row = byRepo.get(slug);
+            if (listed.stream().noneMatch(slug::equalsIgnoreCase)) row = byRepo.get(slug);
         }
         return row;
     }
