@@ -100,6 +100,8 @@ public final class McpBridge {
     private static final Duration SHOWING = Duration.ofSeconds(20);
 
     /** What the client was told while Studio is down. */
+    /** The {@code _meta} key of a tool call's answer that no core gave: none answered, and none was started. */
+    static final String UNREACHED = "botmaker/unreached";
     static final String DOWN = "BotMaker's core is not running and could not be started here. start_studio starts "
             + "Studio, and its core; the tools come back by themselves.";
     /** How long after a failed start of the core the bridge says why, instead of trying again. */
@@ -336,7 +338,12 @@ public final class McpBridge {
         }
         switch (message.path("method").asText()) {
             case "tools/list" -> reply(message, json.createObjectNode().set("tools", tools.deepCopy().add(startTool())));
-            case "tools/call" -> reply(message, toolText(why, true));
+            case "tools/call" -> {
+                ObjectNode answer = toolText(why, true);
+                // Told apart from a tool's own refusal by an in-process client (CoreTools.Answer.unreached).
+                answer.putObject("_meta").put(UNREACHED, true);
+                reply(message, answer);
+            }
             default -> error(message, why);
         }
     }

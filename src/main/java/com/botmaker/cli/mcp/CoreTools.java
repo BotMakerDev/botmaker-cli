@@ -30,8 +30,15 @@ import java.util.function.Consumer;
  */
 public interface CoreTools {
 
-    /** A tool's answer: its text, and whether the tool refused or failed. */
-    record Answer(String text, boolean error) {}
+    /**
+     * A tool's answer: its text, whether the tool refused or failed, and whether no core gave it (none answered and
+     * none could be started; then {@code error} too).
+     */
+    record Answer(String text, boolean error, boolean unreached) {
+        public Answer(String text, boolean error) {
+            this(text, error, false);
+        }
+    }
 
     /** Calls {@code tool} with {@code arguments} and waits for its answer. */
     Answer call(String tool, Map<String, Object> arguments) throws IOException;
@@ -42,6 +49,15 @@ public interface CoreTools {
      */
     static CoreTools onThisComputer() {
         return new Bridged(McpBridge::onThisComputer);
+    }
+
+    /**
+     * As {@link #onThisComputer}, but the core only when one answers: none is started, and a call while none answers
+     * gets an {@link Answer#unreached} answer.
+     */
+    static CoreTools runningOnThisComputer() {
+        return new Bridged((launch, in, out, poll) -> new McpBridge(McpBridge.fromStudioConfig(McpBridge.coreDir()),
+                launch, in, out, poll));
     }
 
     /** How a {@link Bridged} makes its bridge, given the streams it talks over. */
@@ -110,7 +126,8 @@ public interface CoreTools {
                 if (!text.isEmpty()) text.append('\n');
                 text.append(part.path("text").asText(""));
             }
-            return new Answer(text.toString(), reply.at("/result/isError").asBoolean(false));
+            return new Answer(text.toString(), reply.at("/result/isError").asBoolean(false),
+                    reply.path("result").path("_meta").path(McpBridge.UNREACHED).asBoolean(false));
         }
 
         private void answered(String line) {
