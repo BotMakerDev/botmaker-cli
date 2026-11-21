@@ -9,6 +9,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `botmaker core` (2026-11-21): `status` (the dashboard's cards, in the terminal), `watch` (its live feed, `--kind`),
+  `dashboard` (opens the page, `--print` the link), and `start`, `quit [--force]`, `restart [--force]`,
+  `stop [<run_id>|all]`, `open <dir>`, `close [--keep-run]` and `reload`, each one of the core's MCP tools. Only
+  `start`, `open` and `restart` start a core. Exit 0 done, 1 refused, 2 no core. The token is sent only to a core
+  that proves it holds it (`/mcp-hello`), and only the core's own dashboard link is opened.
+- `mcp-bridge` marks the answer it gives with no core (`_meta {"botmaker/unreached": true}`).
 - `SchemaFilesTest` (catalog trust, phase 6): the catalog's `schema/` files (entry, advisory, catalog.json; JSON
   Schema 2020-12) accept the records' JSON and every file the catalog holds, and refuse what the check refuses;
   `json-schema-validator` at test scope only. Skipped where botmaker-catalog is not checked out beside the cli.

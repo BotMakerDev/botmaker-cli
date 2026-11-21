@@ -44,6 +44,14 @@ became BotMaker's release engine; `botmaker release` now only says so (`MovedCom
   plugin, and takes no operation's arguments (2026-11-19, the user's call): the bot is the configuration, so a run
   starts with what it reads from the bot and a tool whose schema requires a value is refused, left to Studio and the
   assistant. No option is built from a schema and no completion of its own.
+- **`botmaker core` reads the core's dashboard feed and acts by its MCP tools** (2026-11-21, `CoreCommand`):
+  `status`, `watch` and `dashboard` read `/dashboard/events` through `core.CoreFeed` by field name (the core's
+  `CLAUDE.md` names what), and `CoreCards` is the page's summary ported. The token goes only to a core that answered
+  `/mcp-hello`'s proof (`McpBridge.proven`), and only a link that is `http`, the core's host and port and path
+  `/dashboard` reaches the OS opener; the key is never printed. `start`, `quit`, `restart`, `stop`, `open`, `close`
+  and `reload` are each a `CoreCommand.Act` of one `Tool`; only `start`, `open` and `restart` start a core
+  (`CoreTools.onThisComputer`), the rest go through `CoreTools.runningOnThisComputer`, which starts none. Exit 0 done,
+  1 refused, 2 no core or unreachable (an answer marked `McpBridge.UNREACHED`).
 - **No dependency on `botmaker-studio` or the toolkit**: copy file shapes, never depend on an application
   (`nouns.md`, `stub-contexts.md`).
 - **Maven is shelled to, never embedded** (`maven.md`).
