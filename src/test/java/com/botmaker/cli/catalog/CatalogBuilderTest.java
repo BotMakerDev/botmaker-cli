@@ -86,6 +86,30 @@ class CatalogBuilderTest {
                 sdk.releases().stream().map(Catalog.Plugin.Release::minContractVersion).toList());
     }
 
+    /** A yanked release stays listed with its reason; pickers leave it out, a yanked newest included. */
+    @Test
+    void a_yanked_release_is_listed_with_its_reason_and_no_picker_offers_it() throws IOException {
+        ApprovedRelease.Yanked why = new ApprovedRelease.Yanked("Deletes saves.", "2026-10-23T10:00:00Z");
+        facts.release(SDK_REPO, "v2.2.0", "LiQiyeDev");
+        entry(SDK, FakeFacts.json(new PluginEntry(SDK_REPO, List.of(FakeFacts.pluginRelease("v2.1.0"),
+                FakeFacts.pluginRelease("v2.2.0").yank(why)))));
+        entry("bots/somedev__firestone.json", FakeFacts.json(new BotEntry("somedev/firestone",
+                List.of(FakeFacts.botRelease("v1.2.0").yank(why)), false)));
+        DerivedFacts two = new DerivedFacts(Map.of(SDK_REPO, Map.of("v2.1.0", SDK_FACTS, "v2.2.0", SDK_FACTS)),
+                derived.botPlugins());
+        Catalog catalog = CatalogBuilder.build(root, publishers, facts, two, NOW);
+
+        Catalog.Plugin sdk = catalog.plugins().getFirst();
+        assertEquals(why, sdk.newest().yanked());
+        assertEquals(List.of("v2.1.0"), sdk.pickable().stream().map(Catalog.Plugin.Release::tag).toList());
+        Catalog.Bot firestone = catalog.bots().getFirst();
+        assertEquals(why, firestone.newest().yanked(), "every release yanked, the bot still listed");
+        assertEquals(List.of(), firestone.pickable());
+        assertTrue(catalog.toJson().contains("\"reason\" : \"Deletes saves.\""), catalog.toJson());
+        write(catalog);
+        assertEquals(catalog, Catalog.read(root.resolve(Catalog.FILE)).orElseThrow(), "read back as written");
+    }
+
     @Test
     void a_plugin_release_keeps_only_the_other_catalog_plugins_it_brings() throws IOException {
         String basicsRepo = "BotMakerDev/botmaker-plugin-basics";

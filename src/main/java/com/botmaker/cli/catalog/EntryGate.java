@@ -12,6 +12,9 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -33,8 +36,8 @@ import java.util.stream.Stream;
  *   <li>The file's name is what its content claims, its JSON is the schema, and no other entry's path differs
  *       from it only by case (GitHub ignores case in a slug, a checkout on macOS or Windows too). Against the
  *       catalog's copy it is one {@link Change}: a new entry with one release, one release appended, releases
- *       removed, or a bot's {@code detached} alone. An approved release is never edited or reordered, and an
- *       entry's {@code repo} never changes.</li>
+ *       removed, one release yanked or unyanked, or a bot's {@code detached} alone. An approved release is never
+ *       otherwise edited or reordered, and an entry's {@code repo} never changes.</li>
  *   <li>The pull request's author controls the repository: they made the GitHub Release the change approves, which
  *       needs push access. A release made by {@value #ACTIONS_BOT} falls back to "the author is the repository's
  *       owner", which an organisation releasing from CI never is.</li>
@@ -107,6 +110,12 @@ public final class EntryGate {
         /** A bot's {@code detached} changed, its releases kept. */
         record Detach(boolean detached) implements Change {}
 
+        /** The release at {@code tag} pulled for {@code why}, nothing else changed (spec § 4). */
+        record Yank(String tag, ApprovedRelease.Yanked why) implements Change {}
+
+        /** The release at {@code tag} no longer pulled, nothing else changed. */
+        record Unyank(String tag) implements Change {}
+
         /** The release the change approves: what rules 3 and 5 and the kind's checks run on. */
         default Optional<ApprovedRelease> approves() {
             return switch (this) {
@@ -114,6 +123,8 @@ public final class EntryGate {
                 case Append append -> Optional.of(append.release());
                 case Remove ignored -> Optional.empty();
                 case Detach ignored -> Optional.empty();
+                case Yank ignored -> Optional.empty();
+                case Unyank ignored -> Optional.empty();
             };
         }
 
@@ -125,6 +136,9 @@ public final class EntryGate {
         static Change between(Optional<? extends Entry> base, Entry head) throws Refused {
             List<ApprovedRelease> now = head.releases();
             if (base.isEmpty()) {
+                if (now.size() == 1 && now.getFirst().yanked() != null) {
+                    throw new Refused("a new release is never listed yanked.");
+                }
                 if (now.size() == 1) return new Create(now.getFirst());
                 throw new Refused("a new entry lists one release, the one its pull request approves; this one lists "
                         + now.size() + ".");
@@ -143,7 +157,10 @@ public final class EntryGate {
             if (detach) {
                 throw new Refused("\"detached\" changes in a pull request of its own, with the releases kept.");
             }
+            Optional<Change> pulled = pulled(before, now);
+            if (pulled.isPresent()) return pulled.get();
             if (now.size() == before.size() + 1 && now.subList(0, before.size()).equals(before)) {
+                if (now.getLast().yanked() != null) throw new Refused("a new release is never listed yanked.");
                 return new Append(now.getLast());
             }
             if (now.size() < before.size() && keepsOrder(before, now)) {
@@ -159,6 +176,34 @@ public final class EntryGate {
             }
             throw new Refused("an approved release is never edited or reordered: a pull request appends one release"
                     + " at the end, or removes some.");
+        }
+
+        /**
+         * A {@link Yank} or {@link Unyank} when {@code now} is {@code before} with only one release's {@code yanked}
+         * changed; empty when anything else differs, which the caller then names.
+         */
+        private static Optional<Change> pulled(List<ApprovedRelease> before, List<ApprovedRelease> now)
+                throws Refused {
+            if (now.size() != before.size()) return Optional.empty();
+            List<Integer> changed = new ArrayList<>();
+            for (int i = 0; i < now.size(); i++) {
+                ApprovedRelease was = before.get(i);
+                ApprovedRelease is = now.get(i);
+                if (was.equals(is)) continue;
+                if (!was.unyank().equals(is.unyank())) return Optional.empty();
+                changed.add(i);
+            }
+            if (changed.size() != 1) {
+                throw new Refused("a pull request yanks or unyanks one release; this one changes " + changed.size()
+                        + ".");
+            }
+            ApprovedRelease was = before.get(changed.getFirst());
+            ApprovedRelease is = now.get(changed.getFirst());
+            if (was.yanked() != null && is.yanked() != null) {
+                throw new Refused("release " + is.tag() + " is already yanked; its reason stays as approved. Unyank"
+                        + " it first to yank it again.");
+            }
+            return Optional.of(is.yanked() != null ? new Yank(is.tag(), is.yanked()) : new Unyank(is.tag()));
         }
 
         /** Whether {@code now} is {@code before} with some releases left out, the rest in order. */
@@ -309,9 +354,10 @@ public final class EntryGate {
         } catch (IOException | IllegalArgumentException e) {
             return List.of(Finding.error(path, "not an entry of this schema: "
                     + (named.kind() == EntryPath.Kind.BOT
-                    ? "{\"repo\", \"releases\": [{\"tag\", \"commit\"[, \"bmkSha256\"]}, …]} and an optional"
-                    + " \"detached\""
-                    : "{\"repo\", \"releases\": [{\"tag\", \"commit\", \"jarSha256\", \"pomSha256\"}, …]}")
+                    ? "{\"repo\", \"releases\": [{\"tag\", \"commit\"[, \"bmkSha256\"][, \"yanked\": {\"reason\","
+                    + " \"at\"}]}, …]} and an optional \"detached\""
+                    : "{\"repo\", \"releases\": [{\"tag\", \"commit\", \"jarSha256\", \"pomSha256\"[, \"yanked\":"
+                    + " {\"reason\", \"at\"}]}, …]}")
                     + ", no tag twice, nothing else."));
         }
         if (!named.matches(entry)) {
@@ -359,6 +405,10 @@ public final class EntryGate {
             findings.add(Finding.error(path, e.getMessage()));
             return findings;
         }
+        if (change instanceof Change.Yank yank) {
+            String refusal = yankRefusal(yank.why(), Instant.now());
+            if (refusal != null) findings.add(Finding.error(path, "yank of " + yank.tag() + ": " + refusal));
+        }
         previous.ifPresent(held -> {
             if (!admin && !controls(author, held.repo(), held.newest().tag(), facts)) {
                 findings.add(Finding.error(path, "this entry belongs to whoever controls " + held.repo()
@@ -400,6 +450,30 @@ public final class EntryGate {
                     + ": the entry is opened by whoever made the release it lists."));
         }
         return findings;
+    }
+
+    /**
+     * Why a yank's reason or time is not what the rules allow at {@code now}, or {@code null}: a reason of 1 to
+     * {@value ApprovedRelease.Yanked#MAX_REASON} characters, a time within a day of the check.
+     */
+    public static String yankRefusal(ApprovedRelease.Yanked why, Instant now) {
+        String reason = why.reason().strip();
+        if (reason.isEmpty() || reason.length() > ApprovedRelease.Yanked.MAX_REASON) {
+            return "the reason is 1 to " + ApprovedRelease.Yanked.MAX_REASON + " characters; this one is "
+                    + reason.length() + ".";
+        }
+        Instant at;
+        try {
+            at = Instant.parse(why.at());
+        } catch (DateTimeParseException e) {
+            return "\"at\" " + why.at() + " is not an ISO-8601 time such as 2026-11-21T10:00:00Z.";
+        }
+        // Only a time ahead is refused: the checks of a pull request run again days after it was opened, and a yank
+        // that passed once must pass again (2026-11-21, the phase's review).
+        if (Duration.between(now, at).compareTo(Duration.ofDays(1)) > 0) {
+            return "\"at\" " + why.at() + " is more than a day ahead; yank with the time you open the pull request.";
+        }
+        return null;
     }
 
     /**

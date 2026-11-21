@@ -86,7 +86,7 @@ public final class CatalogBuilder {
                 if (name == null) name = jar.name();
                 releases.add(new Catalog.Plugin.Release(release.tag(), release.commit(), release.jarSha256(),
                         release.pomSha256(), jar.minContractVersion(), jar.editorDependencies(), jar.plugins(),
-                        published.get().publishedAt()));
+                        published.get().publishedAt(), release.yanked()));
             }
             if (releases.isEmpty()) continue;
             plugins.add(new Catalog.Plugin(entry.repo(), publishers.rankOf(repo.get().ownerId()),
@@ -119,7 +119,7 @@ public final class CatalogBuilder {
                         && VERSION.matcher(p.version() == null ? "" : p.version()).matches())) continue;
                 releases.add(new Catalog.Bot.Release(release.tag(), release.commit(), pins, release.bmkSha256(),
                         published.get().publishedAt(), published.get().bmkDownloads(),
-                        platforms == null ? List.of() : platforms));
+                        platforms == null ? List.of() : platforms, release.yanked()));
             }
             if (releases.isEmpty()) continue;
             Integer downloads = releases.stream().map(Catalog.Bot.Release::downloads).filter(Objects::nonNull)
@@ -157,7 +157,7 @@ public final class CatalogBuilder {
                         r.minContractVersion(), r.editorDependencies(), r.plugins().stream()
                         .filter(p -> listed.contains(p.repo()) && !p.repo().equals(plugin.repo())
                                 && VERSION.matcher(p.version() == null ? "" : p.version()).matches())
-                        .toList(), r.publishedAt()))
+                        .toList(), r.publishedAt(), r.yanked()))
                 .toList();
         return new Catalog.Plugin(plugin.repo(), plugin.rank(), plugin.coordinate(), plugin.name(),
                 plugin.description(), plugin.tags(), plugin.stars(), releases, plugin.updatedAt());

@@ -20,22 +20,58 @@ import java.util.regex.Pattern;
  * @param pomSha256 likewise; the pom names the dependencies Studio downloads with the jar
  * @param bmkSha256 a bot's only, and optional (2026-10-25): the sha256 of the {@code .bmk} on its GitHub Release,
  *                  which the catalog's check rebuilt from {@code commit} and Studio checks a file it opens against
+ * @param yanked    set when the release was pulled (2026-11-21, spec § 4): kept on record, left out of every picker,
+ *                  a banner for whoever is on it, nothing refused. The only edit of an approved release the check
+ *                  allows ({@link EntryGate.Change.Yank}, {@link EntryGate.Change.Unyank}).
  */
-@JsonPropertyOrder({"tag", "commit", "jarSha256", "pomSha256", "bmkSha256"})
+@JsonPropertyOrder({"tag", "commit", "jarSha256", "pomSha256", "bmkSha256", "yanked"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record ApprovedRelease(String tag, String commit, String jarSha256, String pomSha256, String bmkSha256) {
+public record ApprovedRelease(String tag, String commit, String jarSha256, String pomSha256, String bmkSha256,
+                              Yanked yanked) {
 
     static final Pattern COMMIT = Pattern.compile("[0-9a-f]{40}");
     static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
+
+    /**
+     * Why and when a release was pulled.
+     *
+     * @param reason 1–300 characters, shown to whoever is on the release
+     * @param at     an ISO-8601 instant, within a day of the check that approved the yank
+     */
+    @JsonPropertyOrder({"reason", "at"})
+    public record Yanked(String reason, String at) {
+        /** The longest reason the check takes. */
+        public static final int MAX_REASON = 300;
+
+        public Yanked {
+            Entry.required(reason, "reason");
+            Entry.required(at, "at");
+        }
+    }
 
     public ApprovedRelease {
         Entry.required(tag, "tag");
         Entry.required(commit, "commit");
     }
 
+    /** A release, not yanked. */
+    public ApprovedRelease(String tag, String commit, String jarSha256, String pomSha256, String bmkSha256) {
+        this(tag, commit, jarSha256, pomSha256, bmkSha256, null);
+    }
+
     /** A plugin's release: no {@code .bmk}. */
     public ApprovedRelease(String tag, String commit, String jarSha256, String pomSha256) {
         this(tag, commit, jarSha256, pomSha256, null);
+    }
+
+    /** The same release, pulled for {@code why}. */
+    public ApprovedRelease yank(Yanked why) {
+        return new ApprovedRelease(tag, commit, jarSha256, pomSha256, bmkSha256, why);
+    }
+
+    /** The same release, no longer pulled. */
+    public ApprovedRelease unyank() {
+        return yank(null);
     }
 
     /** A bot's release with no {@code .bmk}: a commit, no hashes. */

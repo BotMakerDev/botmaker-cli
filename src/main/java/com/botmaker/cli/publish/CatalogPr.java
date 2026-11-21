@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -111,6 +112,13 @@ public final class CatalogPr {
         /** {@code entry} with {@code tag} no longer approved, the other releases kept. */
         public static Change withdraw(Entry entry, String tag, String command) {
             return put(entry, entry.repo() + " remove " + tag, "Removes release " + tag + " from", command);
+        }
+
+        /** {@code entry}, its release {@code tag} already yanked or unyanked in it, the rest unchanged. */
+        public static Change yank(Entry entry, String tag, boolean undo, String command) {
+            return undo
+                    ? put(entry, "unyank " + entry.repo() + " " + tag, "Unyanks release " + tag + " of", command)
+                    : put(entry, "yank " + entry.repo() + " " + tag, "Yanks release " + tag + " of", command);
         }
 
         private static Change put(Entry entry, String subject, String verb, String command) {
@@ -292,6 +300,55 @@ public final class CatalogPr {
             return host.open(Change.remove(path, command), account, listener);
         }
         return host.open(Change.withdraw(held.withReleases(kept), tag, command), account, listener);
+    }
+
+    /**
+     * Opens the pull request yanking {@code path}'s release {@code tag} for {@code reason} at {@code now}, or with
+     * {@code reason} empty unyanking it (spec § 4), after checking here what the catalog checks: the release is
+     * listed, yanked or not as the change needs, the reason fits, and {@code account} controls the entry or is an
+     * admin.
+     *
+     * @return the pull request's URL, or empty when there was nothing to open
+     */
+    public static Optional<String> yank(EntryPath path, String tag, Optional<String> reason, Instant now,
+                                        PublishHost.Account account, String command, EntryFacts facts, Reader catalog,
+                                        Opener host, Listener listener) throws Refusal {
+        Entry held = catalog.listed(path).orElseThrow(() -> new Refusal(path.key() + " is not listed in the catalog ("
+                + path.path() + "), or GitHub did not answer."));
+        String wanted = tag.strip();
+        ApprovedRelease release = held.release(wanted).orElseThrow(() -> new Refusal(path.key()
+                + " lists no release " + wanted + "; it lists "
+                + String.join(", ", held.releases().stream().map(ApprovedRelease::tag).toList()) + "."));
+        String newest = held.newest().tag();
+        try {
+            if (!admin(account, catalog) && !EntryGate.controls(account.login(), held.repo(), newest, facts)) {
+                throw new Refusal("only whoever controls " + held.repo() + " or an admin may yank its releases, and "
+                        + account.login() + " neither made its release " + newest + " nor owns it.");
+            }
+        } catch (UncheckedIOException e) {
+            throw new Refusal("could not reach GitHub to check the entry: " + e.getCause().getMessage());
+        }
+        ApprovedRelease changed;
+        if (reason.isEmpty()) {
+            if (release.yanked() == null) throw new Refusal(wanted + " is not yanked.");
+            changed = release.unyank();
+        } else {
+            if (release.yanked() != null) {
+                throw new Refusal(wanted + " is already yanked: " + release.yanked().reason()
+                        + " Unyank it first to give another reason.");
+            }
+            if (reason.get().isBlank()) {
+                throw new Refusal("a yank says why, in 1 to " + ApprovedRelease.Yanked.MAX_REASON + " characters.");
+            }
+            ApprovedRelease.Yanked why = new ApprovedRelease.Yanked(reason.get().strip(), now.toString());
+            String refusal = EntryGate.yankRefusal(why, now);
+            if (refusal != null) throw new Refusal(refusal);
+            changed = release.yank(why);
+        }
+        List<ApprovedRelease> releases = held.releases().stream().map(r -> r.tag().equals(wanted) ? changed : r)
+                .toList();
+        return host.open(Change.yank(held.withReleases(releases), wanted, reason.isEmpty(), command), account,
+                listener);
     }
 
     /** What carries a pull request: a host's {@link PublishHost#pullRequest}, all an unpublish needs of it. */

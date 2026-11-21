@@ -10,6 +10,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -164,6 +167,84 @@ class EntryGateTest {
         write(head, BOT, json(new BotEntry("somedev/firestone", List.of(botRelease("v1.2.0"), botRelease("v1.3.0")),
                 true)));
         assertRefused(check("somedev", BOT), "a pull request of its own");
+    }
+
+    @Test
+    void the_controller_or_an_admin_yanks_and_unyanks_a_release_and_nobody_else_does() throws Exception {
+        admins();
+        write(base, BOT, botJson("somedev/firestone", "v1.2.0"));
+        write(head, BOT, yanked("v1.2.0", "Deletes saves.", Instant.now()));
+        assertEquals(List.of(), check("somedev", BOT));
+        assertEquals(List.of(), check("BotMakerDev", ADMIN_ID, BOT));
+        assertRefused(check("mallory", 9, BOT), "only they may change it");
+        assertEquals(new EntryGate.Change.Yank("v1.2.0", new ApprovedRelease.Yanked("Deletes saves.",
+                        BotEntry.read(head.resolve(BOT)).newest().yanked().at())),
+                EntryGate.Change.between(Optional.of(BotEntry.read(base.resolve(BOT))),
+                        BotEntry.read(head.resolve(BOT))));
+
+        Files.copy(head.resolve(BOT), base.resolve(BOT), StandardCopyOption.REPLACE_EXISTING);
+        write(head, BOT, botJson("somedev/firestone", "v1.2.0"));
+        assertEquals(List.of(), check("somedev", BOT), "unyank");
+        assertRefused(check("mallory", 9, BOT), "only they may change it");
+        write(head, BOT, yanked("v1.2.0", "Another reason.", Instant.now()));
+        assertRefused(check("somedev", BOT), "already yanked");
+    }
+
+    @Test
+    void a_yank_that_also_edits_the_release_or_yanks_two_is_refused() throws IOException {
+        facts.release("somedev/firestone", "v1.3.0", "somedev");
+        write(base, BOT, botJson("somedev/firestone", "v1.2.0", "v1.3.0"));
+        ApprovedRelease.Yanked why = new ApprovedRelease.Yanked("Broken.", Instant.now().toString());
+        write(head, BOT, json(new BotEntry("somedev/firestone", List.of(
+                ApprovedRelease.ofBot("v1.2.0", commitOf("elsewhere")).yank(why), botRelease("v1.3.0")), false)));
+        assertRefused(check("somedev", BOT), "release v1.2.0 was edited");
+        write(head, BOT, json(new BotEntry("somedev/firestone", List.of(
+                botRelease("v1.2.0").yank(why), botRelease("v1.3.0").yank(why)), false)));
+        assertRefused(check("somedev", BOT), "yanks or unyanks one release");
+    }
+
+    @Test
+    void a_yank_reason_is_1_to_300_characters_and_its_time_within_a_day() throws IOException {
+        write(base, BOT, botJson("somedev/firestone", "v1.2.0"));
+        write(head, BOT, yanked("v1.2.0", "x".repeat(300), Instant.now()));
+        assertEquals(List.of(), check("somedev", BOT));
+        write(head, BOT, yanked("v1.2.0", "x".repeat(301), Instant.now()));
+        assertRefused(check("somedev", BOT), "1 to 300 characters");
+        write(head, BOT, yanked("v1.2.0", "", Instant.now()));
+        assertRefused(check("somedev", BOT), "not an entry of this schema");
+        write(head, BOT, yanked("v1.2.0", "Old.", Instant.now().minus(Duration.ofDays(5))));
+        assertEquals(List.of(), check("somedev", BOT), "checks run again days later still pass");
+        write(head, BOT, yanked("v1.2.0", "Soon.", Instant.now().plus(Duration.ofDays(2))));
+        assertRefused(check("somedev", BOT), "more than a day ahead");
+        write(head, BOT, yanked("v1.2.0", "Soon.", null));
+        assertRefused(check("somedev", BOT), "not an ISO-8601 time");
+    }
+
+    @Test
+    void a_new_or_appended_release_is_never_listed_yanked() throws IOException {
+        ApprovedRelease.Yanked why = new ApprovedRelease.Yanked("Broken.", Instant.now().toString());
+        write(head, BOT, json(new BotEntry("somedev/firestone", List.of(botRelease("v1.2.0").yank(why)), false)));
+        assertRefused(check("somedev", BOT), "never listed yanked");
+        facts.release("somedev/firestone", "v1.3.0", "somedev");
+        write(base, BOT, botJson("somedev/firestone", "v1.2.0"));
+        write(head, BOT, json(new BotEntry("somedev/firestone", List.of(botRelease("v1.2.0"),
+                botRelease("v1.3.0").yank(why)), false)));
+        assertRefused(check("somedev", BOT), "never listed yanked");
+    }
+
+    @Test
+    void an_approved_plugin_release_is_otherwise_never_edited() throws IOException {
+        ApprovedRelease held = pluginRelease("v2.1.0");
+        write(head, SDK, json(new PluginEntry(SDK_REPO, List.of(new ApprovedRelease(held.tag(), held.commit(),
+                FakeFacts.shaOf("another jar"), held.pomSha256())))));
+        assertRefused(check("LiQiyeDev", SDK), "release v2.1.0 was edited");
+    }
+
+    /** Firestone's entry with {@code tag} yanked for {@code reason} at {@code at}, or an unreadable time for null. */
+    private static String yanked(String tag, String reason, Instant at) {
+        ApprovedRelease.Yanked why = new ApprovedRelease.Yanked("REASON", at == null ? "yesterday" : at.toString());
+        return json(new BotEntry("somedev/firestone", List.of(botRelease(tag).yank(why)), false))
+                .replace("\"REASON\"", "\"" + reason + "\"");
     }
 
     @Test

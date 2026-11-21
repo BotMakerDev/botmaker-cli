@@ -36,7 +36,8 @@ final class BotListCommand implements Callable<Integer> {
         }
         for (Catalog.Bot bot : catalog.get().bots()) {
             console.out(String.join("  ", Objects.requireNonNullElse(bot.rank(), Rank.COMMUNITY).displayName(),
-                    bot.repo(), bot.newest().tag(), bot.description()).strip());
+                    bot.repo(), bot.pickable().isEmpty() ? "(every release pulled)" : bot.pickable().getFirst().tag(),
+                    bot.description()).strip());
         }
         return 0;
     }

@@ -35,7 +35,8 @@ import java.util.concurrent.Callable;
         synopsisSubcommandLabel = "<command>",
         subcommands = {PluginNewCommand.class, PluginDeclareCommand.class, PluginUpgradeCommand.class,
                 PluginValidateCommand.class, PluginRunCommand.class,
-                PluginPublishCommand.class, PluginUnpublishCommand.class, PluginListCommand.class})
+                PluginPublishCommand.class, PluginUnpublishCommand.class, PluginYankCommand.class,
+                PluginListCommand.class})
 final class PluginCommand implements Callable<Integer> {
 
     @ParentCommand

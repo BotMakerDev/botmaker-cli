@@ -9,6 +9,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Yank (spec `2026-11-21-catalog-trust-design.md`, phase 2). An approved release can carry `yanked: {reason, at}`.
+  The catalog lists it, and no picker offers it (`Catalog.Plugin.pickable()`, `Catalog.Bot.pickable()`).
+  `botmaker bot|plugin yank --repo <o/r> --release <tag> --reason "…"` opens the pull request, and `--undo` lists the
+  release again. `EntryGate` accepts a yank or an unyank of one release only, by the entry's controller or an admin.
+  The reason is 1 to 300 characters, and `at` is no more than a day ahead of the check (a check run again days
+  later still passes). `bot list` and `plugin list` print the newest release not yanked. A new release is never listed yanked,
+  and a yanked release is otherwise never edited.
 - `catalog.json` schema 6 (spec `2026-11-21-catalog-trust-design.md`, phase 1). A release has a `publishedAt`, and
   an entry has an `updatedAt`, the time of its newest release. A bot release has `downloads`, its `.bmk`'s GitHub
   download count, which is absent when there is no `.bmk`. A bot release also lists `platforms`. A bot has

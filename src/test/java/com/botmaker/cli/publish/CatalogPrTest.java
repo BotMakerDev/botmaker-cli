@@ -6,6 +6,7 @@ package com.botmaker.cli.publish;
 import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.BotEntry;
 import com.botmaker.cli.catalog.Catalog;
+import com.botmaker.cli.catalog.CatalogJson;
 import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.FakeFacts;
@@ -13,6 +14,8 @@ import com.botmaker.cli.catalog.PluginEntry;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -107,6 +110,46 @@ class CatalogPrTest {
         assertThrows(Refusal.class, () -> CatalogPr.unpublish(path, Optional.empty(),
                 new PublishHost.Account("otherdev", 8), "test", facts, catalog, new FakeRunner(facts).host(HERE)::pullRequest,
                 FakeRunner.QUIET), "only whoever controls the entry");
+    }
+
+    @Test
+    void a_yank_writes_the_entry_with_that_release_pulled_and_undo_lists_it_again() throws Exception {
+        FakeFacts facts = new FakeFacts().repo("somedev/firestone", 2, "", null)
+                .release("somedev/firestone", "v1", "somedev").release("somedev/firestone", "v2", "somedev");
+        EntryPath path = EntryPath.parse("bots/somedev__firestone.json").orElseThrow();
+        Map<String, Entry> held = new HashMap<>(Map.of(path.path(), new BotEntry("somedev/firestone",
+                List.of(FakeFacts.botRelease("v1"), FakeFacts.botRelease("v2")), false)));
+        CatalogPr.Reader catalog = reader(held);
+        Instant now = Instant.parse("2026-11-21T10:00:00Z");
+        List<CatalogPr.Change> opened = new ArrayList<>();
+        CatalogPr.Opener host = (change, account, listener) -> {
+            opened.add(change);
+            return Optional.empty();
+        };
+
+        CatalogPr.yank(path, "v1", Optional.of("Deletes saves."), now, SOMEDEV, "test", facts, catalog, host,
+                FakeRunner.QUIET);
+        CatalogPr.Change yank = opened.getFirst();
+        assertEquals("bot: yank somedev/firestone v1", yank.title());
+        BotEntry written = CatalogJson.strict().readValue(yank.content().orElseThrow(), BotEntry.class);
+        assertEquals(new ApprovedRelease.Yanked("Deletes saves.", "2026-11-21T10:00:00Z"),
+                written.releases().getFirst().yanked());
+        assertEquals(FakeFacts.botRelease("v2"), written.releases().getLast(), "the other release untouched");
+
+        Refusal stranger = assertThrows(Refusal.class, () -> CatalogPr.yank(path, "v1", Optional.of("x"), now,
+                new PublishHost.Account("otherdev", 8), "test", facts, catalog, host, FakeRunner.QUIET));
+        assertTrue(stranger.getMessage().contains("or an admin"), stranger.getMessage());
+        Refusal notYanked = assertThrows(Refusal.class, () -> CatalogPr.yank(path, "v1", Optional.empty(), now,
+                SOMEDEV, "test", facts, catalog, host, FakeRunner.QUIET));
+        assertTrue(notYanked.getMessage().contains("is not yanked"), notYanked.getMessage());
+        assertThrows(Refusal.class, () -> CatalogPr.yank(path, "v1", Optional.of("x".repeat(301)), now, SOMEDEV,
+                "test", facts, catalog, host, FakeRunner.QUIET));
+
+        held.put(path.path(), written);
+        CatalogPr.yank(path, "v1", Optional.empty(), now, SOMEDEV, "test", facts, catalog, host, FakeRunner.QUIET);
+        assertEquals("bot: unyank somedev/firestone v1", opened.getLast().title());
+        assertEquals(FakeFacts.botRelease("v1"), CatalogJson.strict().readValue(opened.getLast().content()
+                .orElseThrow(), BotEntry.class).releases().getFirst());
     }
 
     private static final PublishHost.Account SOMEDEV = new PublishHost.Account("somedev", 7);

@@ -36,7 +36,8 @@ final class PluginListCommand implements Callable<Integer> {
         }
         for (Catalog.Plugin plugin : catalog.get().plugins()) {
             console.out(String.join("  ", Objects.requireNonNullElse(plugin.rank(), Rank.COMMUNITY).displayName(),
-                    plugin.repo(), plugin.coordinate() + ":" + plugin.newest().tag(),
+                    plugin.repo(), plugin.pickable().isEmpty() ? plugin.coordinate() + " (every release pulled)"
+                            : plugin.coordinate() + ":" + plugin.pickable().getFirst().tag(),
                     Objects.requireNonNullElse(plugin.name(), "")).strip());
         }
         return 0;

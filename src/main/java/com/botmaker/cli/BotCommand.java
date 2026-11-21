@@ -30,7 +30,7 @@ import java.util.concurrent.Callable;
                 + "its catalog entry — for anybody else to start from.",
         mixinStandardHelpOptions = true,
         synopsisSubcommandLabel = "<command>",
-        subcommands = {BotNewCommand.class, BotPublishCommand.class, BotUnpublishCommand.class,
+        subcommands = {BotNewCommand.class, BotPublishCommand.class, BotUnpublishCommand.class, BotYankCommand.class,
                 BotListCommand.class, BotExportCommand.class, BotRunCommand.class})
 final class BotCommand implements Callable<Integer> {
 

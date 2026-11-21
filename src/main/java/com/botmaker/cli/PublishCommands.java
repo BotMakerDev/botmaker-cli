@@ -19,11 +19,12 @@ import com.botmaker.cli.validate.CheckResult;
 import picocli.CommandLine;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * What {@code plugin publish}, {@code bot publish} and the two {@code unpublish} commands share: the library
+ * What {@code plugin publish}, {@code bot publish}, the two {@code unpublish} and the two {@code yank} commands share: the library
  * ({@link Publish}, {@link CatalogPr}) wired to this machine and its outcome printed.
  */
 final class PublishCommands {
@@ -92,6 +93,35 @@ final class PublishCommands {
         }
         console.step(release.map(tag -> path.key() + " " + tag).orElse(path.key())
                 + " leaves the catalog once its checks pass on the pull request.");
+        return 0;
+    }
+
+    /**
+     * The pull request yanking {@code path}'s release {@code tag} for {@code reasonText}, or with {@code undo}
+     * unyanking it; exactly one of the two is given.
+     */
+    static int yank(Main main, EntryPath path, String tag, String reasonText, boolean undo, String command) {
+        Console console = main.console();
+        if (undo == (reasonText != null)) {
+            console.error(undo ? "--undo takes no --reason." : "--reason says why the release is yanked.");
+            return 2;
+        }
+        Optional<String> reason = Optional.ofNullable(reasonText);
+        Listener listener = listener(console);
+        PublishHost host = PublishHost.commands(Path.of("."), StepRunner.system(listener), listener,
+                BotExport.maven(main.mvn()));
+        GitHubFacts facts = GitHubFacts.anonymousOrToken();
+        try {
+            PublishHost.Account account = host.account()
+                    .orElseThrow(() -> new Refusal("`gh` is not signed in; run `gh auth login` first."));
+            CatalogPr.yank(path, tag, reason, Instant.now(), account, command, facts, CatalogPr.Reader.of(facts),
+                    host::pullRequest, listener).ifPresent(console::out);
+        } catch (Refusal e) {
+            console.error(e.getMessage());
+            return 1;
+        }
+        console.step(path.key() + " " + tag.strip() + (reason.isPresent() ? " is yanked" : " is listed again")
+                + " once the catalog's checks pass on the pull request.");
         return 0;
     }
 

@@ -58,16 +58,25 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
          * @param plugins            the other catalog plugins its pom declares, which a project adding it gets too
          *                           (2026-10-24: New Project locks them)
          * @param publishedAt        when its GitHub Release was published (ISO-8601), {@code null} when unknown
+         * @param yanked             why and when it was pulled, {@code null} when it was not (spec 2026-11-21 § 4)
          */
         @JsonInclude(JsonInclude.Include.NON_EMPTY)
         @JsonPropertyOrder({"tag", "commit", "jarSha256", "pomSha256", "minContractVersion", "editorDependencies",
-                "plugins", "publishedAt"})
+                "plugins", "publishedAt", "yanked"})
         public record Release(String tag, String commit, String jarSha256, String pomSha256,
                               String minContractVersion, List<String> editorDependencies,
-                              List<DerivedFacts.Pin> plugins, String publishedAt) {
+                              List<DerivedFacts.Pin> plugins, String publishedAt, ApprovedRelease.Yanked yanked) {
             public Release {
                 editorDependencies = editorDependencies == null ? List.of() : List.copyOf(editorDependencies);
                 plugins = plugins == null ? List.of() : List.copyOf(plugins);
+            }
+
+            /** A release not yanked. */
+            public Release(String tag, String commit, String jarSha256, String pomSha256,
+                           String minContractVersion, List<String> editorDependencies,
+                           List<DerivedFacts.Pin> plugins, String publishedAt) {
+                this(tag, commit, jarSha256, pomSha256, minContractVersion, editorDependencies, plugins, publishedAt,
+                        null);
             }
 
             /** A release whose publishing time is not known. */
@@ -101,6 +110,12 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
         public Release newest() {
             return releases.getFirst();
         }
+
+        /** The releases a picker offers: none yanked, newest first. */
+        @JsonIgnore
+        public List<Release> pickable() {
+            return releases.stream().filter(r -> r.yanked() == null).toList();
+        }
     }
 
     /**
@@ -127,14 +142,23 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
          * @param publishedAt when its GitHub Release was published (ISO-8601), {@code null} when unknown
          * @param downloads   its {@code .bmk}'s GitHub download count, {@code null} for a release with no {@code .bmk}
          * @param platforms   the systems its pom names ({@link Platform#PROPERTY}); empty means every known one
+         * @param yanked      why and when it was pulled, {@code null} when it was not (spec 2026-11-21 § 4)
          */
         @JsonInclude(JsonInclude.Include.NON_EMPTY)
-        @JsonPropertyOrder({"tag", "commit", "plugins", "bmkSha256", "publishedAt", "downloads", "platforms"})
+        @JsonPropertyOrder({"tag", "commit", "plugins", "bmkSha256", "publishedAt", "downloads", "platforms",
+                "yanked"})
         public record Release(String tag, String commit, List<DerivedFacts.Pin> plugins, String bmkSha256,
-                              String publishedAt, Integer downloads, List<Platform> platforms) {
+                              String publishedAt, Integer downloads, List<Platform> platforms,
+                              ApprovedRelease.Yanked yanked) {
             public Release {
                 plugins = plugins == null ? List.of() : List.copyOf(plugins);
                 platforms = platforms == null ? List.of() : List.copyOf(platforms);
+            }
+
+            /** A release not yanked. */
+            public Release(String tag, String commit, List<DerivedFacts.Pin> plugins, String bmkSha256,
+                           String publishedAt, Integer downloads, List<Platform> platforms) {
+                this(tag, commit, plugins, bmkSha256, publishedAt, downloads, platforms, null);
             }
 
             /** A release with no time, count or platforms. */
@@ -169,6 +193,12 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
         @JsonIgnore
         public Release newest() {
             return releases.getFirst();
+        }
+
+        /** The releases a picker offers: none yanked, newest first. */
+        @JsonIgnore
+        public List<Release> pickable() {
+            return releases.stream().filter(r -> r.yanked() == null).toList();
         }
     }
 
