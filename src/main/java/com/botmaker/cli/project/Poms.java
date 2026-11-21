@@ -204,6 +204,27 @@ public final class Poms {
         return true;
     }
 
+    /**
+     * Sets one {@code <properties>} entry, adding the element when the pom has none; rewrites the file only when the
+     * value changes.
+     *
+     * @return whether the file was rewritten
+     */
+    public static boolean setProperty(Path pom, String name, String value) throws IOException {
+        Document doc = parse(pom);
+        Element root = doc.getDocumentElement();
+        Element properties = firstChild(root, "properties");
+        if (properties == null) {
+            properties = doc.createElement("properties");
+            root.appendChild(properties);
+        } else if (firstChild(properties, name) != null && text(properties, name).equals(value)) {
+            return false;
+        }
+        setText(doc, properties, name, value);
+        write(doc, pom);
+        return true;
+    }
+
     private static Document parse(Path pom) throws IOException {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();

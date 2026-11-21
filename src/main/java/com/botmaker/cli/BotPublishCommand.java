@@ -4,15 +4,20 @@
 package com.botmaker.cli;
 
 import com.botmaker.cli.catalog.EntryPath;
+import com.botmaker.cli.catalog.Platform;
 import com.botmaker.cli.publish.Level;
 import com.botmaker.cli.publish.Publish;
 import com.botmaker.cli.publish.PublishRequest;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.ITypeConverter;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.TypeConversionException;
 
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
@@ -60,10 +65,32 @@ final class BotPublishCommand implements Callable<Integer> {
     @Option(names = "--dry-run", description = "Check, print what would be listed, and create or tag nothing.")
     private boolean dryRun;
 
+    @Option(names = "--platforms", paramLabel = "<linux,windows,macos>", split = ",",
+            converter = PlatformConverter.class,
+            description = "The systems the bot runs on, written to the pom's " + Platform.PROPERTY + " and committed "
+                    + "before the tag. Default: the pom as it is (none named means all).")
+    private List<Platform> platforms;
+
     @Override
     public Integer call() {
         return PublishCommands.publish(parent.main(), new PublishRequest(Path.of(directory).toAbsolutePath().normalize(),
                 EntryPath.Kind.BOT, bump == null ? Level.DEFAULT : bump, Optional.ofNullable(tag),
-                Optional.ofNullable(repo), dryRun, "botmaker bot publish"));
+                Optional.ofNullable(repo), dryRun, "botmaker bot publish", platforms));
+    }
+
+    /**
+     * One system of {@code --platforms}' comma list (picocli splits it and converts each part), refused when BotMaker
+     * does not know it or it is blank.
+     */
+    static final class PlatformConverter implements ITypeConverter<Platform> {
+        @Override
+        public Platform convert(String value) {
+            Platform platform = Platform.fromId(value.trim().toLowerCase(Locale.ROOT));
+            if (platform == Platform.UNKNOWN) {
+                throw new TypeConversionException("not " + (value.isBlank() ? "empty" : "'" + value.trim() + "'")
+                        + ": name some of " + Platform.write(Platform.known()));
+            }
+            return platform;
+        }
     }
 }

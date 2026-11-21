@@ -9,6 +9,7 @@ import com.botmaker.cli.bmk.BotFile;
 import com.botmaker.cli.bmk.BotFiles;
 import com.botmaker.cli.bmk.BotJson;
 import com.botmaker.cli.bmk.Central;
+import com.botmaker.cli.project.Poms;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -263,6 +265,12 @@ public final class BotChecks {
         if (pins.isEmpty()) {
             return List.of(Finding.error(path, "the pom declares no plugin the catalog lists; a bot declares at"
                     + " least one (the BotMaker SDK, for most)."));
+        }
+        List<String> unknown = Platform.unknownIds(Poms.properties(pom).get(Platform.PROPERTY));
+        if (!unknown.isEmpty()) {
+            return List.of(Finding.error(path, Platform.PROPERTY + " names " + String.join(", ", unknown)
+                    + ", which is not " + Platform.known().stream().map(Platform::id)
+                    .collect(Collectors.joining(", ", "one of ", "."))));
         }
         return pins.stream().filter(p -> !CatalogBuilder.VERSION.matcher(p.version()).matches())
                 .map(p -> Finding.error(path, p.repo() + " is pinned at \"" + p.version() + "\", not a released"

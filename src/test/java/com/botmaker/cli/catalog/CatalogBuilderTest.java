@@ -229,8 +229,55 @@ class CatalogBuilderTest {
         write(catalog);
         assertEquals(catalog, Catalog.read(root.resolve(Catalog.FILE)).orElseThrow());
         assertTrue(catalog.toJson().contains("\"rank\" : \"admin\""));
-        assertTrue(catalog.toJson().contains("\"schemaVersion\" : 5"));
+        assertTrue(catalog.toJson().contains("\"schemaVersion\" : 6"));
         assertFalse(catalog.toJson().contains("\"id\""), "a plugin is named by its repo since 2026-10-27");
+    }
+
+    @Test
+    void a_release_says_when_it_was_published_and_the_entry_its_newest() throws IOException {
+        facts.releases.put(SDK_REPO + "@v2.1.0",
+                new EntryFacts.Release("LiQiyeDev", false, false, "2026-11-20T10:00:00Z", Map.of()));
+        Catalog.Plugin sdk = CatalogBuilder.build(root, publishers, facts, derived, NOW).plugins().getFirst();
+        assertEquals("2026-11-20T10:00:00Z", sdk.newest().publishedAt());
+        assertEquals("2026-11-20T10:00:00Z", sdk.updatedAt());
+    }
+
+    @Test
+    void a_bot_counts_its_bmk_downloads() throws IOException {
+        entry("bots/somedev__firestone.json", botJson("somedev/firestone", "v1.2.0", "v1.3.0"));
+        facts.release("somedev/firestone", "v1.3.0", "somedev");
+        facts.releases.put("somedev/firestone@v1.2.0", new EntryFacts.Release("somedev", false, false,
+                "2026-11-01T00:00:00Z", Map.of("firestone-v1.2.0.bmk", 12, "notes.txt", 99)));
+        facts.releases.put("somedev/firestone@v1.3.0", new EntryFacts.Release("somedev", false, false,
+                "2026-11-02T00:00:00Z", Map.of("firestone-v1.3.0.bmk", 30)));
+        List<DerivedFacts.Pin> pins = List.of(new DerivedFacts.Pin(SDK_REPO, "2.1.0"));
+        DerivedFacts both = new DerivedFacts(derived.plugins(),
+                Map.of("somedev/firestone", Map.of("v1.2.0", pins, "v1.3.0", pins), "stranger/fork", Map.of("v1", pins)));
+        Catalog.Bot bot = CatalogBuilder.build(root, publishers, facts, both, NOW).bots().getFirst();
+        assertEquals(List.of(30, 12), bot.releases().stream().map(Catalog.Bot.Release::downloads).toList());
+        assertEquals(42, bot.downloads());
+        assertEquals("2026-11-02T00:00:00Z", bot.updatedAt());
+    }
+
+    @Test
+    void a_release_with_no_bmk_counts_nothing() throws IOException {
+        Catalog catalog = CatalogBuilder.build(root, publishers, facts, derived, NOW);
+        Catalog.Bot bot = catalog.bots().getFirst();
+        assertNull(bot.newest().downloads(), "no .bmk: no count, not 0");
+        assertNull(bot.downloads());
+        assertFalse(catalog.toJson().contains("\"downloads\""), "neither the bot nor a plugin counts anything");
+    }
+
+    @Test
+    void a_bot_lists_the_platforms_its_pom_names() throws IOException {
+        DerivedFacts withPlatforms = new DerivedFacts(derived.plugins(), derived.botPlugins(),
+                Map.of("somedev/firestone", Map.of("v1.2.0", List.of(Platform.WINDOWS))));
+        Catalog catalog = CatalogBuilder.build(root, publishers, facts, withPlatforms, NOW);
+        assertEquals(List.of(Platform.WINDOWS), catalog.bots().getFirst().newest().platforms());
+        assertEquals(List.of(), catalog.bots().get(1).newest().platforms(), "no facts: none listed, read as all");
+        assertTrue(catalog.toJson().contains("\"platforms\" : [ \"windows\" ]"));
+        write(catalog);
+        assertEquals(catalog, Catalog.read(root.resolve(Catalog.FILE)).orElseThrow());
     }
 
     private void write(Catalog catalog) throws IOException {

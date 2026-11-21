@@ -140,6 +140,17 @@ class PomFactsTest {
         assertTrue(derived.botPlugins().isEmpty());
     }
 
+    /** A pom naming no system lists none, which a reader takes as all: a system learned later is not ruled out. */
+    @Test
+    void a_bot_pom_lists_the_systems_it_names_and_none_for_none() {
+        FakeFacts named = new FakeFacts().pom(BOT.repo(), "v1.2.0",
+                "<project><properties><botmaker.platforms>macos, linux</botmaker.platforms></properties></project>");
+        assertEquals(List.of(Platform.LINUX, Platform.MACOS),
+                PomFacts.read(List.of(BOT), named, IDS).botPlatforms(BOT.repo(), "v1.2.0"));
+        FakeFacts none = new FakeFacts().pom(BOT.repo(), "v1.2.0", "<project/>");
+        assertEquals(List.of(), PomFacts.read(List.of(BOT), none, IDS).botPlatforms(BOT.repo(), "v1.2.0"));
+    }
+
     @Test
     void the_index_writes_the_catalog_once_and_leaves_it_when_nothing_changed() throws IOException {
         Files.createDirectories(dir.resolve("plugins"));

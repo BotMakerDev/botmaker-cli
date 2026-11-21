@@ -3,6 +3,7 @@
 
 package com.botmaker.cli;
 
+import com.botmaker.cli.catalog.Platform;
 import com.botmaker.cli.publish.Level;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
@@ -12,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -176,6 +178,14 @@ class CommandLineTest {
      * option cannot be called that; the test is here because the name is forced by something invisible at
      * the call site, and renaming it back would fail at construction rather than at review.
      */
+    /** picocli splits {@code --platforms} and converts each system: a list of {@link Platform}, never of lists. */
+    @Test
+    void bot_publish_takes_the_systems_it_runs_on() {
+        assertEquals(List.of(Platform.WINDOWS, Platform.LINUX), parse("bot", "publish", "--platforms", "Windows, linux")
+                .subcommand().subcommand().matchedOptionValue("--platforms", List.of()));
+        assertThrows(CommandLine.ParameterException.class, () -> parse("bot", "publish", "--platforms", "linux,beos"));
+    }
+
     @Test
     void publish_takes_the_tag_it_will_publish_under() {
         assertEquals("v1.2.0", parse("plugin", "publish", "--tag", "v1.2.0")

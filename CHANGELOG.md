@@ -5,6 +5,19 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- `catalog.json` schema 6 (spec `2026-11-21-catalog-trust-design.md`, phase 1). A release has a `publishedAt`, and
+  an entry has an `updatedAt`, the time of its newest release. A bot release has `downloads`, its `.bmk`'s GitHub
+  download count, which is absent when there is no `.bmk`. A bot release also lists `platforms`. A bot has
+  `downloads`, the sum over its releases. Fields were only added, so a schema-5 reader reads it.
+- `catalog.Platform` (`linux`, `windows`, `macos`): the systems a bot's pom names in `botmaker.platforms`. When the
+  pom names none, the bot runs on all of them. The entry check refuses an id it does not know.
+- `botmaker bot publish --platforms linux,windows` writes the pom property and commits it before the tag.
+  `PublishRequest.platforms` does the same for Studio. `Poms.setProperty` writes one property.
+
 ## [0.14.0] — 2026-11-21
 
 ### Added

@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -66,7 +67,8 @@ public final class CatalogBuilder {
             List<Catalog.Plugin.Release> releases = new ArrayList<>();
             String name = null;
             for (ApprovedRelease release : entry.releases().reversed()) {
-                if (!published(facts, entry.repo(), release.tag())) continue;
+                Optional<EntryFacts.Release> published = published(facts, entry.repo(), release.tag());
+                if (published.isEmpty()) continue;
                 DerivedFacts.PluginFacts jar = derived.plugin(entry.repo(), release.tag());
                 Optional<Catalog.Plugin.Release> kept = before != null && before.repo().equalsIgnoreCase(entry.repo())
                         ? previous(before.releases(), release, Catalog.Plugin.Release::tag, Catalog.Plugin.Release::commit)
@@ -83,12 +85,13 @@ public final class CatalogBuilder {
                 }
                 if (name == null) name = jar.name();
                 releases.add(new Catalog.Plugin.Release(release.tag(), release.commit(), release.jarSha256(),
-                        release.pomSha256(), jar.minContractVersion(), jar.editorDependencies(), jar.plugins()));
+                        release.pomSha256(), jar.minContractVersion(), jar.editorDependencies(), jar.plugins(),
+                        published.get().publishedAt()));
             }
             if (releases.isEmpty()) continue;
             plugins.add(new Catalog.Plugin(entry.repo(), publishers.rankOf(repo.get().ownerId()),
                     repo.get().coordinate(), name, repo.get().description(), repo.get().topics(),
-                    repo.get().stars(), releases));
+                    repo.get().stars(), releases, releases.getFirst().publishedAt()));
         }
         plugins.sort(Comparator.comparing(p -> p.repo().toLowerCase(Locale.ROOT)));
         Set<String> listed = plugins.stream().map(Catalog.Plugin::repo).collect(Collectors.toSet());
@@ -101,20 +104,30 @@ public final class CatalogBuilder {
             Catalog.Bot before = previousBots.get(entry.repo());
             List<Catalog.Bot.Release> releases = new ArrayList<>();
             for (ApprovedRelease release : entry.releases().reversed()) {
-                if (!published(facts, entry.repo(), release.tag())) continue;
+                Optional<EntryFacts.Release> published = published(facts, entry.repo(), release.tag());
+                if (published.isEmpty()) continue;
                 List<DerivedFacts.Pin> pins = derived.bot(entry.repo(), release.tag());
-                if (pins == null && before != null && before.repo().equalsIgnoreCase(entry.repo())) {
-                    pins = previous(before.releases(), release, Catalog.Bot.Release::tag, Catalog.Bot.Release::commit)
-                            .map(Catalog.Bot.Release::plugins).orElse(null);
+                List<Platform> platforms = derived.botPlatforms(entry.repo(), release.tag());
+                Optional<Catalog.Bot.Release> kept = before != null && before.repo().equalsIgnoreCase(entry.repo())
+                        ? previous(before.releases(), release, Catalog.Bot.Release::tag, Catalog.Bot.Release::commit)
+                        : Optional.empty();
+                if (pins == null) {
+                    pins = kept.map(Catalog.Bot.Release::plugins).orElse(null);
+                    if (platforms == null) platforms = kept.map(Catalog.Bot.Release::platforms).orElse(null);
                 }
                 if (pins == null || pins.isEmpty() || !pins.stream().allMatch(p -> listed.contains(p.repo())
                         && VERSION.matcher(p.version() == null ? "" : p.version()).matches())) continue;
-                releases.add(new Catalog.Bot.Release(release.tag(), release.commit(), pins, release.bmkSha256()));
+                releases.add(new Catalog.Bot.Release(release.tag(), release.commit(), pins, release.bmkSha256(),
+                        published.get().publishedAt(), published.get().bmkDownloads(),
+                        platforms == null ? List.of() : platforms));
             }
             if (releases.isEmpty()) continue;
+            Integer downloads = releases.stream().map(Catalog.Bot.Release::downloads).filter(Objects::nonNull)
+                    .reduce(Integer::sum).orElse(null);
             bots.add(new Catalog.Bot(entry.repo(), publishers.rankOf(repo.get().ownerId()),
                     repo.get().description(), repo.get().topics(), repo.get().stars(),
-                    entry.detached() ? null : repo.get().parent().orElse(null), releases));
+                    entry.detached() ? null : repo.get().parent().orElse(null), releases,
+                    releases.getFirst().publishedAt(), downloads));
         }
         bots.sort(Comparator.comparing(b -> b.repo().toLowerCase(Locale.ROOT)));
 
@@ -144,10 +157,10 @@ public final class CatalogBuilder {
                         r.minContractVersion(), r.editorDependencies(), r.plugins().stream()
                         .filter(p -> listed.contains(p.repo()) && !p.repo().equals(plugin.repo())
                                 && VERSION.matcher(p.version() == null ? "" : p.version()).matches())
-                        .toList()))
+                        .toList(), r.publishedAt()))
                 .toList();
         return new Catalog.Plugin(plugin.repo(), plugin.rank(), plugin.coordinate(), plugin.name(),
-                plugin.description(), plugin.tags(), plugin.stars(), releases);
+                plugin.description(), plugin.tags(), plugin.stars(), releases, plugin.updatedAt());
     }
 
     static final Pattern VERSION =Pattern.compile("v?\\d+(\\.\\d+){0,3}");
@@ -162,9 +175,9 @@ public final class CatalogBuilder {
                 .findFirst();
     }
 
-    /** Whether {@code repo}'s release at {@code tag} is still a published GitHub Release. */
-    private static boolean published(EntryFacts facts, String repo, String tag) {
-        return facts.release(repo, tag).filter(r -> !r.draft() && !r.prerelease()).isPresent();
+    /** {@code repo}'s release at {@code tag} while it is still a published GitHub Release. */
+    private static Optional<EntryFacts.Release> published(EntryFacts facts, String repo, String tag) {
+        return facts.release(repo, tag).filter(r -> !r.draft() && !r.prerelease());
     }
 
     /** Why a plugin's derived facts may not be listed, or {@code null}. */

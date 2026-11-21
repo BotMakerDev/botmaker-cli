@@ -17,10 +17,17 @@ import java.util.Map;
  * every value again.
  *
  * @param plugins    by plugin {@code owner/repo}, then by release tag
- * @param botPlugins by bot {@code owner/repo}, then by release tag
+ * @param botPlugins   by bot {@code owner/repo}, then by release tag
+ * @param botPlatforms the systems a bot's pom names ({@link Platform#PROPERTY}), by bot, then by release tag
  */
 public record DerivedFacts(Map<String, Map<String, PluginFacts>> plugins,
-                           Map<String, Map<String, List<Pin>>> botPlugins) {
+                           Map<String, Map<String, List<Pin>>> botPlugins,
+                           Map<String, Map<String, List<Platform>>> botPlatforms) {
+
+    /** Facts with no bot's platforms. */
+    public DerivedFacts(Map<String, Map<String, PluginFacts>> plugins, Map<String, Map<String, List<Pin>>> botPlugins) {
+        this(plugins, botPlugins, Map.of());
+    }
 
     /**
      * A plugin as its pom at one release says.
@@ -50,6 +57,12 @@ public record DerivedFacts(Map<String, Map<String, PluginFacts>> plugins,
     public DerivedFacts {
         plugins = plugins == null ? Map.of() : Map.copyOf(plugins);
         botPlugins = botPlugins == null ? Map.of() : Map.copyOf(botPlugins);
+        botPlatforms = botPlatforms == null ? Map.of() : Map.copyOf(botPlatforms);
+    }
+
+    /** The systems bot {@code repo}'s pom names at {@code tag}, or {@code null}. */
+    List<Platform> botPlatforms(String repo, String tag) {
+        return botPlatforms.getOrDefault(repo, Map.of()).get(tag);
     }
 
     /** The facts of the plugin at {@code repo} at {@code tag}, or {@code null}. */

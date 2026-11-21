@@ -10,6 +10,7 @@ import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryGate;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.FakeFacts;
+import com.botmaker.cli.catalog.Platform;
 import com.botmaker.cli.catalog.PluginEntry;
 import com.botmaker.cli.catalog.Publishers;
 import com.botmaker.cli.validate.CheckResult;
@@ -381,5 +382,23 @@ class PublishTest {
                         false, "test"), FakeRunner.QUIET, runner.host(dir));
         assertInstanceOf(Publish.Outcome.Refused.class, outcome);
         assertEquals(List.of(), runner.changes);
+    }
+
+    @Test
+    void platformsWrittenToPom() throws Exception {
+        Path pom = Files.writeString(dir.resolve("pom.xml"), """
+                <project><modelVersion>4.0.0</modelVersion><groupId>g</groupId><artifactId>a</artifactId>\
+                <version>1</version></project>""");
+        String written = Publish.platformsPom(dir, List.of(Platform.WINDOWS)).orElseThrow();
+        assertTrue(written.contains("<botmaker.platforms>windows</botmaker.platforms>"), written);
+        assertEquals(Optional.empty(), Publish.platformsPom(dir, List.of()), "none asked: the pom stays");
+        assertEquals(Optional.empty(), Publish.platformsPom(dir, Platform.known()), "all, and the pom names none");
+        Files.writeString(pom, written);
+        assertEquals(Optional.empty(), Publish.platformsPom(dir, List.of(Platform.WINDOWS)), "already so");
+        assertTrue(Publish.platformsPom(dir, List.of(Platform.MACOS, Platform.LINUX)).orElseThrow()
+                .contains("<botmaker.platforms>linux,macos</botmaker.platforms>"));
+        Files.writeString(pom, written.replace(">windows<", ">windows,beos<"));
+        assertTrue(Publish.platformsPom(dir, List.of(Platform.WINDOWS)).orElseThrow()
+                .contains("<botmaker.platforms>windows</botmaker.platforms>"), "an unknown id is written away");
     }
 }

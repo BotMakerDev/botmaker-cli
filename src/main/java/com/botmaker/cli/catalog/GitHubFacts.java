@@ -74,9 +74,19 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
         if (known != null) return known;
         Optional<Release> found = api(API + repo + "/releases/tags/" + encode(tag))
                 .map(json -> new Release(json.path("author").path("login").asText(),
-                        json.path("draft").asBoolean(), json.path("prerelease").asBoolean()));
+                        json.path("draft").asBoolean(), json.path("prerelease").asBoolean(),
+                        json.path("published_at").textValue(), assetDownloads(json.path("assets"))));
         found.filter(release -> !release.draft()).ifPresent(release -> releases.put(repo + "@" + tag, found));
         return found;
+    }
+
+    /** Each asset's {@code download_count} by its name; a name listed twice keeps its first count. */
+    private static Map<String, Integer> assetDownloads(JsonNode assets) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (JsonNode asset : assets) {
+            counts.putIfAbsent(asset.path("name").asText(), asset.path("download_count").asInt());
+        }
+        return counts;
     }
 
     @Override

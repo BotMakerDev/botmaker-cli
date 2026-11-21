@@ -47,6 +47,7 @@ public final class PomFacts {
     public static DerivedFacts read(List<? extends Entry> entries, Source poms, Map<String, String> pluginRepos) {
         Map<String, Map<String, DerivedFacts.PluginFacts>> plugins = new HashMap<>();
         Map<String, Map<String, List<DerivedFacts.Pin>>> bots = new HashMap<>();
+        Map<String, Map<String, List<Platform>>> platforms = new HashMap<>();
         for (Entry entry : entries) {
             for (ApprovedRelease release : entry.releases()) {
                 Optional<String> text = poms.pom(entry.repo(), release.commit());
@@ -63,7 +64,9 @@ public final class PomFacts {
                             }
                             case BotEntry bot -> {
                                 List<DerivedFacts.Pin> read = pins(pom, pluginRepos);
+                                List<Platform> systems = listedPlatforms(pom);
                                 bots.computeIfAbsent(bot.repo(), k -> new HashMap<>()).put(release.tag(), read);
+                                platforms.computeIfAbsent(bot.repo(), k -> new HashMap<>()).put(release.tag(), systems);
                             }
                         }
                     } finally {
@@ -75,7 +78,24 @@ public final class PomFacts {
                 }
             }
         }
-        return new DerivedFacts(plugins, bots);
+        return new DerivedFacts(plugins, bots, platforms);
+    }
+
+    /**
+     * The known systems a bot's pom names in {@link Platform#PROPERTY}, every known one when it names none; an id
+     * this BotMaker does not know is left out ({@link BotChecks#checkPom} refuses it).
+     */
+    public static List<Platform> platforms(Path pom) throws IOException {
+        return Platform.parse(Poms.properties(pom).get(Platform.PROPERTY));
+    }
+
+    /**
+     * What the catalog lists for a release: the systems the pom names, or none when it names none, which a reader
+     * takes as every system ({@link Catalog.Bot.Release#runsOn}) — so a system BotMaker learns later is not ruled out.
+     */
+    static List<Platform> listedPlatforms(Path pom) throws IOException {
+        String value = Poms.properties(pom).get(Platform.PROPERTY);
+        return value == null || value.isBlank() ? List.of() : Platform.parse(value);
     }
 
     /**

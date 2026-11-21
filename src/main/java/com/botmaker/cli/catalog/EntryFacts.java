@@ -6,6 +6,7 @@ package com.botmaker.cli.catalog;
 import com.botmaker.cli.bmk.Central;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -14,8 +15,30 @@ import java.util.Optional;
  */
 public interface EntryFacts {
 
-    /** A GitHub Release. {@code authorLogin} made it, which needs push access to the repository. */
-    record Release(String authorLogin, boolean draft, boolean prerelease) {}
+    /**
+     * A GitHub Release. {@code authorLogin} made it, which needs push access to the repository.
+     *
+     * @param publishedAt    when it was published (ISO-8601), {@code null} for a draft
+     * @param assetDownloads each attached file's GitHub {@code download_count}, by file name (2026-11-21)
+     */
+    record Release(String authorLogin, boolean draft, boolean prerelease, String publishedAt,
+                   Map<String, Integer> assetDownloads) {
+
+        public Release {
+            assetDownloads = assetDownloads == null ? Map.of() : Map.copyOf(assetDownloads);
+        }
+
+        /** A release with no time and no files. */
+        public Release(String authorLogin, boolean draft, boolean prerelease) {
+            this(authorLogin, draft, prerelease, null, Map.of());
+        }
+
+        /** How often its {@code .bmk} was downloaded, or {@code null} when it has none. */
+        public Integer bmkDownloads() {
+            return assetDownloads.entrySet().stream().filter(e -> e.getKey().endsWith(".bmk"))
+                    .map(Map.Entry::getValue).reduce(Integer::sum).orElse(null);
+        }
+    }
 
     /**
      * A repository as GitHub describes it now (after a rename or a transfer).

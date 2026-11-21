@@ -11,7 +11,9 @@ import com.botmaker.cli.catalog.EntryFacts;
 import com.botmaker.cli.catalog.EntryGate;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.Finding;
+import com.botmaker.cli.catalog.Platform;
 import com.botmaker.cli.catalog.PluginEntry;
+import com.botmaker.cli.catalog.PomFacts;
 import com.botmaker.cli.bmk.BotFiles;
 import com.botmaker.cli.project.Poms;
 
@@ -19,6 +21,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -144,13 +147,20 @@ public final class Publish {
         }
         Map<String, String> build = fresh && target.kind() == EntryPath.Kind.PLUGIN
                 ? JitpackFiles.stale(target.dir()) : Map.of();
+        Optional<String> platformsPom = fresh && target.kind() == EntryPath.Kind.BOT
+                ? platformsPom(target.dir(), request.platforms()) : Optional.empty();
         if (request.dryRun()) {
             if (!build.isEmpty()) listener.step("Would write and commit " + String.join(", ", build.keySet()) + ".");
+            if (platformsPom.isPresent()) listener.step("Would write and commit the pom's " + Platform.PROPERTY + ".");
             return new Outcome.WouldList(repo, tag, version.listing());
         }
         if (!build.isEmpty()) {
             listener.step("Writing " + String.join(", ", build.keySet()) + ", the JitPack build this botmaker carries.");
             host.commitFiles("Build on JitPack with BotMaker's build script", build);
+        }
+        if (platformsPom.isPresent()) {
+            listener.step("Writing " + Platform.PROPERTY + " = " + Platform.write(request.platforms()) + " to the pom.");
+            host.commitFiles("List the systems this bot runs on", Map.of("pom.xml", platformsPom.get()));
         }
         if (fresh) release(target, tag, host);
 
@@ -201,6 +211,33 @@ public final class Publish {
         return EntryPath.parse(file).orElseThrow(() -> new Refusal(target.repo() + " cannot be listed: the catalog"
                 + " names an entry's file after owner/name, and this one does not fit (letters, digits, '.', '-' and"
                 + " '_')."));
+    }
+
+    /**
+     * The bot's pom with {@code platforms} as its {@link Platform#PROPERTY}, or empty when none was asked or the pom
+     * already says the same (a pom naming none means every known system, so all three ticked changes nothing).
+     */
+    static Optional<String> platformsPom(Path dir, List<Platform> platforms) throws Refusal {
+        if (platforms.isEmpty()) return Optional.empty();
+        Path pom = dir.resolve("pom.xml");
+        try {
+            // A pom also naming a system nobody knows is rewritten: the catalog would refuse it after the tag.
+            String named = Poms.properties(pom).get(Platform.PROPERTY);
+            if (Platform.unknownIds(named).isEmpty()
+                    && PomFacts.platforms(pom).equals(Platform.parse(Platform.write(platforms)))) {
+                return Optional.empty();
+            }
+            Path copy = Files.createTempFile("publish-pom", ".xml");
+            try {
+                Files.copy(pom, copy, StandardCopyOption.REPLACE_EXISTING);
+                Poms.setProperty(copy, Platform.PROPERTY, Platform.write(platforms));
+                return Optional.of(Files.readString(copy));
+            } finally {
+                Files.deleteIfExists(copy);
+            }
+        } catch (IOException e) {
+            throw new Refusal("could not write the systems this bot runs on to its pom: " + e.getMessage());
+        }
     }
 
     /**
