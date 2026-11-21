@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -31,6 +32,24 @@ public sealed interface Entry permits BotEntry, PluginEntry {
 
     /** The same entry holding {@code releases} instead. */
     Entry withReleases(List<ApprovedRelease> releases);
+
+    /**
+     * The slugs the repository had before GitHub renamed or transferred it, oldest first (2026-11-21, spec § 3);
+     * empty for one never moved. A run copy, an {@code upstream} or a pin under an old slug still finds the entry.
+     */
+    List<String> formerly();
+
+    /** The same entry at {@code slug}, its {@link #repo()} appended to {@link #formerly()}: a move, nothing else. */
+    Entry moved(String slug);
+
+    /** {@link #formerly()} with {@code repo} after the others, and without {@code to}, the slug moved to. */
+    default List<String> formerlyAnd(String repo, String to) {
+        // A repository renamed back to a slug it had before is that slug again, not one of its former ones.
+        List<String> more = new ArrayList<>(formerly());
+        more.removeIf(to::equalsIgnoreCase);
+        more.add(repo);
+        return more;
+    }
 
     /** The newest approved release, what Studio offers first. */
     @JsonIgnore
@@ -75,6 +94,22 @@ public sealed interface Entry permits BotEntry, PluginEntry {
     static String required(String value, String field) {
         if (value == null || value.isBlank()) throw new IllegalArgumentException("missing \"" + field + "\"");
         return value;
+    }
+
+    /**
+     * {@code formerly} as an entry holds it: each an {@code owner/name}, none twice nor {@code repo}, without case.
+     */
+    static List<String> formerly(List<String> formerly, String repo) {
+        if (formerly == null) return List.of();
+        Set<String> seen = new HashSet<>();
+        seen.add(repo.toLowerCase(Locale.ROOT));
+        for (String slug : formerly) {
+            if (!isSlug(slug)) throw new IllegalArgumentException("\"formerly\" holds " + slug + ", not owner/name");
+            if (!seen.add(slug.toLowerCase(Locale.ROOT))) {
+                throw new IllegalArgumentException("\"formerly\" holds " + slug + " twice, or the entry's own repo");
+            }
+        }
+        return List.copyOf(formerly);
     }
 
     /**

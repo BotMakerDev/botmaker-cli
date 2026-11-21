@@ -3,6 +3,7 @@
 
 package com.botmaker.cli.catalog;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 import java.io.IOException;
@@ -16,18 +17,31 @@ import java.util.List;
  * held until 2026-10-27 is gone with {@code StudioPlugin.id()}.
  *
  * @param releases each with its commit and its jar's and pom's sha256
+ * @param formerly {@link Entry#formerly()}; omitted from the file when empty
  */
-@JsonPropertyOrder({"repo", "releases"})
-public record PluginEntry(String repo, List<ApprovedRelease> releases) implements Entry {
+@JsonPropertyOrder({"repo", "releases", "formerly"})
+public record PluginEntry(String repo, List<ApprovedRelease> releases,
+                          @JsonInclude(JsonInclude.Include.NON_EMPTY) List<String> formerly) implements Entry {
 
     public PluginEntry {
         Entry.required(repo, "repo");
         releases = Entry.releases(releases, true);
+        formerly = Entry.formerly(formerly, repo);
+    }
+
+    /** A plugin never moved. */
+    public PluginEntry(String repo, List<ApprovedRelease> releases) {
+        this(repo, releases, List.of());
     }
 
     @Override
     public PluginEntry withReleases(List<ApprovedRelease> releases) {
-        return new PluginEntry(repo, releases);
+        return new PluginEntry(repo, releases, formerly);
+    }
+
+    @Override
+    public PluginEntry moved(String slug) {
+        return new PluginEntry(slug, releases, formerlyAnd(repo, slug));
     }
 
     public static PluginEntry read(Path file) throws IOException {

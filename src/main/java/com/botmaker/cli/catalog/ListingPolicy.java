@@ -33,8 +33,10 @@ import java.util.Optional;
  *       the branch was made on; otherwise {@link Kind#HOLD}.</li>
  *   <li>An entry checked against other ranks than main's, by an author who is no admin on main now:
  *       {@link Kind#HOLD}, since the check may have passed it as a demoted admin's.</li>
- *   <li>The pull request is not exactly one entry path, added, modified or removed (a rename is two): {@link Kind#HOLD},
- *       since it can never pass the check either.</li>
+ *   <li>One entry file moved to another of its kind ({@link EntryGate.Change.Move}, which the check passed only
+ *       for a repository GitHub renamed or transferred): {@link Kind#MERGE}.</li>
+ *   <li>The pull request is not exactly one entry path, added, modified or removed: {@link Kind#HOLD}, since it can
+ *       never pass the check either.</li>
  *   <li>A new entry over {@value #NEW_ENTRIES_PER_DAY} in the author's last 24 hours: {@link Kind#WAIT} until the
  *       oldest falls out of the window.</li>
  *   <li>Otherwise {@link Kind#MERGE}. Only additions count: updating your own entry is never limited.</li>
@@ -78,9 +80,22 @@ public final class ListingPolicy {
             + " this pull request's branch was made, so the check read other ranks than main's. Update the branch"
             + " so the check runs again.", Optional.empty(), true);
 
-    /** One changed file, as GitHub's pull request files API reports it. */
+    /**
+     * One changed file, as GitHub's pull request files API reports it.
+     *
+     * @param previous a renamed file's old path ({@code previous_filename}), else {@code null}
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Change(String path, String status) {
+    public record Change(String path, String status, String previous) {
+
+        public Change(String path, String status) {
+            this(path, status, null);
+        }
+
+        boolean renamed() {
+            return "renamed".equalsIgnoreCase(status);
+        }
+
         /** Only a change to an entry that exists is unlimited; every other status (added, copied, …) is new. */
         boolean added() {
             return !"modified".equalsIgnoreCase(status) && !"removed".equalsIgnoreCase(status);
@@ -134,9 +149,30 @@ public final class ListingPolicy {
         System.out.println(decide(Facts.read(Files.readString(Path.of(args[0])))).toJson());
     }
 
+    /** One entry file renamed to another of its kind, or one removed and one added. */
+    static boolean isMove(List<Change> changes) {
+        List<String> paths;
+        if (changes.size() == 1 && changes.getFirst().renamed()) {
+            paths = List.of(String.valueOf(changes.getFirst().previous()), changes.getFirst().path());
+        } else if (changes.size() == 2 && changes.stream().anyMatch(c -> "removed".equalsIgnoreCase(c.status()))
+                && changes.stream().anyMatch(c -> "added".equalsIgnoreCase(c.status()))) {
+            paths = changes.stream().map(Change::path).toList();
+        } else {
+            return false;
+        }
+        Optional<EntryPath> a = EntryPath.parse(paths.get(0));
+        Optional<EntryPath> b = EntryPath.parse(paths.get(1));
+        return a.isPresent() && b.isPresent() && a.get().kind() == b.get().kind();
+    }
+
     public static Decision decide(Facts facts) {
         if (!facts.checksPassed()) {
             return Decision.of(Kind.HOLD, "the catalog's check has not passed.");
+        }
+        // A move (spec § 3): the check proved both slugs one repository on GitHub, so no rank decides it and it is
+        // no new entry. GitHub reports it as one rename, or as a removal and an addition when it sees no rename.
+        if (isMove(facts.changes())) {
+            return Decision.of(Kind.MERGE, "moves a listed entry after its repository's rename or transfer.");
         }
         if (facts.changes().size() != 1) {
             return Decision.of(Kind.HOLD, "a pull request changes exactly one entry file; this one changes "

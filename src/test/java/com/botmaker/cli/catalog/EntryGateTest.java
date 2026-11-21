@@ -240,6 +240,93 @@ class EntryGateTest {
         assertRefused(check("LiQiyeDev", SDK), "release v2.1.0 was edited");
     }
 
+    private static final String MOVED = "bots/newdev__firestone2.json";
+
+    /** Firestone listed in the base, GitHub naming it newdev/firestone2 now; the head without the old file. */
+    private BotEntry renamedOnGitHub() throws IOException {
+        write(base, BOT, botJson("somedev/firestone", "v1.2.0"));
+        Files.delete(head.resolve(BOT));
+        facts.repo("somedev/firestone", 2, "newdev/firestone2", "Idle runs.", null)
+                .repo("newdev/firestone2", 2, "newdev/firestone2", "Idle runs.", null);
+        return BotEntry.read(base.resolve(BOT));
+    }
+
+    @Test
+    void moveSameRepoId() throws Exception {
+        write(head, BOT, botJson("somedev/firestone", "v1.2.0"));
+        BotEntry held = renamedOnGitHub();
+        write(head, MOVED, json(held.moved("newdev/firestone2")));
+        assertEquals(List.of(), check(EntryGate.ACTIONS_BOT, BOT, MOVED), "nobody's control is asked");
+        assertEquals(List.of("somedev/firestone"), BotEntry.read(head.resolve(MOVED)).formerly());
+        assertEquals(new EntryGate.Change.Move("somedev/firestone"),
+                EntryGate.Change.moved(held, BotEntry.read(head.resolve(MOVED))));
+    }
+
+    @Test
+    void moveDifferentRepoId() throws IOException {
+        write(head, BOT, botJson("somedev/firestone", "v1.2.0"));
+        BotEntry held = renamedOnGitHub();
+        facts.repoWithId("newdev/firestone2", "newdev/firestone2", 777);
+        write(head, MOVED, json(held.moved("newdev/firestone2")));
+        assertRefused(check("newdev", BOT, MOVED), "not resolve");
+    }
+
+    @Test
+    void moveToASlugGitHubNoLongerNames() throws IOException {
+        write(head, BOT, botJson("somedev/firestone", "v1.2.0"));
+        BotEntry held = renamedOnGitHub();
+        facts.repo("newdev/firestone2", 2, "third/firestone3", "", null)
+                .repo("somedev/firestone", 2, "third/firestone3", "", null);
+        write(head, MOVED, json(held.moved("newdev/firestone2")));
+        assertRefused(check("newdev", BOT, MOVED), "names this repository third/firestone3 now");
+    }
+
+    @Test
+    void moveChangesReleases() throws IOException {
+        write(head, BOT, botJson("somedev/firestone", "v1.2.0"));
+        BotEntry held = renamedOnGitHub();
+        facts.release("newdev/firestone2", "v1.3.0", "newdev");
+        write(head, MOVED, json(held.moved("newdev/firestone2").appended(botRelease("v1.3.0"))));
+        assertRefused(check("newdev", BOT, MOVED), "changes only \"repo\"");
+    }
+
+    @Test
+    void moveWithoutFormerly() throws IOException {
+        write(head, BOT, botJson("somedev/firestone", "v1.2.0"));
+        renamedOnGitHub();
+        write(head, MOVED, botJson("newdev/firestone2", "v1.2.0"));
+        assertRefused(check("newdev", BOT, MOVED), "appends somedev/firestone");
+    }
+
+    @Test
+    void caseOnlyIsNotAMove() throws IOException {
+        write(head, BOT, botJson("somedev/firestone", "v1.2.0"));
+        BotEntry held = renamedOnGitHub();
+        String upper = "bots/SomeDev__firestone.json";
+        write(head, upper, json(new BotEntry("SomeDev/firestone", held.releases(), false)));
+        assertRefused(check("somedev", BOT, upper), "differ only by case");
+    }
+
+    @Test
+    void formerlyChangesOnlyByAMove() throws IOException {
+        write(base, BOT, botJson("somedev/firestone", "v1.2.0"));
+        write(head, BOT, json(new BotEntry("somedev/firestone", List.of(botRelease("v1.2.0")), false,
+                List.of("other/name"))));
+        assertRefused(check("somedev", BOT), "\"formerly\" changes only with a move");
+    }
+
+    @Test
+    void aNewEntryNamesNoFormerly() {
+        BotEntry head = new BotEntry("somedev/firestone", List.of(botRelease("v1.2.0")), false,
+                List.of("victim/popular"));
+        try {
+            EntryGate.Change.between(Optional.empty(), head);
+            throw new AssertionError("a new entry naming formerly passed");
+        } catch (EntryGate.Refused refused) {
+            assertTrue(refused.getMessage().contains("a new entry names no \"formerly\""), refused.getMessage());
+        }
+    }
+
     /** Firestone's entry with {@code tag} yanked for {@code reason} at {@code at}, or an unreadable time for null. */
     private static String yanked(String tag, String reason, Instant at) {
         ApprovedRelease.Yanked why = new ApprovedRelease.Yanked("REASON", at == null ? "yesterday" : at.toString());

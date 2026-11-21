@@ -63,14 +63,14 @@ public final class CatalogBuilder {
                 p -> p.repo().toLowerCase(Locale.ROOT))) {
             Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
             if (repo.isEmpty()) continue;
-            Catalog.Plugin before = previousPlugins.get(entry.repo());
+            Catalog.Plugin before = previousRow(previousPlugins, entry);
             List<Catalog.Plugin.Release> releases = new ArrayList<>();
             String name = null;
             for (ApprovedRelease release : entry.releases().reversed()) {
                 Optional<EntryFacts.Release> published = published(facts, entry.repo(), release.tag());
                 if (published.isEmpty()) continue;
                 DerivedFacts.PluginFacts jar = derived.plugin(entry.repo(), release.tag());
-                Optional<Catalog.Plugin.Release> kept = before != null && before.repo().equalsIgnoreCase(entry.repo())
+                Optional<Catalog.Plugin.Release> kept = before != null
                         ? previous(before.releases(), release, Catalog.Plugin.Release::tag, Catalog.Plugin.Release::commit)
                         : Optional.empty();
                 if (jar == null && kept.isPresent()) {
@@ -91,7 +91,7 @@ public final class CatalogBuilder {
             if (releases.isEmpty()) continue;
             plugins.add(new Catalog.Plugin(entry.repo(), publishers.rankOf(repo.get().ownerId()),
                     repo.get().coordinate(), name, repo.get().description(), repo.get().topics(),
-                    repo.get().stars(), releases, releases.getFirst().publishedAt()));
+                    repo.get().stars(), releases, releases.getFirst().publishedAt(), entry.formerly()));
         }
         plugins.sort(Comparator.comparing(p -> p.repo().toLowerCase(Locale.ROOT)));
         Set<String> listed = plugins.stream().map(Catalog.Plugin::repo).collect(Collectors.toSet());
@@ -101,14 +101,14 @@ public final class CatalogBuilder {
         for (BotEntry entry : read(root, EntryPath.BOTS, BotEntry::read, b -> b.repo().toLowerCase(Locale.ROOT))) {
             Optional<EntryFacts.Repo> repo = facts.repo(entry.repo());
             if (repo.isEmpty()) continue;
-            Catalog.Bot before = previousBots.get(entry.repo());
+            Catalog.Bot before = previousRow(previousBots, entry);
             List<Catalog.Bot.Release> releases = new ArrayList<>();
             for (ApprovedRelease release : entry.releases().reversed()) {
                 Optional<EntryFacts.Release> published = published(facts, entry.repo(), release.tag());
                 if (published.isEmpty()) continue;
                 List<DerivedFacts.Pin> pins = derived.bot(entry.repo(), release.tag());
                 List<Platform> platforms = derived.botPlatforms(entry.repo(), release.tag());
-                Optional<Catalog.Bot.Release> kept = before != null && before.repo().equalsIgnoreCase(entry.repo())
+                Optional<Catalog.Bot.Release> kept = before != null
                         ? previous(before.releases(), release, Catalog.Bot.Release::tag, Catalog.Bot.Release::commit)
                         : Optional.empty();
                 if (pins == null) {
@@ -127,7 +127,7 @@ public final class CatalogBuilder {
             bots.add(new Catalog.Bot(entry.repo(), publishers.rankOf(repo.get().ownerId()),
                     repo.get().description(), repo.get().topics(), repo.get().stars(),
                     entry.detached() ? null : repo.get().parent().orElse(null), releases,
-                    releases.getFirst().publishedAt(), downloads));
+                    releases.getFirst().publishedAt(), downloads, entry.formerly()));
         }
         bots.sort(Comparator.comparing(b -> b.repo().toLowerCase(Locale.ROOT)));
 
@@ -160,13 +160,26 @@ public final class CatalogBuilder {
                         .toList(), r.publishedAt(), r.yanked()))
                 .toList();
         return new Catalog.Plugin(plugin.repo(), plugin.rank(), plugin.coordinate(), plugin.name(),
-                plugin.description(), plugin.tags(), plugin.stars(), releases, plugin.updatedAt());
+                plugin.description(), plugin.tags(), plugin.stars(), releases, plugin.updatedAt(), plugin.formerly());
     }
 
     static final Pattern VERSION =Pattern.compile("v?\\d+(\\.\\d+){0,3}");
 
     /** At most this long, no control characters: a name Studio shows as a label. */
     private static final Pattern NAME = Pattern.compile("[^\\p{Cntrl}]{1,80}");
+
+    /**
+     * The previous catalog's row for {@code entry}: at its repo, else at the newest slug it had {@code formerly}, so a
+     * move made tonight still keeps the facts its releases were read with (2026-11-21); null when none.
+     */
+    private static <R> R previousRow(Map<String, R> byRepo, Entry entry) {
+        R row = byRepo.get(entry.repo());
+        for (String slug : entry.formerly().reversed()) {
+            if (row != null) break;
+            row = byRepo.get(slug);
+        }
+        return row;
+    }
 
     /** The previous row's release with {@code release}'s tag and pinned commit: its facts still hold. */
     private static <R> Optional<R> previous(List<R> rows, ApprovedRelease release, Function<R, String> tag,

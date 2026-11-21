@@ -43,12 +43,15 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
      * @param tags       the repository's GitHub topics
      * @param releases   every approved release still published, newest first; never empty
      * @param updatedAt  its newest release's {@code publishedAt}
+     * @param formerly   the slugs its repository had before a rename or a transfer, oldest first (spec 2026-11-21
+     *                   § 3); a host pinning the old coordinate finds the entry by one
      */
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     @JsonPropertyOrder({"repo", "rank", "coordinate", "name", "description", "tags", "stars", "releases",
-            "updatedAt"})
+            "updatedAt", "formerly"})
     public record Plugin(String repo, Rank rank, String coordinate, String name, String description,
-                         List<String> tags, int stars, List<Release> releases, String updatedAt) {
+                         List<String> tags, int stars, List<Release> releases, String updatedAt,
+                         List<String> formerly) {
 
         /**
          * One approved release, with its pins and what its pom says.
@@ -97,6 +100,13 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
             description = description == null ? "" : description;
             tags = tags == null ? List.of() : List.copyOf(tags);
             releases = releases == null ? List.of() : List.copyOf(releases);
+            formerly = formerly == null ? List.of() : List.copyOf(formerly);
+        }
+
+        /** A plugin never moved. */
+        public Plugin(String repo, Rank rank, String coordinate, String name, String description,
+                      List<String> tags, int stars, List<Release> releases, String updatedAt) {
+            this(repo, rank, coordinate, name, description, tags, stars, releases, updatedAt, List.of());
         }
 
         /** A plugin whose update time is not known. */
@@ -125,12 +135,14 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
      * @param releases  every approved release still published, newest first; never empty
      * @param updatedAt its newest release's {@code publishedAt}
      * @param downloads the sum of its releases' {@code downloads}, {@code null} when none has a count
+     * @param formerly  the slugs its repository had before a rename or a transfer, oldest first (spec 2026-11-21
+     *                  § 3); a run copy or an {@code upstream} at an old one finds the entry by it
      */
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     @JsonPropertyOrder({"repo", "rank", "description", "tags", "stars", "forkOf", "releases", "updatedAt",
-            "downloads"})
+            "downloads", "formerly"})
     public record Bot(String repo, Rank rank, String description, List<String> tags, int stars, String forkOf,
-                      List<Release> releases, String updatedAt, Integer downloads) {
+                      List<Release> releases, String updatedAt, Integer downloads, List<String> formerly) {
 
         /**
          * One approved release.
@@ -181,6 +193,13 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
             description = description == null ? "" : description;
             tags = tags == null ? List.of() : List.copyOf(tags);
             releases = releases == null ? List.of() : List.copyOf(releases);
+            formerly = formerly == null ? List.of() : List.copyOf(formerly);
+        }
+
+        /** A bot never moved. */
+        public Bot(String repo, Rank rank, String description, List<String> tags, int stars, String forkOf,
+                   List<Release> releases, String updatedAt, Integer downloads) {
+            this(repo, rank, description, tags, stars, forkOf, releases, updatedAt, downloads, List.of());
         }
 
         /** A bot whose update time and downloads are not known. */

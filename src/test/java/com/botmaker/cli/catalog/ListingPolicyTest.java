@@ -42,6 +42,20 @@ class ListingPolicyTest {
     }
 
     @Test
+    void renameOfOneEntryChecked() {
+        String from = "bots/somedev__firestone.json";
+        String to = "bots/newdev__firestone2.json";
+        assertEquals(ListingPolicy.Kind.MERGE, decide(true,
+                List.of(new ListingPolicy.Change(to, "renamed", from)), List.of()).decision());
+        assertEquals(ListingPolicy.Kind.MERGE, decide(true, List.of(new ListingPolicy.Change(from, "removed"),
+                new ListingPolicy.Change(to, "added")), List.of()).decision(), "GitHub saw no rename");
+        assertEquals(ListingPolicy.Kind.HOLD, decide(false,
+                List.of(new ListingPolicy.Change(to, "renamed", from)), List.of()).decision(), "a red check holds");
+        assertEquals(ListingPolicy.Kind.HOLD, decide(true, List.of(new ListingPolicy.Change(
+                "plugins/newdev__firestone2.json", "renamed", from)), List.of()).decision(), "a bot is no plugin");
+    }
+
+    @Test
     void a_fourth_new_entry_in_a_day_waits_until_the_oldest_leaves_the_window() {
         Instant oldest = NOW.minus(Duration.ofHours(20));
         ListingPolicy.Decision decision = decide(true, List.of(NEW_BOT),

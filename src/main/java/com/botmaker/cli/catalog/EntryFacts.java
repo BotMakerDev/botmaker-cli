@@ -45,13 +45,31 @@ public interface EntryFacts {
      *
      * @param name   its current name, which a rename changes while the entry still says the old one
      * @param parent the repository it was forked from, {@code owner/name}
+     * @param id     GitHub's number for the repository, which a rename and a transfer keep (2026-11-21); {@code 0}
+     *               when unknown, which matches nothing
      */
     record Repo(long ownerId, String ownerLogin, String name, String description, List<String> topics, int stars,
-                Optional<String> parent) {
+                Optional<String> parent, long id) {
+
+        /** A repository whose id is not known. */
+        public Repo(long ownerId, String ownerLogin, String name, String description, List<String> topics, int stars,
+                    Optional<String> parent) {
+            this(ownerId, ownerLogin, name, description, topics, stars, parent, 0);
+        }
 
         /** What JitPack serves it as now: {@code com.github.<owner>:<name>}. */
         public String coordinate() {
             return "com.github." + ownerLogin + ":" + name;
+        }
+
+        /** {@code owner/name} as GitHub names it now. */
+        public String slug() {
+            return ownerLogin + "/" + name;
+        }
+
+        /** Whether {@code other} is this very repository by its id, whatever its slug. */
+        public boolean sameAs(Repo other) {
+            return id != 0 && id == other.id;
         }
 
         public Repo {

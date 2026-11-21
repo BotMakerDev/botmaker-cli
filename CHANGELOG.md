@@ -9,6 +9,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Rename and move (catalog trust, phase 3). An entry carries `formerly`, its former slugs oldest first, and so do
+  `catalog.json`'s rows. `EntryGate` accepts a move: one entry file removed and one added, `repo` the new slug and the
+  old one appended to `formerly`, both slugs one GitHub repository id (`EntryFacts.Repo.id`); `formerly` changes by
+  nothing else. `ListingPolicy` merges a move. `IndexCommand` moves an entry itself when GitHub renamed or
+  transferred its repository, and the index workflow commits it with `catalog.json` — no pull request, which the
+  workflow's token could not get checked.
 - Yank (spec `2026-11-21-catalog-trust-design.md`, phase 2). An approved release can carry `yanked: {reason, at}`.
   The catalog lists it, and no picker offers it (`Catalog.Plugin.pickable()`, `Catalog.Bot.pickable()`).
   `botmaker bot|plugin yank --repo <o/r> --release <tag> --reason "…"` opens the pull request, and `--undo` lists the

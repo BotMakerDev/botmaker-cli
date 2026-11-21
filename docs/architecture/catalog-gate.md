@@ -30,7 +30,12 @@ a bot at its commit and refuses a plugin file whose hash differs. No key is invo
 A pull request is one `EntryGate.Change` against the base copy: **create** (a new entry, one release),
 **append** (one release after the others), **remove** (some releases, the rest in order; the whole entry goes by
 deleting its file) or **detach** (a bot's `detached` alone). An approved release is never edited or reordered, and a
-listed entry's `repo` never changes. There is no reading of schema 3's single `tag`.
+listed entry's `repo` changes only by a **move** (2026-11-21, catalog trust phase 3): the old file removed and the new
+one added, `repo` set to the new slug and the old one appended to `formerly`, nothing else changed, and GitHub
+resolving both slugs to one repository id. `IndexCommand` makes the move itself when GitHub renamed or transferred a
+listed repository and commits it with `catalog.json` (a pull request opened with the workflow's token would start no
+check); a move opened by hand passes the same rule, and `ListingPolicy` merges it. There is no reading of schema 3's
+single `tag`.
 
 ## validate.yml — `EntryGate`
 

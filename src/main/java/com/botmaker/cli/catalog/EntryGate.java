@@ -32,12 +32,13 @@ import java.util.stream.Stream;
  * shared rules, in the spec's numbering:
  *
  * <ol>
- *   <li>The pull request changes exactly one entry path, and it is no symbolic link.</li>
+ *   <li>The pull request changes exactly one entry path, and it is no symbolic link; or it is a {@link Change.Move},
+ *       one entry file removed and one added, which only follows a rename or a transfer GitHub made (spec § 3).</li>
  *   <li>The file's name is what its content claims, its JSON is the schema, and no other entry's path differs
  *       from it only by case (GitHub ignores case in a slug, a checkout on macOS or Windows too). Against the
  *       catalog's copy it is one {@link Change}: a new entry with one release, one release appended, releases
  *       removed, one release yanked or unyanked, or a bot's {@code detached} alone. An approved release is never
- *       otherwise edited or reordered, and an entry's {@code repo} never changes.</li>
+ *       otherwise edited or reordered, and an entry's {@code repo} and {@code formerly} change only by a move.</li>
  *   <li>The pull request's author controls the repository: they made the GitHub Release the change approves, which
  *       needs push access. A release made by {@value #ACTIONS_BOT} falls back to "the author is the repository's
  *       owner", which an organisation releasing from CI never is.</li>
@@ -116,6 +117,12 @@ public final class EntryGate {
         /** The release at {@code tag} no longer pulled, nothing else changed. */
         record Unyank(String tag) implements Change {}
 
+        /**
+         * The entry's file renamed after its repository, which GitHub renamed or transferred from {@code from}: its
+         * {@code repo} the new slug, {@code from} appended to {@code formerly}, nothing else changed (spec § 3).
+         */
+        record Move(String from) implements Change {}
+
         /** The release the change approves: what rules 3 and 5 and the kind's checks run on. */
         default Optional<ApprovedRelease> approves() {
             return switch (this) {
@@ -125,7 +132,25 @@ public final class EntryGate {
                 case Detach ignored -> Optional.empty();
                 case Yank ignored -> Optional.empty();
                 case Unyank ignored -> Optional.empty();
+                case Move ignored -> Optional.empty();
             };
+        }
+
+        /**
+         * The {@link Move} from {@code held} to {@code head}, the entry at the new path.
+         *
+         * @throws Refused when anything but {@code repo} and an appended {@code formerly} changed
+         */
+        static Move moved(Entry held, Entry head) throws Refused {
+            if (head.repo().equalsIgnoreCase(held.repo())) {
+                throw new Refused("a move only follows a new owner or name; " + held.repo() + " and " + head.repo()
+                        + " differ only by case, which GitHub reads as one repository.");
+            }
+            if (!held.moved(head.repo()).equals(head)) {
+                throw new Refused("a move changes only \"repo\" to the new slug and appends " + held.repo()
+                        + " to \"formerly\"; the releases and the rest stay as approved.");
+            }
+            return new Move(held.repo());
         }
 
         /**
@@ -136,6 +161,11 @@ public final class EntryGate {
         static Change between(Optional<? extends Entry> base, Entry head) throws Refused {
             List<ApprovedRelease> now = head.releases();
             if (base.isEmpty()) {
+                // Only a move writes "formerly": a new entry naming one would take over a slug it never was.
+                if (!head.formerly().isEmpty()) {
+                    throw new Refused("a new entry names no \"formerly\"; only a move, after GitHub renamed or "
+                            + "transferred a listed repository, adds one.");
+                }
                 if (now.size() == 1 && now.getFirst().yanked() != null) {
                     throw new Refused("a new release is never listed yanked.");
                 }
@@ -147,6 +177,10 @@ public final class EntryGate {
             if (!held.repo().equals(head.repo())) {
                 throw new Refused("a listed entry keeps its repository " + held.repo() + "; it cannot become "
                         + head.repo() + ".");
+            }
+            if (!held.formerly().equals(head.formerly())) {
+                throw new Refused("\"formerly\" changes only with a move, when GitHub renamed or transferred the"
+                        + " repository.");
             }
             List<ApprovedRelease> before = held.releases();
             boolean detach = held instanceof BotEntry bot && head instanceof BotEntry next && bot.detached() != next.detached();
@@ -303,6 +337,14 @@ public final class EntryGate {
 
     /** Rules 1–5 for a pull request. Empty means the kind's own checks run next. */
     public static List<Finding> check(Request request, EntryFacts facts) {
+        if (isMoveShape(request)) {
+            try {
+                return move(request, facts);
+            } catch (UncheckedIOException e) {
+                return List.of(Finding.error(String.join(", ", request.changed()), "could not reach GitHub: "
+                        + e.getCause().getMessage() + ". Re-run the check."));
+            }
+        }
         if (request.changed().size() != 1) {
             return List.of(Finding.error(String.join(", ", request.changed()), "a pull request changes exactly one"
                     + " entry file, bots/<owner>__<repo>.json or plugins/<id>.json; this one changes "
@@ -352,13 +394,7 @@ public final class EntryGate {
         try {
             entry = read(file, named.kind());
         } catch (IOException | IllegalArgumentException e) {
-            return List.of(Finding.error(path, "not an entry of this schema: "
-                    + (named.kind() == EntryPath.Kind.BOT
-                    ? "{\"repo\", \"releases\": [{\"tag\", \"commit\"[, \"bmkSha256\"][, \"yanked\": {\"reason\","
-                    + " \"at\"}]}, …]} and an optional \"detached\""
-                    : "{\"repo\", \"releases\": [{\"tag\", \"commit\", \"jarSha256\", \"pomSha256\"[, \"yanked\":"
-                    + " {\"reason\", \"at\"}]}, …]}")
-                    + ", no tag twice, nothing else."));
+            return List.of(notTheSchema(path, named.kind()));
         }
         if (!named.matches(entry)) {
             return List.of(Finding.error(path, "the file name is what the entry names: rename it to "
@@ -370,6 +406,93 @@ public final class EntryGate {
                     + " case; GitHub reads both as one repository or one file."));
         }
         return checkEntry(entry, path, request.author(), admin, previous, facts);
+    }
+
+    /** The refusal of a file that does not read as an entry of {@code kind}, naming the schema. */
+    private static Finding notTheSchema(String path, EntryPath.Kind kind) {
+        return Finding.error(path, "not an entry of this schema: " + (kind == EntryPath.Kind.BOT
+                ? "{\"repo\", \"releases\": [{\"tag\", \"commit\"[, \"bmkSha256\"][, \"yanked\": {\"reason\","
+                + " \"at\"}]}, …]}, an optional \"detached\""
+                : "{\"repo\", \"releases\": [{\"tag\", \"commit\", \"jarSha256\", \"pomSha256\"[, \"yanked\":"
+                + " {\"reason\", \"at\"}]}, …]}")
+                + " and an optional \"formerly\": [\"owner/name\", …], no tag twice, nothing else.");
+    }
+
+    /** Two entry paths of one kind: what a {@link Change.Move} changes, a file removed and one added. */
+    private static boolean isMoveShape(Request request) {
+        if (request.changed().size() != 2) return false;
+        Optional<EntryPath> a = EntryPath.parse(request.changed().get(0));
+        Optional<EntryPath> b = EntryPath.parse(request.changed().get(1));
+        return a.isPresent() && b.isPresent() && a.get().kind() == b.get().kind();
+    }
+
+    /**
+     * A {@link Change.Move}: one entry file removed and one added, contents equal but for {@code repo} and an
+     * appended {@code formerly}, and GitHub resolving both slugs to one repository id, the new one its current
+     * name. Nobody's control is asked: the move only follows what GitHub already did, so index.yml makes it.
+     */
+    private static List<Finding> move(Request request, EntryFacts facts) {
+        String both = String.join(", ", request.changed());
+        if (request.base().isEmpty()) {
+            return List.of(Finding.error(both, "the check ran without --base, so whose entry this was cannot be"
+                    + " told."));
+        }
+        Path base = request.base().get();
+        EntryPath from = null;
+        EntryPath to = null;
+        for (String path : request.changed()) {
+            EntryPath named = EntryPath.parse(path).orElseThrow();
+            boolean held = Files.isRegularFile(base.resolve(path), LinkOption.NOFOLLOW_LINKS);
+            boolean now = Files.exists(request.head().resolve(path), LinkOption.NOFOLLOW_LINKS);
+            if (held && !now) from = named;
+            else if (!held && now) to = named;
+        }
+        if (from == null || to == null) {
+            return List.of(Finding.error(both, "a pull request changes exactly one entry file, or moves one: this"
+                    + " one changes two that are not one file removed and one added."));
+        }
+        String path = to.path();
+        if (Files.isSymbolicLink(request.head().resolve(path))) {
+            return List.of(Finding.error(path, "a symbolic link; an entry is a plain JSON file."));
+        }
+        Entry held;
+        Entry entry;
+        try {
+            held = read(base.resolve(from.path()), from.kind());
+        } catch (IOException | IllegalArgumentException e) {
+            return List.of(Finding.error(from.path(), "the catalog's current copy of this file does not read, so"
+                    + " what moves cannot be told; the admin replaces it."));
+        }
+        try {
+            entry = read(request.head().resolve(path), to.kind());
+        } catch (IOException | IllegalArgumentException e) {
+            return List.of(notTheSchema(path, to.kind()));
+        }
+        if (!to.matches(entry)) {
+            return List.of(Finding.error(path, "the file name is what the entry names: rename it to "
+                    + EntryPath.of(entry) + "."));
+        }
+        try {
+            Change.moved(held, entry);
+        } catch (Refused e) {
+            return List.of(Finding.error(path, e.getMessage()));
+        }
+        Optional<String> twin = caseTwin(base, to);
+        if (twin.isPresent()) {
+            return List.of(Finding.error(path, "the catalog already lists " + twin.get() + ", which differs only by"
+                    + " case; GitHub reads both as one repository or one file."));
+        }
+        Optional<EntryFacts.Repo> was = facts.repo(held.repo());
+        Optional<EntryFacts.Repo> is = facts.repo(entry.repo());
+        if (was.isEmpty() || is.isEmpty() || !was.get().sameAs(is.get())) {
+            return List.of(Finding.error(path, "GitHub does not resolve " + held.repo() + " and " + entry.repo()
+                    + " to one repository, so this is no move: list the new repository as an entry of its own."));
+        }
+        if (!is.get().slug().equalsIgnoreCase(entry.repo())) {
+            return List.of(Finding.error(path, "GitHub names this repository " + is.get().slug() + " now; move the"
+                    + " entry there."));
+        }
+        return List.of();
     }
 
     /**
@@ -531,6 +654,7 @@ public final class EntryGate {
 
     /** What {@link Part#KIND} needs before it reads the entry, when rule 1 ran in another step. */
     private static List<Finding> oneEntry(Request request) {
+        if (isMoveShape(request)) return List.of();
         if (request.changed().size() == 1 && (EntryPath.parse(request.changed().getFirst()).isPresent()
                 || isPublishers(request))) {
             return List.of();
@@ -545,7 +669,8 @@ public final class EntryGate {
      * rules 2–5.
      */
     private static List<Finding> kindChecks(Request request, EntryFacts facts, Console console) {
-        if (isPublishers(request)) return List.of();
+        // A move approves no release; the rules decided it.
+        if (isPublishers(request) || isMoveShape(request)) return List.of();
         String path = request.changed().getFirst();
         Path file = request.head().resolve(path);
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) return List.of();

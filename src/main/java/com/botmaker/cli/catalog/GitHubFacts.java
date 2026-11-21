@@ -63,7 +63,7 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
                 json.path("name").asText(), json.path("description").asText(""),
                 StreamSupport.stream(json.path("topics").spliterator(), false).map(JsonNode::asText).toList(),
                 json.path("stargazers_count").asInt(),
-                Optional.ofNullable(json.path("parent").path("full_name").textValue()))));
+                Optional.ofNullable(json.path("parent").path("full_name").textValue()), json.path("id").asLong())));
     }
 
     @Override

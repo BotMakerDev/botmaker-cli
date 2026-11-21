@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -64,7 +65,20 @@ public final class FakeFacts implements EntryFacts, PomFacts.Source {
     FakeFacts repo(String slug, long ownerId, String now, String description, String parent) {
         int slash = now.indexOf('/');
         repos.put(slug, new Repo(ownerId, now.substring(0, slash), now.substring(slash + 1), description,
-                List.of("idle"), 3, Optional.ofNullable(parent)));
+                List.of("idle"), 3, Optional.ofNullable(parent), idOf(now)));
+        return this;
+    }
+
+    /** One id per repository as GitHub names it now, so an old slug and its new one share it. */
+    static long idOf(String now) {
+        return Math.abs((long) now.toLowerCase(Locale.ROOT).hashCode()) + 1;
+    }
+
+    /** {@code slug} described as {@code now} with GitHub's id {@code id}: another repository holding a slug. */
+    FakeFacts repoWithId(String slug, String now, long id) {
+        int slash = now.indexOf('/');
+        repos.put(slug, new Repo(1, now.substring(0, slash), now.substring(slash + 1), "", List.of(), 0,
+                Optional.empty(), id));
         return this;
     }
 
