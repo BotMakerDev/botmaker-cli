@@ -31,6 +31,8 @@ import java.util.Optional;
  *   <li>It modifies {@code publishers.json} alone, which the check passes only for an admin
  *       ({@link PublishersCheck}): {@link Kind#MERGE}, never limited, while {@code main}'s copy is still the one
  *       the branch was made on; otherwise {@link Kind#HOLD}.</li>
+ *   <li>It adds or modifies one advisory ({@link AdvisoryCheck}, an admin's alone): {@link Kind#MERGE} while its
+ *       author is an admin on main now, else {@link Kind#HOLD} (2026-11-21).</li>
  *   <li>An entry checked against other ranks than main's, by an author who is no admin on main now:
  *       {@link Kind#HOLD}, since the check may have passed it as a demoted admin's.</li>
  *   <li>One entry file moved to another of its kind ({@link EntryGate.Change.Move}, which the check passed only
@@ -186,6 +188,12 @@ public final class ListingPolicy {
             return facts.publishersCurrent() && facts.authorAdmin()
                     ? Decision.of(Kind.MERGE, "changes the ranks; the check passed it as an admin's.")
                     : STALE_PUBLISHERS;
+        }
+        if (Advisory.idOf(change.path()).isPresent() && !"removed".equalsIgnoreCase(change.status())
+                && !change.renamed()) {
+            // The check passed it only as an admin's, by the ranks it read: an admin on main now keeps it sound.
+            return facts.authorAdmin() ? Decision.of(Kind.MERGE, "files or changes an advisory; the check passed it"
+                    + " as an admin's.") : STALE_PUBLISHERS;
         }
         if (EntryPath.parse(change.path()).isEmpty() || "renamed".equalsIgnoreCase(change.status())) {
             return Decision.of(Kind.HOLD, change.path() + " is not one entry file added, changed or removed.");

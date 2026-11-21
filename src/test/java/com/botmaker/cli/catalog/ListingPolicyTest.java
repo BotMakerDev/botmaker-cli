@@ -123,6 +123,19 @@ class ListingPolicyTest {
                 "facts without the ranks' state hold: a stale entry-facts.sh never merges on old ranks");
     }
 
+    @Test
+    void an_advisory_merges_for_an_admin_on_main_and_is_never_removed() {
+        ListingPolicy.Change filed = new ListingPolicy.Change("advisories/BMA-2026-0001.json", "added");
+        assertEquals(ListingPolicy.Kind.MERGE, decide(List.of(filed), false, true).decision());
+        assertEquals(ListingPolicy.Kind.MERGE, decide(List.of(new ListingPolicy.Change(
+                "advisories/BMA-2026-0001.json", "modified")), true, true).decision());
+        assertEquals(ListingPolicy.Kind.HOLD, decide(List.of(filed), true, false).decision(), "demoted since");
+        assertEquals(ListingPolicy.Kind.HOLD, decide(List.of(new ListingPolicy.Change(
+                "advisories/BMA-2026-0001.json", "removed")), true, true).decision());
+        assertEquals(ListingPolicy.Kind.HOLD, decide(List.of(new ListingPolicy.Change(
+                "advisories/notes.json", "added")), true, true).decision(), "not an advisory's name");
+    }
+
     private static ListingPolicy.Decision decide(boolean green, List<ListingPolicy.Change> changes,
                                                  List<Instant> recent) {
         return ListingPolicy.decide(new ListingPolicy.Facts("somedev", green, NOW, changes, recent, true, true));

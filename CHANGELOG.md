@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Security advisories (catalog trust, phase 5): `advisories/BMA-<year>-<NNNN>.json` in the catalog, filed by an
+  admin with `botmaker advisory new`, then only `extend`ed or `withdraw`n through its own pull request. `EntryGate`
+  refuses anyone but an admin, an id out of sequence or not the file's name, a repo no entry has (current or former
+  slug), a tag no approved release has, any other edit and a deletion. `catalog.json` lists the active ones.
 - Rename and move (catalog trust, phase 3). An entry carries `formerly`, its former slugs oldest first, and so do
   `catalog.json`'s rows. `EntryGate` accepts a move: one entry file removed and one added, `repo` the new slug and the
   old one appended to `formerly`, both slugs one GitHub repository id (`EntryFacts.Repo.id`); `formerly` changes by

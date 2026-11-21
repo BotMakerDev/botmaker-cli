@@ -3,6 +3,7 @@
 
 package com.botmaker.cli.publish;
 
+import com.botmaker.cli.catalog.Advisory;
 import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.BotEntry;
 import com.botmaker.cli.catalog.Catalog;
@@ -11,10 +12,12 @@ import com.botmaker.cli.catalog.Entry;
 import com.botmaker.cli.catalog.EntryPath;
 import com.botmaker.cli.catalog.FakeFacts;
 import com.botmaker.cli.catalog.PluginEntry;
+import com.botmaker.cli.catalog.Publishers;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -150,6 +153,75 @@ class CatalogPrTest {
         assertEquals("bot: unyank somedev/firestone v1", opened.getLast().title());
         assertEquals(FakeFacts.botRelease("v1"), CatalogJson.strict().readValue(opened.getLast().content()
                 .orElseThrow(), BotEntry.class).releases().getFirst());
+    }
+
+    @Test
+    void advisoryChange() throws Exception {
+        EntryPath path = EntryPath.parse("bots/somedev__firestone.json").orElseThrow();
+        Map<String, Entry> held = Map.of(path.path(), new BotEntry("somedev/firestone",
+                List.of(FakeFacts.botRelease("v1"), FakeFacts.botRelease("v2")), false));
+        Map<String, Advisory> advisories = new HashMap<>(Map.of("BMA-2026-0001", new Advisory("BMA-2026-0001",
+                "somedev/firestone", List.of("v1"), Advisory.Severity.LOW, "old", null, "2026-01-02", "x")));
+        CatalogPr.Reader catalog = new CatalogPr.Reader() {
+            @Override
+            public Optional<Entry> listed(EntryPath p) {
+                return Optional.ofNullable(held.get(p.path()));
+            }
+
+            @Override
+            public Optional<Catalog> catalog() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<Publishers> publishers() {
+                return Optional.of(new Publishers(List.of(new Publishers.Publisher(9, "admin")), List.of()));
+            }
+
+            @Override
+            public Optional<List<String>> advisoryIds() {
+                return Optional.of(List.copyOf(advisories.keySet()));
+            }
+
+            @Override
+            public Optional<Advisory> advisory(String id) {
+                return Optional.ofNullable(advisories.get(id));
+            }
+        };
+        PublishHost.Account admin = new PublishHost.Account("admin", 9);
+        List<CatalogPr.Change> opened = new ArrayList<>();
+        CatalogPr.Opener host = (change, account, listener) -> {
+            opened.add(change);
+            return Optional.empty();
+        };
+
+        CatalogPr.fileAdvisory("somedev/firestone", List.of("v1"), Advisory.Severity.HIGH, "Leaks the token.",
+                Optional.empty(), LocalDate.parse("2026-11-21"), admin, "test", catalog, host, FakeRunner.QUIET);
+        CatalogPr.Change filed = opened.getLast();
+        assertEquals("advisories/BMA-2026-0002.json", filed.file(), "after the withdrawn 0001, which keeps its number");
+        assertEquals("advisory/advisories/BMA-2026-0002.json", filed.branch());
+        Advisory written = CatalogJson.strict().readValue(filed.content().orElseThrow(), Advisory.class);
+        assertEquals(new Advisory("BMA-2026-0002", "somedev/firestone", List.of("v1"), Advisory.Severity.HIGH,
+                "Leaks the token.", null, "2026-11-21", null), written);
+
+        assertThrows(Refusal.class, () -> CatalogPr.fileAdvisory("somedev/firestone", List.of("v1"),
+                Advisory.Severity.HIGH, "x", Optional.empty(), LocalDate.parse("2026-11-21"), SOMEDEV, "test", catalog,
+                host, FakeRunner.QUIET), "an admin's alone");
+        assertThrows(Refusal.class, () -> CatalogPr.fileAdvisory("somedev/firestone", List.of("v9"),
+                Advisory.Severity.HIGH, "x", Optional.empty(), LocalDate.parse("2026-11-21"), admin, "test", catalog,
+                host, FakeRunner.QUIET), "an approved release");
+
+        advisories.put(written.id(), written);
+        CatalogPr.changeAdvisory("BMA-2026-0002", List.of("v2"), Optional.empty(), admin, "test", catalog, host,
+                FakeRunner.QUIET);
+        assertEquals(List.of("v1", "v2"), CatalogJson.strict().readValue(opened.getLast().content().orElseThrow(),
+                Advisory.class).releases());
+        CatalogPr.changeAdvisory("BMA-2026-0002", List.of(), Optional.of("Never leaked."), admin, "test", catalog,
+                host, FakeRunner.QUIET);
+        assertEquals(written.withdraw("Never leaked."), CatalogJson.strict().readValue(opened.getLast().content()
+                .orElseThrow(), Advisory.class));
+        assertThrows(Refusal.class, () -> CatalogPr.changeAdvisory("BMA-2026-0001", List.of("v2"), Optional.empty(),
+                admin, "test", catalog, host, FakeRunner.QUIET), "a withdrawn advisory changes no more");
     }
 
     private static final PublishHost.Account SOMEDEV = new PublishHost.Account("somedev", 7);

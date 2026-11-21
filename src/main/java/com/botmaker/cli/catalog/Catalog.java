@@ -18,14 +18,17 @@ import java.util.Optional;
  * {@code catalog.json}, the one file Studio reads: every listed plugin and bot with its rank and what was derived
  * about it. Written only by {@link CatalogBuilder}.
  *
- * @param builtAt when its content last changed (ISO-8601), not when the builder last ran
+ * @param builtAt    when its content last changed (ISO-8601), not when the builder last ran
+ * @param advisories the advisories not withdrawn, by id (spec 2026-11-21 § 5)
  */
-@JsonPropertyOrder({"schemaVersion", "builtAt", "plugins", "bots"})
-public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, List<Bot> bots) {
+@JsonPropertyOrder({"schemaVersion", "builtAt", "plugins", "bots", "advisories"})
+public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, List<Bot> bots,
+                      @JsonInclude(JsonInclude.Include.NON_EMPTY) List<Advisory> advisories) {
 
     /**
      * 6 (2026-11-21): a release's {@code publishedAt}, an entry's {@code updatedAt}, a bot's {@code downloads} and
-     * {@code platforms}; added only, so a reader of 5 reads it. 5 (2026-10-27): a plugin has no {@code id}, its
+     * {@code platforms}, a release's {@code yanked}, an entry's {@code formerly}, the catalog's {@code advisories};
+     * added only, so a reader of 5 reads it. 5 (2026-10-27): a plugin has no {@code id}, its
      * {@code repo} names it, and a pin names the plugin by {@code repo}. 4 (2026-10-24): every approved release per
      * entry, newest first, each pinned.
      */
@@ -224,11 +227,17 @@ public record Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, L
     public Catalog {
         plugins = plugins == null ? List.of() : List.copyOf(plugins);
         bots = bots == null ? List.of() : List.copyOf(bots);
+        advisories = advisories == null ? List.of() : List.copyOf(advisories);
+    }
+
+    /** A catalog with no advisory. */
+    public Catalog(int schemaVersion, String builtAt, List<Plugin> plugins, List<Bot> bots) {
+        this(schemaVersion, builtAt, plugins, bots, List.of());
     }
 
     /** The same catalog stamped {@code builtAt}. */
     public Catalog builtAt(String when) {
-        return new Catalog(schemaVersion, when, plugins, bots);
+        return new Catalog(schemaVersion, when, plugins, bots, advisories);
     }
 
     public String toJson() {

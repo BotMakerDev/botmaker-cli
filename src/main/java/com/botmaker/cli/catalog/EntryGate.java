@@ -51,7 +51,8 @@ import java.util.stream.Stream;
  * <p><b>An admin may change anyone's entry</b> (2026-10-23, the dashboard's edits): when the author's account id
  * is an admin in the base {@code publishers.json}, rules 3 and 4 pass. Rules 1, 2 and 5 and the kind's checks
  * still run, so an admin lists only a published release that builds. A pull request that changes only
- * {@code publishers.json} is {@link PublishersCheck}'s.
+ * {@code publishers.json} is {@link PublishersCheck}'s, one that changes one advisory {@link AdvisoryCheck}'s
+ * (2026-11-21).
  *
  * <p>The kind's own rules follow in {@link BotChecks} and {@link PluginChecks}, on the approved release only:
  * releases already approved are not rebuilt. No command-line library (picocli is {@code optional} here), and the
@@ -351,6 +352,13 @@ public final class EntryGate {
                     + request.changed().size() + " paths."));
         }
         String path = request.changed().getFirst();
+        Optional<String> advisory = Advisory.idOf(path);
+        if (advisory.isPresent()) {
+            return request.base().isEmpty()
+                    ? List.of(Finding.error(path, "the check ran without --base, so who is an admin cannot be told."))
+                    : AdvisoryCheck.check(request.head(), request.base().get(), request.authorId(), path,
+                    advisory.get());
+        }
         Optional<EntryPath> named = EntryPath.parse(path);
         if (named.isEmpty() && !path.equals(Publishers.FILE)) {
             return List.of(Finding.error(path, "not an entry path: a pull request changes one"
@@ -656,7 +664,7 @@ public final class EntryGate {
     private static List<Finding> oneEntry(Request request) {
         if (isMoveShape(request)) return List.of();
         if (request.changed().size() == 1 && (EntryPath.parse(request.changed().getFirst()).isPresent()
-                || isPublishers(request))) {
+                || isPublishers(request) || isAdvisory(request))) {
             return List.of();
         }
         return List.of(Finding.error(String.join(", ", request.changed()), "the kind's checks read exactly one"
@@ -670,7 +678,7 @@ public final class EntryGate {
      */
     private static List<Finding> kindChecks(Request request, EntryFacts facts, Console console) {
         // A move approves no release; the rules decided it.
-        if (isPublishers(request) || isMoveShape(request)) return List.of();
+        if (isPublishers(request) || isAdvisory(request) || isMoveShape(request)) return List.of();
         String path = request.changed().getFirst();
         Path file = request.head().resolve(path);
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) return List.of();
@@ -741,6 +749,11 @@ public final class EntryGate {
     /** A pull request that changes {@code publishers.json} alone: no entry, so no kind's check. */
     private static boolean isPublishers(Request request) {
         return request.changed().equals(List.of(Publishers.FILE));
+    }
+
+    /** A pull request that changes one advisory alone: no entry, so no kind's check. */
+    private static boolean isAdvisory(Request request) {
+        return request.changed().size() == 1 && Advisory.idOf(request.changed().getFirst()).isPresent();
     }
 
     /** An account id as GitHub prints it, or {@code -1}, which the usage check refuses. */

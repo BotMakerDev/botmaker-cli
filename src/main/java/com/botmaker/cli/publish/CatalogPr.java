@@ -3,6 +3,7 @@
 
 package com.botmaker.cli.publish;
 
+import com.botmaker.cli.catalog.Advisory;
 import com.botmaker.cli.catalog.ApprovedRelease;
 import com.botmaker.cli.catalog.BotEntry;
 import com.botmaker.cli.catalog.Catalog;
@@ -21,9 +22,11 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * The one pull request a publish or an unpublish opens on {@code BotMakerDev/botmaker-catalog}: one entry file
@@ -56,9 +59,36 @@ public final class CatalogPr {
             return Optional.empty();
         }
 
+        /** The ids under {@code advisories/}, or empty when GitHub did not answer. */
+        default Optional<List<String>> advisoryIds() {
+            return Optional.empty();
+        }
+
+        /** The advisory {@code id}, or empty when there is none (or GitHub did not answer). */
+        default Optional<Advisory> advisory(String id) {
+            return Optional.empty();
+        }
+
         /** Through GitHub's raw files. */
         static Reader of(GitHubFacts facts) {
             return new Reader() {
+                @Override
+                public Optional<List<String>> advisoryIds() {
+                    return facts.names(REPO, BRANCH, Advisory.DIRECTORY).map(names -> names.stream()
+                            .map(name -> Advisory.idOf(Advisory.DIRECTORY + name)).flatMap(Optional::stream).toList());
+                }
+
+                @Override
+                public Optional<Advisory> advisory(String id) {
+                    return facts.raw(REPO, BRANCH, Advisory.path(id)).flatMap(json -> {
+                        try {
+                            return Optional.of(CatalogJson.strict().readValue(json, Advisory.class));
+                        } catch (JsonProcessingException e) {
+                            return Optional.empty();
+                        }
+                    });
+                }
+
                 @Override
                 public Optional<Entry> listed(EntryPath path) {
                     return facts.raw(REPO, BRANCH, path.path()).flatMap(json -> {
@@ -100,9 +130,21 @@ public final class CatalogPr {
     /**
      * One pull request.
      *
+     * @param file    the one file it changes, from the catalog's root: an entry's, or an advisory's
      * @param content the file's new text, or empty to remove it
      */
-    public record Change(EntryPath path, Optional<String> content, String title, String body) {
+    public record Change(String file, Optional<String> content, String title, String body) {
+
+        /**
+         * Files or changes {@code advisory}, as {@code subject} (an admin's alone, spec 2026-11-21 § 5).
+         */
+        public static Change advisory(Advisory advisory, String subject, String command) {
+            String json = advisory.toJson();
+            String file = Advisory.path(advisory.id());
+            return new Change(file, Optional.of(json), "advisory: " + subject, "Files or changes `" + file
+                    + "`.\n\nOpened by `" + command + "`. The catalog's checks run on it and merge it when they pass."
+                    + "\n\n```json\n" + json + "```");
+        }
 
         /** Adds or updates {@code entry}'s file, titled after its newest release. */
         public static Change put(Entry entry, String command) {
@@ -130,21 +172,24 @@ public final class CatalogPr {
             }
             EntryPath path = EntryPath.parse(EntryPath.of(entry))
                     .orElseThrow(() -> new IllegalArgumentException(EntryPath.of(entry) + " is no entry path"));
-            return new Change(path, Optional.of(json), kind(path) + ": " + subject,
+            return new Change(path.path(), Optional.of(json), kind(path) + ": " + subject,
                     verb + " `" + path.path() + "`.\n\nOpened by `" + command + "`. The catalog's checks run"
                             + " on it and merge it when they pass.\n\n```json\n" + json + "```");
         }
 
         /** Removes the entry at {@code path}. */
         public static Change remove(EntryPath path, String command) {
-            return new Change(path, Optional.empty(), kind(path) + ": remove " + path.key(),
+            return new Change(path.path(), Optional.empty(), kind(path) + ": remove " + path.key(),
                     "Removes `" + path.path() + "`.\n\nOpened by `" + command + "`. The catalog's checks run on it"
                             + " and merge it when they pass.");
         }
 
-        /** {@code entry/<path>}: one branch per entry, so a second publish of the same entry replaces the first. */
+        /**
+         * {@code entry/<path>}: one branch per entry, so a second publish of the same entry replaces the first; an
+         * advisory's is {@code advisory/<path>}.
+         */
         public String branch() {
-            return "entry/" + path.path();
+            return (Advisory.idOf(file).isPresent() ? "advisory/" : "entry/") + file;
         }
 
         private static String kind(EntryPath path) {
@@ -182,7 +227,7 @@ public final class CatalogPr {
             steps.add(new Step.Run(true, List.of("gh", "repo", "fork", "--remote=true", "--remote-name=fork")));
         }
         steps.add(new Step.Run(true, List.of("git", "checkout", "-b", change.branch())));
-        String file = change.path().path();
+        String file = change.file();
         if (change.content().isPresent()) {
             steps.add(new Step.Write(file, change.content().get()));
             steps.add(new Step.Run(true, List.of("git", "add", "--", file)));
@@ -225,7 +270,7 @@ public final class CatalogPr {
                 }
                 case Step.Commit commit -> {
                     if (runner.read(clone, List.of("git", "diff", "--cached", "--quiet")).isPresent()) {
-                        listener.step(change.path().path() + " already reads so in the catalog; nothing to open.");
+                        listener.step(change.file() + " already reads so in the catalog; nothing to open.");
                         return Optional.empty();
                     }
                     if (!runner.change(clone, List.of("git", "commit", "--quiet", "-m", commit.title())).ok()) {
@@ -349,6 +394,80 @@ public final class CatalogPr {
                 .toList();
         return host.open(Change.yank(held.withReleases(releases), wanted, reason.isEmpty(), command), account,
                 listener);
+    }
+
+    /**
+     * Opens the pull request filing a new advisory against {@code tags} of the entry at {@code repo} (spec § 5), after
+     * checking here what the catalog checks: {@code account} is an admin, the entry is listed and approved each tag.
+     * Its id is the next of {@code today}'s year among those the catalog holds.
+     *
+     * @return the pull request's URL, or empty when there was nothing to open
+     */
+    public static Optional<String> fileAdvisory(String repo, List<String> tags, Advisory.Severity severity,
+                                                String summary, Optional<String> url, LocalDate today,
+                                                PublishHost.Account account, String command, Reader catalog,
+                                                Opener host, Listener listener) throws Refusal {
+        requireAdmin(account, catalog);
+        String slug = repo.strip();
+        Entry entry = Stream.of(EntryPath.bot(slug), EntryPath.plugin(slug)).map(EntryPath::parse)
+                .flatMap(Optional::stream).map(catalog::listed).flatMap(Optional::stream).findFirst()
+                .orElseThrow(() -> new Refusal(slug + " is not listed in the catalog, or GitHub did not answer."));
+        requireApproved(entry, tags);
+        List<String> ids = catalog.advisoryIds().orElseThrow(() -> new Refusal("could not list the catalog's"
+                + " advisories to number this one; re-run when GitHub answers."));
+        Advisory advisory = new Advisory(Advisory.next(today.getYear(), ids), entry.repo(),
+                tags.stream().map(String::strip).distinct().toList(), severity, summary.strip(),
+                url.map(String::strip).orElse(null), today.toString(), null);
+        String refusal = advisory.problem();
+        if (refusal != null) throw new Refusal(refusal);
+        return host.open(Change.advisory(advisory, advisory.id() + " " + entry.repo(), command), account, listener);
+    }
+
+    /**
+     * Opens the pull request appending {@code tags} to advisory {@code id}, or with {@code reason} present
+     * withdrawing it instead; the only two changes an advisory takes.
+     */
+    public static Optional<String> changeAdvisory(String id, List<String> tags, Optional<String> reason,
+                                                  PublishHost.Account account, String command, Reader catalog,
+                                                  Opener host, Listener listener) throws Refusal {
+        requireAdmin(account, catalog);
+        Advisory held = catalog.advisory(id.strip()).orElseThrow(() -> new Refusal("the catalog holds no advisory "
+                + id.strip() + ", or GitHub did not answer."));
+        if (!held.active()) throw new Refusal(held.id() + " is withdrawn: " + held.withdrawn());
+        if (reason.isPresent()) {
+            String why = reason.get().strip();
+            if (why.isEmpty() || why.length() > Advisory.MAX_TEXT) {
+                throw new Refusal("a withdrawal says why, in 1 to " + Advisory.MAX_TEXT + " characters.");
+            }
+            return host.open(Change.advisory(held.withdraw(why), "withdraw " + held.id(), command), account,
+                    listener);
+        }
+        Entry entry = Stream.of(EntryPath.bot(held.repo()), EntryPath.plugin(held.repo())).map(EntryPath::parse)
+                .flatMap(Optional::stream).map(catalog::listed).flatMap(Optional::stream).findFirst()
+                .orElseThrow(() -> new Refusal(held.repo() + " is not listed in the catalog under that slug, or"
+                        + " GitHub did not answer."));
+        List<String> more = tags.stream().map(String::strip).filter(t -> !held.releases().contains(t)).distinct()
+                .toList();
+        if (more.isEmpty()) throw new Refusal(held.id() + " already names " + String.join(", ", tags) + ".");
+        requireApproved(entry, more);
+        return host.open(Change.advisory(held.extend(more), "extend " + held.id(), command), account, listener);
+    }
+
+    private static void requireAdmin(PublishHost.Account account, Reader catalog) throws Refusal {
+        if (!admin(account, catalog)) {
+            throw new Refusal("only an admin files or changes an advisory, and " + account.login() + " is not one"
+                    + " in the catalog's publishers.json.");
+        }
+    }
+
+    private static void requireApproved(Entry entry, List<String> tags) throws Refusal {
+        if (tags.isEmpty()) throw new Refusal("an advisory names at least one release (--release).");
+        for (String tag : tags) {
+            if (entry.release(tag.strip()).isEmpty()) {
+                throw new Refusal(entry.repo() + " lists no release " + tag.strip() + "; it lists "
+                        + String.join(", ", entry.releases().stream().map(ApprovedRelease::tag).toList()) + ".");
+            }
+        }
     }
 
     /** What carries a pull request: a host's {@link PublishHost#pullRequest}, all an unpublish needs of it. */

@@ -18,8 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
@@ -186,6 +188,26 @@ public final class GitHubFacts implements EntryFacts, PomFacts.Source {
             if (response.statusCode() != 200 || response.body().length > MAX_POM_BYTES) return Optional.empty();
             return Optional.of(new String(response.body(), StandardCharsets.UTF_8));
         } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The names of the files in folder {@code dir} of {@code repo} at {@code ref}: empty list when the folder does
+     * not exist, empty when GitHub did not answer.
+     */
+    public Optional<List<String>> names(String repo, String ref, String dir) {
+        try {
+            String folder = dir.endsWith("/") ? dir.substring(0, dir.length() - 1) : dir;
+            return Optional.of(api("https://api.github.com/repos/" + repo + "/contents/" + folder + "?ref="
+                    + encode(ref)).map(node -> {
+                List<String> names = new ArrayList<>();
+                node.forEach(item -> {
+                    if ("file".equals(item.path("type").asText())) names.add(item.path("name").asText());
+                });
+                return names;
+            }).orElse(List.of()));
+        } catch (UncheckedIOException e) {
             return Optional.empty();
         }
     }

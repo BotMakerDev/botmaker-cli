@@ -308,6 +308,26 @@ class CatalogBuilderTest {
         Files.writeString(root.resolve(Catalog.FILE), catalog.toJson());
     }
 
+    @Test
+    void withdrawnNotListed() throws IOException {
+        Advisory held = new Advisory("BMA-2026-0002", "somedev/firestone", List.of("v1.2.0"), Advisory.Severity.HIGH,
+                "Leaks the token.", null, "2026-11-21", null);
+        Advisory withdrawn = new Advisory("BMA-2026-0001", "somedev/firestone", List.of("v1.2.0"),
+                Advisory.Severity.LOW, "A misread log.", null, "2026-11-20", "Never true.");
+        entry(Advisory.path(held.id()), held.toJson());
+        entry(Advisory.path(withdrawn.id()), withdrawn.toJson());
+        entry("advisories/README.md", "not an advisory");
+        Catalog catalog = CatalogBuilder.build(root, publishers, facts, derived, NOW);
+        assertEquals(List.of(held), catalog.advisories());
+        assertTrue(catalog.toJson().contains("\"advisories\""));
+        assertFalse(catalog.toJson().contains("BMA-2026-0001"));
+    }
+
+    @Test
+    void no_advisory_writes_no_key() throws IOException {
+        assertFalse(CatalogBuilder.build(root, publishers, facts, derived, NOW).toJson().contains("advisories"));
+    }
+
     private void entry(String path, String json) throws IOException {
         Path file = root.resolve(path);
         Files.createDirectories(file.getParent());

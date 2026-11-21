@@ -42,6 +42,7 @@ import java.util.stream.Stream;
  *   <li>A bot's release is listed only while every catalog plugin it declares is listed and it declares at least
  *       one.</li>
  *   <li>The coordinate is GitHub's current owner and name, so it follows a transfer or a rename.</li>
+ *   <li>Every advisory under {@code advisories/} not withdrawn is carried as it was filed (2026-11-21).</li>
  *   <li>{@code builtAt} moves only when the content changed, so the file is committed only when it did.</li>
  * </ul>
  */
@@ -135,7 +136,9 @@ public final class CatalogBuilder {
         }
         bots.sort(Comparator.comparing(b -> b.repo().toLowerCase(Locale.ROOT)));
 
-        Catalog built = new Catalog(Catalog.SCHEMA_VERSION, now, plugins, bots);
+        // Every advisory still holding, whether its entry is listed now or not: whoever has the release still has it.
+        List<Advisory> advisories = Advisory.readAll(root).stream().filter(Advisory::active).toList();
+        Catalog built = new Catalog(Catalog.SCHEMA_VERSION, now, plugins, bots, advisories);
         return previous.filter(p -> p.builtAt(now).equals(built)).map(p -> built.builtAt(p.builtAt()))
                 .orElse(built);
     }
