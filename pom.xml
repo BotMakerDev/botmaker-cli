@@ -171,6 +171,13 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- SchemaFilesTest: the catalog's schema/ files describe what the check accepts and the index writes. -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>2.0.4</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

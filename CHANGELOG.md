@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `SchemaFilesTest` (catalog trust, phase 6): the catalog's `schema/` files (entry, advisory, catalog.json; JSON
+  Schema 2020-12) accept the records' JSON and every file the catalog holds, and refuse what the check refuses;
+  `json-schema-validator` at test scope only. Skipped where botmaker-catalog is not checked out beside the cli.
 - Security advisories (catalog trust, phase 5): `advisories/BMA-<year>-<NNNN>.json` in the catalog, filed by an
   admin with `botmaker advisory new`, then only `extend`ed or `withdraw`n through its own pull request. `EntryGate`
   refuses anyone but an admin, an id out of sequence or not the file's name, a repo no entry has (current or former
