@@ -9,6 +9,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `botmaker studio [project]` (2026-11-22) starts the released Studio on its own and returns. Studio's output goes to
+  `studio.log` in the cache folder. The command is `--studio`, else `$BOTMAKER_STUDIO`, else the saved one, else the
+  package's `/opt/botmaker-studio/bin/BotMaker Studio`. `botmaker studio dev [project]` installs `botmaker-studio`
+  and its upstreams from the checkout (`-am install`, no tests), then starts its `javafx:run` the same way, logging
+  to `studio-dev.log`. `--no-build` skips the install. `botmaker studio set --umbrella <dir>` and
+  `--command <command>` save the checkout and the released command in `studio-places.properties`, in the config
+  folder. The checkout may be named by its `botmaker-studio` folder. `--forget-umbrella` and `--forget-command`
+  drop a saved value. `plugin run`, `mcp-bridge` and `doctor` read the saved places after their flags and
+  environment variables. A `--studio` or `$BOTMAKER_STUDIO` beats a saved checkout. A saved checkout that has
+  moved is skipped.
 - `botmaker core` (2026-11-21): `status` (the dashboard's cards, in the terminal), `watch` (its live feed, `--kind`),
   `dashboard` (opens the page, `--print` the link), and `start`, `quit [--force]`, `restart [--force]`,
   `stop [<run_id>|all]`, `open <dir>`, `close [--keep-run]` and `reload`, each one of the core's MCP tools. Only

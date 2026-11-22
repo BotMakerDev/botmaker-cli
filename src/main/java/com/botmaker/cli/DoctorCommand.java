@@ -120,18 +120,17 @@ final class DoctorCommand implements Callable<Integer> {
     }
 
     /**
-     * Studio, which this program launches and never discovers.
-     *
-     * <p>A packaged Studio has no canonical location on Linux, so there is nothing to probe for: the
-     * question is only whether the person has said where it is. That is {@code $BOTMAKER_STUDIO} or
-     * {@code --studio}, and this reports the first.
+     * Studio, which this program launches: a released one ($BOTMAKER_STUDIO, what {@code studio set} saved, else the
+     * package's own launcher) and the checkout {@code studio dev} builds.
      */
     private Finding studio() {
-        String command = System.getenv("BOTMAKER_STUDIO");
-        boolean set = command != null && !command.isBlank();
+        Optional<List<String>> released = StudioPlaces.released(null);
+        Optional<Path> checkout = StudioPlaces.umbrella(null);
+        boolean set = released.isPresent() || checkout.isPresent();
         return new Finding(set, false, "studio",
-                set ? "$BOTMAKER_STUDIO = " + command
-                        : "$BOTMAKER_STUDIO not set — `plugin run` needs --studio or --umbrella");
+                set ? "released: " + released.map(argv -> String.join(" ", argv)).orElse("(none)") + "; checkout: "
+                        + checkout.map(Path::toString).orElse("(none)")
+                        : "none known — `botmaker studio set --command <command>` or `--umbrella <checkout>`");
     }
 
     private Finding projects() {

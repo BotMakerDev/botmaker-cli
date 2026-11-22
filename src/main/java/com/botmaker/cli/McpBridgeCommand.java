@@ -48,14 +48,12 @@ final class McpBridgeCommand implements Callable<Integer> {
 
     /** The checkout first, as {@code plugin run} launches Studio; none of them, start_studio says how to give one. */
     private Optional<Launch> launch() {
-        String checkout = umbrella != null ? umbrella : System.getenv("BOTMAKER_UMBRELLA");
-        if (checkout != null && !checkout.isBlank()) {
-            Path dir = Path.of(checkout);
+        Optional<Path> checkout = StudioPlaces.umbrellaFirst(umbrella, studioCommand);
+        if (checkout.isPresent()) {
+            Path dir = checkout.get();
             return Optional.of(Launch.of(List.of(Mvn.executable(dir), "-B", "-o", "-pl", "botmaker-studio",
                     "javafx:run"), dir, "-Djavafx.args=--project=%s"));
         }
-        String command = studioCommand != null ? studioCommand : System.getenv("BOTMAKER_STUDIO");
-        if (command == null || command.isBlank()) return Optional.empty();
-        return Optional.of(Launch.of(List.of(command.strip().split("\\s+")), null, "--project=%s"));
+        return StudioPlaces.released(studioCommand).map(argv -> Launch.of(argv, null, "--project=%s"));
     }
 }

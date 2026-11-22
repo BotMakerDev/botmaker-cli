@@ -59,7 +59,7 @@ import java.util.concurrent.Callable;
         subcommands = {PluginCommand.class, BotCommand.class, DoctorCommand.class,
                 ReportsCommand.class, CompletionCommand.class, McpBridgeCommand.class, AiCommand.class,
                 McpCommand.class, UpdateCommand.class, ToolCommand.class, CoreCommand.class, AdvisoryCommand.class,
-                MovedCommand.class})
+                MovedCommand.class, StudioCommand.class})
 public final class Main implements Callable<Integer> {
 
     /**

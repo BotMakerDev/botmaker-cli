@@ -263,9 +263,14 @@ public final class McpBridge {
         return cacheRoot();
     }
 
-    private static Path cacheRoot() {
+    /** BotMaker's cache folder, where Studio's {@code mcp.json} and the logs of a Studio started from here are. */
+    public static Path cacheRoot() {
         String os = System.getProperty("os.name", "").toLowerCase();
-        if (os.contains("win")) return Path.of(System.getenv("LOCALAPPDATA"), "BotMaker", ".cache");
+        if (os.contains("win")) {
+            String local = System.getenv("LOCALAPPDATA");
+            return local == null || local.isBlank() ? Path.of(System.getProperty("user.home"), "BotMaker", ".cache")
+                    : Path.of(local, "BotMaker", ".cache");
+        }
         if (os.contains("mac")) return Path.of(System.getProperty("user.home"), "Library", "Caches", "botmaker");
         String xdg = System.getenv("XDG_CACHE_HOME");
         return xdg != null && !xdg.isEmpty() ? Path.of(xdg, "botmaker")

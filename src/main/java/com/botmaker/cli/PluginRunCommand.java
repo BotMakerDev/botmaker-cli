@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -152,23 +153,23 @@ final class PluginRunCommand implements Callable<Integer> {
         Console console = parent.main().console();
         String projectArg = projectName == null ? null : "--project=" + projectName;
 
-        String checkout = umbrella != null ? umbrella : System.getenv("BOTMAKER_UMBRELLA");
-        if (checkout != null && !checkout.isBlank()) {
+        Optional<Path> checkout = StudioPlaces.umbrellaFirst(umbrella, studioCommand);
+        if (checkout.isPresent()) {
             List<String> goals = new ArrayList<>(List.of("-pl", "botmaker-studio", "-am", "javafx:run"));
             if (projectArg != null) {
                 goals.add("-Djavafx.args=" + projectArg);
             }
-            Mvn.Result result = parent.main().mvn().runInteractive(Path.of(checkout), goals.toArray(String[]::new));
+            Mvn.Result result = parent.main().mvn().runInteractive(checkout.get(), goals.toArray(String[]::new));
             return result.ok() ? 0 : 1;
         }
 
-        String command = studioCommand != null ? studioCommand : System.getenv("BOTMAKER_STUDIO");
-        if (command == null || command.isBlank()) {
-            console.warn("no Studio to launch. Pass --studio <command>, set BOTMAKER_STUDIO, or point"
-                    + " --umbrella at a BotMaker umbrella checkout. The plugin is installed either way.");
+        Optional<List<String>> released = StudioPlaces.released(studioCommand);
+        if (released.isEmpty()) {
+            console.warn("no Studio to launch. Pass --studio <command> or --umbrella <checkout>, or say where it is"
+                    + " once with `botmaker studio set`. The plugin is installed either way.");
             return 0;
         }
-        List<String> argv = new ArrayList<>(List.of(command.split("\\s+")));
+        List<String> argv = new ArrayList<>(released.get());
         if (projectArg != null) {
             argv.add(projectArg);
         }
