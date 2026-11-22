@@ -906,7 +906,7 @@ class PluginValidatorTest {
     /** {@code ManagedValue.param(GreetingValue.Id.<constant>)}, a String parameter starting as {@code first()}. */
     private static String param(String constant) {
         return "com.botmaker.plugin.api.source.ManagedValue.param(GreetingValue.Id." + constant + ")"
-                + ".in(GreetingValue.Holder.VALUES).startsAs(GoodPlugin::first).shown(\"\", null).because(\"why\")";
+                + ".in(GreetingValue.Holder.VALUES).startsAs(GoodPlugin::first).shown(\"\").because(\"why\")";
     }
 
     /** The good plugin declaring {@code values}, and a pool for the parameter {@code pooled}. */
