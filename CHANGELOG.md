@@ -5,7 +5,7 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
-## [Unreleased]
+## [0.14.1] — 2026-11-22
 
 ### Added
 
@@ -53,6 +53,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   pom names none, the bot runs on all of them. The entry check refuses an id it does not know.
 - `botmaker bot publish --platforms linux,windows` writes the pom property and commits it before the tag.
   `PublishRequest.platforms` does the same for Studio. `Poms.setProperty` writes one property.
+
+### Changed
+
+- Built against botmaker-studio-api 0.19.1 (was 0.19.0).
+- Built against botmaker-plugin-host 0.14.1 (was 0.14.0).
+- Built against botmaker-plugin-archetype 0.11.1 (was 0.11.0).
+- Built against botmaker-java 0.4.1 (was 0.4.0).
 
 ## [0.14.0] — 2026-11-21
 
