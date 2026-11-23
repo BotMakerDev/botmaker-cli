@@ -13,6 +13,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.DoubleConsumer;
 
 /**
  * {@code botmaker update}'s work (2026-11-17): replaces the jar this command runs from with the latest release's
@@ -45,6 +46,15 @@ public final class SelfUpdate {
 
         /** Saves {@code url}'s body to {@code to}. */
         void download(String url, Path to) throws IOException;
+
+        /**
+         * {@link #download(String, Path)}, reporting the fraction done to {@code progress} as bytes arrive, or
+         * {@code -1} when the size is unknown; called on the downloading thread.
+         */
+        default void download(String url, Path to, DoubleConsumer progress) throws IOException {
+            progress.accept(-1);
+            download(url, to);
+        }
 
         /** {@code url}'s body as text, or empty when it could not be fetched. */
         Optional<String> text(String url);

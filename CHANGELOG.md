@@ -7,6 +7,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- `botmaker studio update [--check]` updates the installed Studio to its latest release, the way it was installed:
+  the rpm or deb from its dnf or apt repository (else the release's package), an AppImage replaced in place, the
+  MSI run, the `.app` replaced from the dmg. Each download is checked against the release's `checksums_sha256.txt`,
+  root is asked by `sudo` at a terminal, else `pkexec`, and it refuses while Studio runs. Studio's *Check for
+  Updates* runs the same code (`update.StudioUpdate`).
+
 ### Changed
 
 - `botmaker studio dev` starts Studio with the assistant's `ui` tool on, so Claude can read and press its windows

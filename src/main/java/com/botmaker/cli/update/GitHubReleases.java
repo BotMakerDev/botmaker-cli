@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,22 +19,36 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.DoubleConsumer;
 
-/** {@link SelfUpdate.Releases} over GitHub's REST API, anonymous: {@code BotMakerDev/botmaker-cli}'s latest release. */
+/**
+ * {@link SelfUpdate.Releases} over GitHub's REST API, anonymous: a {@code BotMakerDev} repository's latest release,
+ * {@code botmaker-cli}'s unless another is named ({@code botmaker-studio}'s for {@link StudioUpdate}).
+ */
 public final class GitHubReleases implements SelfUpdate.Releases {
 
-    private static final String LATEST = "https://api.github.com/repos/BotMakerDev/botmaker-cli/releases/latest";
-
+    private final String repository;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
 
+    public GitHubReleases() {
+        this("botmaker-cli");
+    }
+
+    /** {@code BotMakerDev/<repository>}'s releases. */
+    public GitHubReleases(String repository) {
+        this.repository = repository;
+    }
+
     @Override
     public Optional<SelfUpdate.Latest> latest() throws IOException {
-        HttpResponse<String> response = send(request(LATEST).header("Accept", "application/vnd.github+json").build(),
+        String latest = "https://api.github.com/repos/BotMakerDev/" + repository + "/releases/latest";
+        HttpResponse<String> response = send(request(latest).header("Accept", "application/vnd.github+json").build(),
                 HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() == 404) return Optional.empty();
         if (response.statusCode() != 200) {
-            throw new IOException("GitHub answered " + response.statusCode() + " for botmaker-cli's latest release.");
+            throw new IOException("GitHub answered " + response.statusCode() + " for " + repository
+                    + "'s latest release.");
         }
         JsonNode json = new ObjectMapper().readTree(response.body());
         Map<String, String> assets = new LinkedHashMap<>();
@@ -52,6 +68,30 @@ public final class GitHubReleases implements SelfUpdate.Releases {
     }
 
     @Override
+    public void download(String url, Path to, DoubleConsumer progress) throws IOException {
+        HttpResponse<InputStream> response = send(request(url).build(), HttpResponse.BodyHandlers.ofInputStream());
+        if (response.statusCode() != 200) {
+            response.body().close();
+            throw new IOException("Downloading " + url + " answered " + response.statusCode() + ".");
+        }
+        long total = response.headers().firstValueAsLong("content-length").orElse(-1L);
+        progress.accept(total > 0 ? 0 : -1);
+        try (InputStream in = response.body(); OutputStream out = Files.newOutputStream(to)) {
+            byte[] buf = new byte[64 * 1024];
+            long read = 0;
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                out.write(buf, 0, n);
+                read += n;
+                if (total > 0) progress.accept((double) read / total);
+            }
+        } catch (IOException e) {
+            Files.deleteIfExists(to);
+            throw new IOException("Downloading " + url + " stopped: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public Optional<String> text(String url) {
         try {
             HttpResponse<String> response = send(request(url).build(), HttpResponse.BodyHandlers.ofString());
@@ -62,7 +102,7 @@ public final class GitHubReleases implements SelfUpdate.Releases {
     }
 
     private static HttpRequest.Builder request(String url) {
-        return HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(5))
+        return HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(10))
                 .header("User-Agent", "botmaker-cli");
     }
 

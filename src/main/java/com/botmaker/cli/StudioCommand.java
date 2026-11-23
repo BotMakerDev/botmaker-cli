@@ -4,6 +4,7 @@
 package com.botmaker.cli;
 
 import com.botmaker.cli.mcp.McpBridge;
+import com.botmaker.cli.update.StudioUpdate;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -28,7 +29,8 @@ import java.util.concurrent.Callable;
                 + "said. The released Studio is --studio, else $BOTMAKER_STUDIO, else what `studio set --command` "
                 + "saved, else the package's /opt/botmaker-studio/bin/BotMaker Studio.",
         mixinStandardHelpOptions = true,
-        subcommands = {StudioCommand.Dev.class, StudioCommand.Set.class})
+        // `update` is Studio's updater (update.StudioUpdate), which Studio's Check for Updates runs too.
+        subcommands = {StudioCommand.Dev.class, StudioCommand.Set.class, StudioCommand.Update.class})
 final class StudioCommand implements Callable<Integer> {
 
     @ParentCommand
@@ -146,6 +148,60 @@ final class StudioCommand implements Callable<Integer> {
                 process.destroy();
                 throw new IOException("interrupted while building", stopped);
             }
+        }
+    }
+
+    @Command(name = "update",
+            header = "Update the installed Studio to its latest release, the way it was installed.",
+            description = "The rpm or deb is upgraded from its repository by dnf or apt (else the release's package "
+                    + "is installed), an AppImage replaced, the MSI run, the .app replaced from the dmg; each "
+                    + "download is checked against the release's checksums_sha256.txt. Root is asked by sudo, else "
+                    + "pkexec. Refused while Studio runs. The Studio is --studio, else $BOTMAKER_STUDIO, else what "
+                    + "`studio set --command` saved, else where its installer puts it.",
+            mixinStandardHelpOptions = true)
+    static final class Update implements Callable<Integer> {
+
+        @ParentCommand
+        private StudioCommand studio;
+
+        @Option(names = "--check", description = "Say where the installed Studio stands; install nothing.")
+        private boolean check;
+
+        @Option(names = "--studio", paramLabel = "<path>", description = "The installed Studio's program or AppImage.")
+        private String studioCommand;
+
+        @Override
+        public Integer call() throws IOException {
+            Console console = studio.main.console();
+            Optional<Path> given = StudioPlaces.released(studioCommand)
+                    .filter(argv -> argv.size() == 1).map(argv -> Path.of(argv.getFirst()));
+            StudioUpdate update = StudioUpdate.forCommand(given);
+            if (check) {
+                StudioUpdate.Check checked = update.check();
+                String latest = checked.latest().map(tag -> "the latest release is " + tag)
+                        .orElse("its latest release could not be read");
+                console.out(checked.installed().map(v -> "BotMaker Studio " + v)
+                        .orElse("BotMaker Studio (its version could not be read)") + "; " + latest);
+                console.out(checked.install().describe());
+                if (!checked.running().isEmpty()) {
+                    console.out("running now (process " + checked.running().getFirst() + "): close it to update");
+                }
+                if (checked.updatable()) {
+                    console.out("botmaker studio update installs it");
+                } else if (checked.installed().isEmpty() && checked.latest().isPresent() && checked.managed()) {
+                    console.out("botmaker studio update installs the latest release");
+                }
+                return 0;
+            }
+            switch (update.update(fraction -> { })) {
+                case StudioUpdate.Outcome.Current current ->
+                        console.out("BotMaker Studio is up to date (latest release " + current.tag() + ").");
+                case StudioUpdate.Outcome.Updated updated ->
+                        console.out("BotMaker Studio " + updated.tag() + " is installed.");
+                case StudioUpdate.Outcome.Started started ->
+                        console.out("BotMaker Studio " + started.tag() + "'s installer is started.");
+            }
+            return 0;
         }
     }
 
