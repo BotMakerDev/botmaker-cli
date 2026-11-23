@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
@@ -50,17 +51,23 @@ final class StudioCommand implements Callable<Integer> {
         }
         List<String> argv = new ArrayList<>(released.get());
         if (project != null && !project.isBlank()) argv.add("--project=" + project.strip());
-        return detached(console, argv, null, "studio.log");
+        return detached(console, argv, null, "studio.log", Map.of());
     }
 
-    /** {@code argv} started in {@code dir} on its own, its output in {@code log} in the cache folder; 0, or 1 when unstarted. */
-    static int detached(Console console, List<String> argv, Path dir, String log) throws IOException {
+    /**
+     * {@code argv} started in {@code dir} on its own with {@code environment} added, its output in {@code log} in the
+     * cache folder; 0, or 1 when unstarted.
+     */
+    static int detached(Console console, List<String> argv, Path dir, String log, Map<String, String> environment)
+            throws IOException {
         Path to = McpBridge.cacheRoot().resolve(log);
         Files.createDirectories(to.getParent());
         console.step("$ " + String.join(" ", argv));
         try {
-            new ProcessBuilder(argv).directory(dir == null ? null : dir.toFile()).redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.appendTo(to.toFile())).start();
+            ProcessBuilder builder = new ProcessBuilder(argv).directory(dir == null ? null : dir.toFile())
+                    .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(to.toFile()));
+            builder.environment().putAll(environment);
+            builder.start();
         } catch (IOException unstarted) {
             console.error("Studio did not start: " + unstarted.getMessage());
             return 1;
@@ -73,7 +80,8 @@ final class StudioCommand implements Callable<Integer> {
             header = "Start the dev Studio of your BotMaker checkout, built first.",
             description = "Installs botmaker-studio and every module it is built from (mvn -pl botmaker-studio -am "
                     + "install, no tests), so what you changed is in, then starts it with javafx:run. The checkout "
-                    + "is --umbrella, else $BOTMAKER_UMBRELLA, else what `studio set --umbrella` saved.",
+                    + "is --umbrella, else $BOTMAKER_UMBRELLA, else what `studio set --umbrella` saved. It serves "
+                    + "the assistant's ui tool over its own windows, so Claude can drive it, unless --no-ui.",
             mixinStandardHelpOptions = true)
     static final class Dev implements Callable<Integer> {
 
@@ -89,6 +97,11 @@ final class StudioCommand implements Callable<Integer> {
 
         @Option(names = "--no-build", description = "Start on what ~/.m2 holds; build nothing.")
         private boolean noBuild;
+
+        // On by default (2026-11-23, the user's call): a dev Studio is one's own checkout, and Claude drives it without
+        // a restart. The released Studio never serves the ui tool.
+        @Option(names = "--no-ui", description = "Serve no ui tool: Claude cannot press or read Studio's windows.")
+        private boolean noUi;
 
         @Override
         public Integer call() throws IOException {
@@ -121,7 +134,7 @@ final class StudioCommand implements Callable<Integer> {
             }
             List<String> argv = new ArrayList<>(List.of(mvn, "-B", "-o", "-pl", "botmaker-studio", "javafx:run"));
             if (project != null && !project.isBlank()) argv.add("-Djavafx.args=--project=" + project.strip());
-            return detached(console, argv, checkout, "studio-dev.log");
+            return detached(console, argv, checkout, "studio-dev.log", McpBridge.environment("", !noUi));
         }
 
         private static int run(List<String> argv, Path dir) throws IOException {

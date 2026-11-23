@@ -447,7 +447,7 @@ public final class McpBridge {
     }
 
     /** The environment start_studio adds for {@code home} and {@code ui}: nothing for neither. */
-    static Map<String, String> environment(String home, boolean ui) {
+    public static Map<String, String> environment(String home, boolean ui) {
         Map<String, String> out = new LinkedHashMap<>();
         if (!home.isBlank()) out.put(HOME_ENV, Path.of(home.strip()).toAbsolutePath().normalize().toString());
         if (ui) out.put(UI_ENV, "1");

@@ -5,6 +5,13 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Changed
+
+- `botmaker studio dev` starts Studio with the assistant's `ui` tool on, so Claude can read and press its windows
+  without restarting it; `--no-ui` starts it without. The released Studio never serves it.
+
 ## [0.14.1] — 2026-11-22
 
 ### Added
