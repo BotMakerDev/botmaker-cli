@@ -102,7 +102,7 @@ class McpBridgeTest {
         try (ServerSocket free = new ServerSocket(0)) {
             port = free.getLocalPort();
         }
-        start(port, Optional.of(new McpBridge.Launch(List.of("false"), null, "%s", dir.resolve("studio-run.log"))));
+        start(port, Optional.of(new McpBridge.Launch(List.of("false"), null, "%s", dir.resolve("studio-run.log"), Map.of())));
         send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"start_studio\"}}");
         JsonNode stopped = answer(1);
         assertTrue(stopped.at("/result/isError").asBoolean());
@@ -118,7 +118,7 @@ class McpBridgeTest {
         Path seen = dir.resolve("seen.txt");
         start(port, Optional.of(new McpBridge.Launch(List.of("sh", "-c",
                 "printf '%s %s' \"$BOTMAKER_HOME\" \"$BOTMAKER_MCP_UI\" > '" + seen + "'; exit 3"), null, "%s",
-                dir.resolve("studio-run.log"))));
+                dir.resolve("studio-run.log"), Map.of())));
         Path sandbox = dir.resolve("sandbox");
         send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"start_studio\","
                 + "\"arguments\":{\"home\":\"" + sandbox + "\",\"ui\":true}}}");
