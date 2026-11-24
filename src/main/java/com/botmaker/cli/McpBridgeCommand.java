@@ -51,8 +51,9 @@ final class McpBridgeCommand implements Callable<Integer> {
         Optional<Path> checkout = StudioPlaces.umbrellaFirst(umbrella, studioCommand);
         if (checkout.isPresent()) {
             Path dir = checkout.get();
+            // The dev Studio reloads what Claude recompiles while it runs (DevStudio).
             return Optional.of(Launch.of(List.of(Mvn.executable(dir), "-B", "-o", "-pl", "botmaker-studio",
-                    "javafx:run"), dir, "-Djavafx.args=--project=%s"));
+                    DevStudio.PROFILE, "javafx:run"), dir, "-Djavafx.args=--project=%s", DevStudio.environment()));
         }
         return StudioPlaces.released(studioCommand).map(argv -> Launch.of(argv, null, "--project=%s"));
     }

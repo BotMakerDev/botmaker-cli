@@ -155,7 +155,8 @@ final class PluginRunCommand implements Callable<Integer> {
 
         Optional<Path> checkout = StudioPlaces.umbrellaFirst(umbrella, studioCommand);
         if (checkout.isPresent()) {
-            List<String> goals = new ArrayList<>(List.of("-pl", "botmaker-studio", "-am", "javafx:run"));
+            List<String> goals = new ArrayList<>(List.of("-pl", "botmaker-studio", "-am", DevStudio.PROFILE,
+                    "javafx:run"));
             if (projectArg != null) {
                 goals.add("-Djavafx.args=" + projectArg);
             }

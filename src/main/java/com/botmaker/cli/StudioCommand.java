@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -134,9 +135,12 @@ final class StudioCommand implements Callable<Integer> {
                     return 1;
                 }
             }
-            List<String> argv = new ArrayList<>(List.of(mvn, "-B", "-o", "-pl", "botmaker-studio", "javafx:run"));
+            List<String> argv = new ArrayList<>(List.of(mvn, "-B", "-o", "-pl", "botmaker-studio", DevStudio.PROFILE,
+                    "javafx:run"));
             if (project != null && !project.isBlank()) argv.add("-Djavafx.args=--project=" + project.strip());
-            return detached(console, argv, checkout, "studio-dev.log", McpBridge.environment("", !noUi));
+            Map<String, String> environment = new LinkedHashMap<>(DevStudio.environment());
+            environment.putAll(McpBridge.environment("", !noUi));
+            return detached(console, argv, checkout, "studio-dev.log", environment);
         }
 
         private static int run(List<String> argv, Path dir) throws IOException {

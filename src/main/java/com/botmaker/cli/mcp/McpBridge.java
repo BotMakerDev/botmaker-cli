@@ -66,14 +66,20 @@ public final class McpBridge {
      * How start_studio starts Studio: {@code command} run in {@code dir}, and {@code projectArg} the argument it takes
      * for a project to open, {@code %s} standing for the project's name; what it prints goes to {@code log}.
      */
-    public record Launch(List<String> command, Path dir, String projectArg, Path log) {
+    public record Launch(List<String> command, Path dir, String projectArg, Path log, Map<String, String> environment) {
         public Launch {
             command = List.copyOf(command);
+            environment = Map.copyOf(environment);
         }
 
         /** {@code command} with its output in Studio's cache folder, beside its {@code mcp.json}. */
         public static Launch of(List<String> command, Path dir, String projectArg) {
-            return new Launch(command, dir, projectArg, cacheRoot().resolve("studio-run.log"));
+            return of(command, dir, projectArg, Map.of());
+        }
+
+        /** {@link #of(List, Path, String)} with variables added to Studio's own environment. */
+        public static Launch of(List<String> command, Path dir, String projectArg, Map<String, String> environment) {
+            return new Launch(command, dir, projectArg, cacheRoot().resolve("studio-run.log"), environment);
         }
     }
 
@@ -483,6 +489,7 @@ public final class McpBridge {
             // Never this process's stdout: that is the protocol.
             ProcessBuilder builder = new ProcessBuilder(argv).directory(how.dir() == null ? null : how.dir().toFile())
                     .redirectErrorStream(true).redirectOutput(log.toFile());
+            builder.environment().putAll(how.environment());
             builder.environment().putAll(asked);
             process = builder.start();
             launchedWith = asked;

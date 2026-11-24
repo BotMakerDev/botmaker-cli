@@ -5,6 +5,14 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- The dev Studio that `botmaker studio start`, `botmaker plugin run --umbrella` and `start_studio` start from a checkout
+  reloads recompiled classes while it runs: `-Pdevreload`, on a JetBrains Runtime from `$BOTMAKER_JBR` or `~/.jdks/jbr-*`
+  (`DevStudio`).
+
 ## [0.14.3] — 2026-11-24
 
 ### Changed
