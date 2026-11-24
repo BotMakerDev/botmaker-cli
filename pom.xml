@@ -12,7 +12,7 @@
     -->
     <groupId>com.github.BotMakerDev</groupId>
     <artifactId>botmaker-cli</artifactId>
-    <version>0.14.3-SNAPSHOT</version>
+    <version>0.14.3</version>
     <licenses>
         <license>
             <name>PolyForm-Noncommercial-1.0.0</name>
@@ -65,11 +65,11 @@
         -->
         <botmaker.cli.version>dev</botmaker.cli.version>
         <!-- Each upstream's main version; a release commit sets the released ones (doc 43). -->
-        <botmaker.studioapi.version>0.19.2-SNAPSHOT</botmaker.studioapi.version>
-        <botmaker.pluginhost.version>0.14.2-SNAPSHOT</botmaker.pluginhost.version>
-        <botmaker.java.version>0.4.2-SNAPSHOT</botmaker.java.version>
-        <botmaker.pluginarchetype.version>0.11.2-SNAPSHOT</botmaker.pluginarchetype.version>
-        <botmaker.runlog.version>0.2.1-SNAPSHOT</botmaker.runlog.version>
+        <botmaker.studioapi.version>v0.20.0</botmaker.studioapi.version>
+        <botmaker.pluginhost.version>v0.14.2</botmaker.pluginhost.version>
+        <botmaker.java.version>v0.4.2</botmaker.java.version>
+        <botmaker.pluginarchetype.version>v0.11.2</botmaker.pluginarchetype.version>
+        <botmaker.runlog.version>v0.2.0</botmaker.runlog.version>
     </properties>
 
     <repositories>
