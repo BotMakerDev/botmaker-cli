@@ -3,6 +3,7 @@
 
 package com.botmaker.cli.mcp;
 
+import com.botmaker.cli.ai.AiTool;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -435,7 +436,7 @@ public final class McpBridge {
         ObjectNode result = json.createObjectNode();
         result.put("protocolVersion", clientInit.path("protocolVersion").asText(FALLBACK_PROTOCOL));
         result.putObject("capabilities").putObject("tools").put("listChanged", true);
-        result.putObject("serverInfo").put("name", "botmaker-studio").put("version", "bridge");
+        result.putObject("serverInfo").put("name", AiTool.SERVER).put("version", "bridge");
         result.put("instructions", "BotMaker's core is not running, and no Studio has told this computer how to start "
                 + "one. start_studio starts Studio; its tools appear here once it runs.");
         return result;

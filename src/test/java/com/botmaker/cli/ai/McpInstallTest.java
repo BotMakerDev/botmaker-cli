@@ -50,11 +50,11 @@ class McpInstallTest {
         Files.writeString(file, """
                 model = "gpt-5"
 
-                [mcp_servers.botmaker-studio]
+                [mcp_servers.botmaker]
                 command = 'old'
                 args = []
 
-                [mcp_servers.botmaker-studio.env]
+                [mcp_servers.botmaker.env]
                 X = '1'
 
                 [mcp_servers.other]
@@ -64,7 +64,7 @@ class McpInstallTest {
         String text = Files.readString(file);
         assertTrue(text.startsWith("model = \"gpt-5\"\n\n[mcp_servers.other]\ncommand = 'other'\n\n"), text);
         assertTrue(text.endsWith("""
-                [mcp_servers.botmaker-studio]
+                [mcp_servers.botmaker]
                 command = '/jdk/bin/java'
                 args = ['-jar','/u/botmaker-cli/target/b-all.jar','mcp-bridge','--umbrella','/u']
                 env = { MAVEN_HOME = '/opt/maven' }
@@ -85,8 +85,8 @@ class McpInstallTest {
     @Test
     void aCodexConfigItCannotBeSureOfIsLeftAlone() throws IOException {
         Path file = home.resolve("config.toml");
-        for (String mine : List.of("notes = '''\n[x]\n'''\n", "mcp_servers.botmaker-studio.command = 'x'\n",
-                "[mcp_servers]\nbotmaker-studio = { command = 'x' }\n")) {
+        for (String mine : List.of("notes = '''\n[x]\n'''\n", "mcp_servers.botmaker.command = 'x'\n",
+                "[mcp_servers]\nbotmaker = { command = 'x' }\n", "mcp_servers.\"botmaker\".args = []\n")) {
             Files.writeString(file, mine);
             assertEquals(McpInstall.Result.LEFT_ALONE, McpInstall.codex(file, SERVER).result(), mine);
             assertEquals(mine, Files.readString(file));

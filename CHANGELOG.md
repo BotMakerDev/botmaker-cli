@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- The MCP server is named `botmaker`, for the core it serves with or without Studio, not `botmaker-studio`: its
+  tools are `mcp__botmaker__*`. Register it again with `botmaker mcp install <tool>`; remove the old entry yourself.
+
 ### Fixed
 
 - `start_studio` without `home`, after one with a sandbox `home`, waited three minutes on the sandbox's core, which the

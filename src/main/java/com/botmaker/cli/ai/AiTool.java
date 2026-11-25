@@ -43,7 +43,7 @@ public enum AiTool {
     UNKNOWN("unknown", "Unknown tool", "", "");
 
     /** The name the server is registered under in every tool, which is also Claude Code's tool prefix. */
-    public static final String SERVER = "botmaker-studio";
+    public static final String SERVER = "botmaker";
     /** The environment variable Codex reads the bearer token from. */
     static final String TOKEN_ENV = "BOTMAKER_MCP_TOKEN";
 

@@ -36,10 +36,16 @@ public final class McpInstall {
     private static final ObjectMapper JSON = new ObjectMapper();
     static final String OPENCODE_SCHEMA = "https://opencode.ai/config.json";
 
-    /** A table header of the server's own, or of one nested in it: {@code [mcp_servers.botmaker-studio.env]}. */
+    private static final String NAME = Pattern.quote(AiTool.SERVER);
+    /** A table header of the server's own, or of one nested in it: {@code [mcp_servers.botmaker.env]}. */
     private static final Pattern CODEX_OWN_HEADER = Pattern.compile(
-            "\\[\\s*mcp_servers\\s*\\.\\s*(\"" + Pattern.quote(AiTool.SERVER) + "\"|" + Pattern.quote(AiTool.SERVER)
-                    + ")\\s*(\\.[^]]*)?]\\s*(#.*)?");
+            "\\[\\s*mcp_servers\\s*\\.\\s*(\"" + NAME + "\"|" + NAME + ")\\s*(\\.[^]]*)?]\\s*(#.*)?");
+    /**
+     * The server named as a key outside its table: a dotted key, or a key of an {@code [mcp_servers]} table. A path
+     * holding the name ({@code /opt/botmaker/bin}) is not one.
+     */
+    private static final Pattern CODEX_NAMED = Pattern.compile(
+            "(^|mcp_servers\\s*\\.\\s*)(\"" + NAME + "\"|" + NAME + ")\\s*[.=]");
 
     private McpInstall() {}
 
@@ -158,7 +164,7 @@ public final class McpInstall {
             if (bare.startsWith("[")) inOwn = CODEX_OWN_HEADER.matcher(bare).matches();
             if (!inOwn) kept.add(line);
         }
-        if (kept.stream().anyMatch(l -> l.contains(AiTool.SERVER))) {
+        if (kept.stream().anyMatch(l -> CODEX_NAMED.matcher(l.strip()).find())) {
             return new Done(Result.LEFT_ALONE, file, "it names " + AiTool.SERVER + " outside its own table");
         }
         String rest = String.join("\n", kept).stripTrailing();
