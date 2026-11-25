@@ -127,6 +127,14 @@ class McpBridgeTest {
     }
 
     @Test
+    void aStartWithoutAHomeGoesBackToTheUsersCore(@TempDir Path dir) {
+        Path own = dir.resolve("cache");
+        Path sandbox = dir.resolve("sandbox");
+        assertEquals(sandbox.resolve("core"), McpBridge.coreFor(McpBridge.environment(sandbox.toString(), true), own));
+        assertEquals(own, McpBridge.coreFor(McpBridge.environment("", true), own));
+    }
+
+    @Test
     void neitherSandboxNorFlagAddsNothing() {
         assertEquals(Map.of(), McpBridge.environment("", false));
         assertEquals(Map.of("BOTMAKER_MCP_UI", "1"), McpBridge.environment(" ", true));

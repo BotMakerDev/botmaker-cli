@@ -123,8 +123,11 @@ public final class McpBridge {
     private volatile Supplier<Optional<Upstream>> upstream;
     private final Optional<Launch> launch;
     private volatile CoreStart coreStart;
-    /** True for {@link #onThisComputer}: a sandbox home start_studio is given moves the core it talks to there. */
-    private final boolean followsHome;
+    /**
+     * The user's own core folder for {@link #onThisComputer}, null for a bridge that never moves: start_studio moves
+     * the core it talks to into the sandbox home it is given, and back here when it is given none.
+     */
+    private final Path ownCore;
     /** Why the last start of the core failed, and when; null after none failed. Under {@link #starting}. */
     private String startFailed;
     private long startFailedAt;
@@ -173,15 +176,15 @@ public final class McpBridge {
     /** @param coreStart starts BotMaker's core when a client's request finds none answering */
     public McpBridge(Supplier<Optional<Upstream>> upstream, Optional<Launch> launch, CoreStart coreStart,
             InputStream in, OutputStream out, Duration poll) {
-        this(upstream, launch, coreStart, false, in, out, poll);
+        this(upstream, launch, coreStart, null, in, out, poll);
     }
 
     private McpBridge(Supplier<Optional<Upstream>> upstream, Optional<Launch> launch, CoreStart coreStart,
-            boolean followsHome, InputStream in, OutputStream out, Duration poll) {
+            Path ownCore, InputStream in, OutputStream out, Duration poll) {
         this.upstream = upstream;
         this.launch = launch;
         this.coreStart = coreStart;
-        this.followsHome = followsHome;
+        this.ownCore = ownCore;
         this.in = in;
         this.out = out;
         this.poll = poll;
@@ -194,7 +197,17 @@ public final class McpBridge {
      */
     public static McpBridge onThisComputer(Optional<Launch> launch, InputStream in, OutputStream out, Duration poll) {
         Path dir = coreDir();
-        return new McpBridge(fromStudioConfig(dir), launch, coreProcess(dir, launch), true, in, out, poll);
+        return new McpBridge(fromStudioConfig(dir), launch, coreProcess(dir, launch), dir, in, out, poll);
+    }
+
+    /**
+     * The core folder a Studio started with {@code asked} ties to: its sandbox home's, else {@code own}. Without the
+     * way back, a start without a home after one with a home would wait on the sandbox's core, which that Studio never
+     * reaches (2026-11-25).
+     */
+    static Path coreFor(Map<String, String> asked, Path own) {
+        String home = asked.get(HOME_ENV);
+        return home == null ? own : Path.of(home).resolve("core");
     }
 
     /** The core in {@code dir}, its command made from the checkout start_studio runs, when no Studio saved one. */
@@ -477,8 +490,8 @@ public final class McpBridge {
                     + "dev Studio, through javafx:run) or --studio <command>, or set BOTMAKER_UMBRELLA or "
                     + "BOTMAKER_STUDIO.", true);
         }
-        // A sandbox Studio's core keeps its files under its home: talk to that one from now on.
-        if (followsHome && asked.containsKey(HOME_ENV)) follow(Path.of(asked.get(HOME_ENV)).resolve("core"));
+        // A sandbox Studio's core keeps its files under its home, the user's Studio under the user's: talk to that one.
+        if (ownCore != null) follow(coreFor(asked, ownCore));
         Launch how = launch.get();
         List<String> argv = new ArrayList<>(how.command());
         if (!project.isBlank()) argv.add(how.projectArg().formatted(project.strip()));

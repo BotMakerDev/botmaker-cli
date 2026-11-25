@@ -7,6 +7,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- `start_studio` without `home`, after one with a sandbox `home`, waited three minutes on the sandbox's core, which the
+  user's Studio never reaches, and the bridge started a stray core there; it now talks to the user's own core again
+  (`McpBridge.coreFor`).
+
 ### Added
 
 - The dev Studio that `botmaker studio start`, `botmaker plugin run --umbrella` and `start_studio` start from a checkout
