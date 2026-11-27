@@ -5,6 +5,14 @@ All notable changes to `botmaker-cli`.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this module uses
 [semantic versioning](https://semver.org/). `release.sh` refuses to cut a version with no section here.
 
+## [Unreleased]
+
+### Added
+
+- `botmaker core pilot [status|start|stop|reset]` (2026-11-27): the core's Remote Pilot from the shell, over
+  `POST /pilot` with the bearer. `start --transport tailnet|funnel|quick-tunnel|lan` prints the pairing QR and link
+  only to a terminal, never to a pipe. Exit 0 done, 1 refused, 2 no core.
+
 ## [0.14.4] — 2026-11-25
 
 ### Changed

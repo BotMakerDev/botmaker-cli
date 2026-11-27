@@ -5,6 +5,7 @@ package com.botmaker.cli;
 
 import com.botmaker.cli.core.CoreCards;
 import com.botmaker.cli.core.CoreFeed;
+import com.botmaker.cli.core.CorePilot;
 import com.botmaker.cli.core.CoreFeed.Frame;
 import com.botmaker.cli.core.CoreFeed.Kind;
 import com.botmaker.cli.mcp.CoreTools;
@@ -15,6 +16,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.io.Console;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.ConnectException;
@@ -47,7 +49,8 @@ import java.util.concurrent.Callable;
         synopsisSubcommandLabel = "<command>",
         subcommands = {CoreCommand.Status.class, CoreCommand.Watch.class, CoreCommand.Dashboard.class,
                 CoreCommand.Start.class, CoreCommand.Quit.class, CoreCommand.Restart.class, CoreCommand.Stop.class,
-                CoreCommand.Open.class, CoreCommand.Close.class, CoreCommand.Reload.class})
+                CoreCommand.Open.class, CoreCommand.Close.class, CoreCommand.Reload.class,
+                CoreCommand.Pilot.class})
 final class CoreCommand implements Callable<Integer> {
 
     /** How long the core has to send what it is once the feed is open. */
@@ -192,6 +195,64 @@ final class CoreCommand implements Callable<Integer> {
         @Override
         public Integer call() {
             return act(Core.onThisComputer(), Act.close(keepRun), System.out, System.err);
+        }
+    }
+
+    /**
+     * The Remote Pilot of the core's open project (2026-11-27): status, start, stop, reset. Asked of the core over
+     * {@code POST /pilot} with the bearer, never through an MCP tool, so no assistant session reads the pairing link;
+     * the link and its QR are printed only to a terminal.
+     */
+    @Command(name = "pilot", header = "The Remote Pilot: status, start, stop, reset the token.",
+            description = "Streams the open bot's game to the BotPilot phone app. 'start' prints the pairing QR code to a "
+                    + "terminal; the QR and link are never printed to a pipe, because anyone holding them controls the "
+                    + "game.%n%nExit 0: done; 1: the core refused (no project open, no way to reach a phone); 2: no "
+                    + "core runs.",
+            mixinStandardHelpOptions = true)
+    static final class Pilot implements Callable<Integer> {
+        @CommandLine.Parameters(index = "0", arity = "0..1", defaultValue = "status",
+                description = "status (default), start, stop or reset.")
+        private String act;
+        @Option(names = "--transport", description = "For start: tailnet, funnel, quick-tunnel or lan. Funnel and "
+                + "quick-tunnel are public internet; the way is remembered.")
+        private String transport;
+
+        @Override
+        public Integer call() {
+            if (!List.of("status", "start", "stop", "reset").contains(act)) {
+                System.err.println("Unknown act '" + act + "': status, start, stop or reset.");
+                return 1;
+            }
+            Optional<CoreFeed.At> at = CoreFeed.onThisComputer();
+            if (at.isEmpty()) return noCore(System.err);
+            JsonNode state;
+            try {
+                state = CorePilot.ask(at.get(), act, "start".equals(act) ? transport : null);
+            } catch (ConnectException nobody) {
+                return noCore(System.err);
+            } catch (CorePilot.Refused refused) {
+                System.err.println(refused.getMessage());
+                return 1;
+            } catch (IOException unreachable) {
+                System.err.println(unreachable.getMessage());
+                return NO_CORE;
+            }
+            CorePilot.describe(state).forEach(System.out::println);
+            if (CorePilot.link(state) != null && ("start".equals(act) || "status".equals(act))) showLink(state);
+            return "start".equals(act) && !"ON".equals(state.path("phase").asText()) ? 1 : 0;
+        }
+
+        private static void showLink(JsonNode state) {
+            Console console = System.console();
+            if (console == null || !console.isTerminal()) {
+                System.out.println("The pairing code is shown only in a terminal: run this command in one.");
+                return;
+            }
+            System.out.println();
+            CorePilot.qr(state).forEach(System.out::println);
+            System.out.println();
+            System.out.println("Scan it with BotPilot, or open: " + CorePilot.link(state));
+            System.out.println("'botmaker core pilot reset' revokes it.");
         }
     }
 

@@ -49,7 +49,8 @@ became BotMaker's release engine; `botmaker release` now only says so (`MovedCom
   `CLAUDE.md` names what), and `CoreCards` is the page's summary ported. The token goes only to a core that answered
   `/mcp-hello`'s proof (`McpBridge.proven`), and only a link that is `http`, the core's host and port and path
   `/dashboard` reaches the OS opener; the key is never printed. `start`, `quit`, `restart`, `stop`, `open`, `close`
-  and `reload` are each a `CoreCommand.Act` of one `Tool`; only `start`, `open` and `restart` start a core
+  and `reload` are each a `CoreCommand.Act` of one `Tool`; `pilot` is not a tool: `core.CorePilot` posts to the core's
+  `/pilot` with the bearer (2026-11-27) and prints the pairing QR and link only to a terminal; only `start`, `open` and `restart` start a core
   (`CoreTools.onThisComputer`), the rest go through `CoreTools.runningOnThisComputer`, which starts none. Exit 0 done,
   1 refused, 2 no core or unreachable (an answer marked `McpBridge.UNREACHED`).
 - **No dependency on `botmaker-studio` or the toolkit**: copy file shapes, never depend on an application
